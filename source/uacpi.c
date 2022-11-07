@@ -28,3 +28,88 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "<invalid status>";
     }
 }
+
+UACPI_PACKED(struct uacpi_rxsdt {
+    struct acpi_sdt_hdr;
+    uacpi_u8 ptr_bytes[];
+};)
+
+static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
+                                          uacpi_size entry_size)
+{
+    struct uacpi_rxsdt *rxsdt;
+    uacpi_size i, entry_bytes, map_len;
+    uacpi_phys_addr entry_addr;
+    uacpi_status ret;
+
+    rxsdt = uacpi_kernel_map(rxsdt_addr, sizeof(*rxsdt));
+    if (rxsdt == UACPI_NULL)
+        return UACPI_STATUS_MAPPING_FAILED;
+
+    ret = uacpi_check_tbl_signature_with_warn(rxsdt,
+        entry_size == 8 ? ACPI_XSDT_SIGNATURE : ACPI_RSDT_SIGNATURE);
+    if (uacpi_unlikely_error(ret))
+        goto error_out;
+
+    map_len = rxsdt->length;
+    uacpi_kernel_unmap(rxsdt, sizeof(*rxsdt));
+
+    if (uacpi_unlikely(map_len < (sizeof(*rxsdt) + entry_size)))
+        return UACPI_STATUS_INVALID_TABLE_LENGTH;
+
+    // Make sure length is aligned to entry size so we don't OOB
+    entry_bytes = map_len - sizeof(*rxsdt);
+    entry_bytes &= ~(entry_size - 1);
+
+    rxsdt = uacpi_kernel_map(rxsdt_addr, map_len);
+    if (uacpi_unlikely(rxsdt == UACPI_NULL))
+        return UACPI_STATUS_MAPPING_FAILED;
+
+    ret = uacpi_verify_table_checksum_with_warn(rxsdt, map_len);
+    if (uacpi_unlikely_error(ret))
+        goto error_out;
+
+    for (i = 0; i < entry_bytes; i += entry_size) {
+        uacpi_u64 entry_phys_addr_large = 0;
+        uacpi_memcpy(&entry_phys_addr_large, &rxsdt->ptr_bytes[i], entry_size);
+
+        if (!entry_phys_addr_large)
+            continue;
+
+        entry_addr = uacpi_truncate_phys_addr_with_warn(entry_phys_addr_large);
+        uacpi_table_append(entry_addr);
+    }
+
+    ret = UACPI_STATUS_OK;
+
+error_out:
+    uacpi_kernel_unmap(rxsdt, map_len);
+    return ret;
+}
+
+uacpi_status uacpi_initialize(struct uacpi_init_params *params)
+{
+    struct acpi_rsdp *rsdp;
+    uacpi_phys_addr rxsdt;
+    uacpi_size rxsdt_entry_size;
+
+    uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params, sizeof(params->rt_params));
+
+    rsdp = uacpi_kernel_map(params->rsdp, sizeof(struct acpi_rsdp));
+    if (rsdp == UACPI_NULL)
+        return UACPI_STATUS_MAPPING_FAILED;
+
+    if (rsdp->revision > 0 &&
+        !uacpi_rt_params_check(UACPI_PARAM_BAD_XSDT))
+    {
+        rxsdt = uacpi_truncate_phys_addr_with_warn(rsdp->xsdt_addr);
+        rxsdt_entry_size = 8;
+    } else {
+        rxsdt = (uacpi_phys_addr)rsdp->rsdt_addr;
+        rxsdt_entry_size = 4;
+    }
+
+    uacpi_kernel_unmap(rsdp, sizeof(struct acpi_rsdp));
+
+    return initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
+}
