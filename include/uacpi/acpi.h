@@ -1,8 +1,8 @@
 #pragma once
 
-#include <stdint.h>
-#include <uacpi/internal/attributes.h>
+#include <uacpi/internal/compiler.h>
 #include <uacpi/internal/helpers.h>
+#include <uacpi/types.h>
 
 /*
  * -----------------------------------------------------
