@@ -40,50 +40,50 @@
 #define ACPI_ACCESS_QWORD 4
 
 UACPI_PACKED(struct acpi_gas {
-    uint8_t address_space_id;
-    uint8_t register_bit_width;
-    uint8_t register_bit_offset;
-    uint8_t access_size;
-    uint64_t address;
-});
+    uacpi_u8 address_space_id;
+    uacpi_u8 register_bit_width;
+    uacpi_u8 register_bit_offset;
+    uacpi_u8 access_size;
+    uacpi_u64 address;
+};)
 UACPI_EXPECT_SIZEOF(struct acpi_gas, 12);
 
 UACPI_PACKED(struct acpi_rsdp {
     char signature[8];
-    uint8_t checksum;
+    uacpi_u8 checksum;
     char oemid[6];
-    uint8_t revision;
-    uint32_t rsdt_addr;
+    uacpi_u8 revision;
+    uacpi_u32 rsdt_addr;
 
     // vvvv available if .revision >= 2.0 only
-    uint32_t length;
-    uint64_t xsdt_addr;
-    uint8_t extended_checksum;
-    uint8_t rsvd[3];
-});
+    uacpi_u32 length;
+    uacpi_u64 xsdt_addr;
+    uacpi_u8 extended_checksum;
+    uacpi_u8 rsvd[3];
+};)
 UACPI_EXPECT_SIZEOF(struct acpi_rsdp, 36);
 
 struct acpi_sdt_hdr {
     char signature[4];
-    uint32_t length;
-    uint8_t revision;
-    uint8_t checksum;
+    uacpi_u32 length;
+    uacpi_u8 revision;
+    uacpi_u8 checksum;
     char oemid[6];
     char oem_table_id[8];
-    uint32_t oem_revision;
-    uint32_t creator_id;
-    uint32_t creator_revision;
+    uacpi_u32 oem_revision;
+    uacpi_u32 creator_id;
+    uacpi_u32 creator_revision;
 };
 UACPI_EXPECT_SIZEOF(struct acpi_sdt_hdr, 36);
 
 struct acpi_rsdt {
     struct acpi_sdt_hdr hdr;
-    uint32_t entries[];
+    uacpi_u32 entries[];
 };
 
 struct acpi_xsdt {
     struct acpi_sdt_hdr hdr;
-    uint64_t entries[];
+    uacpi_u64 entries[];
 };
 
 // acpi_fdt->iapc_flags
@@ -124,50 +124,50 @@ struct acpi_xsdt {
 
 UACPI_PACKED(struct acpi_fadt {
     struct acpi_sdt_hdr hdr;
-    uint32_t firmware_ctrl;
-    uint32_t dsdt;
-    uint8_t int_model;
-    uint8_t preferred_pm_profile;
-    uint16_t sci_int;
-    uint32_t smi_cmd;
-    uint8_t acpi_enable;
-    uint8_t acpi_disable;
-    uint8_t s4bios_req;
-    uint8_t pstate_cnt;
-    uint32_t pm1a_evt_blk;
-    uint32_t pm1b_evt_blk;
-    uint32_t pm1a_cnt_blk;
-    uint32_t pm1b_cnt_blk;
-    uint32_t pm2_cnt_blk;
-    uint32_t pm_tmr_blk;
-    uint32_t gpe0_blk;
-    uint32_t gpe1_blk;
-    uint8_t pm1_evt_len;
-    uint8_t pm1_cnt_len;
-    uint8_t pm2_cnt_len;
-    uint8_t pm_tmr_len;
-    uint8_t gpe0_blk_len;
-    uint8_t gpe1_blk_len;
-    uint8_t gpe1_base;
-    uint8_t cst_cnt;
-    uint16_t p_lvl2_lat;
-    uint16_t p_lvl3_lat;
-    uint16_t flush_size;
-    uint16_t flush_stride;
-    uint8_t duty_offset;
-    uint8_t duty_width;
-    uint8_t day_alrm;
-    uint8_t mon_alrm;
-    uint8_t century;
-    uint16_t iapc_boot_arch;
-    uint8_t rsvd;
-    uint32_t flags;
+    uacpi_u32 firmware_ctrl;
+    uacpi_u32 dsdt;
+    uacpi_u8 int_model;
+    uacpi_u8 preferred_pm_profile;
+    uacpi_u16 sci_int;
+    uacpi_u32 smi_cmd;
+    uacpi_u8 acpi_enable;
+    uacpi_u8 acpi_disable;
+    uacpi_u8 s4bios_req;
+    uacpi_u8 pstate_cnt;
+    uacpi_u32 pm1a_evt_blk;
+    uacpi_u32 pm1b_evt_blk;
+    uacpi_u32 pm1a_cnt_blk;
+    uacpi_u32 pm1b_cnt_blk;
+    uacpi_u32 pm2_cnt_blk;
+    uacpi_u32 pm_tmr_blk;
+    uacpi_u32 gpe0_blk;
+    uacpi_u32 gpe1_blk;
+    uacpi_u8 pm1_evt_len;
+    uacpi_u8 pm1_cnt_len;
+    uacpi_u8 pm2_cnt_len;
+    uacpi_u8 pm_tmr_len;
+    uacpi_u8 gpe0_blk_len;
+    uacpi_u8 gpe1_blk_len;
+    uacpi_u8 gpe1_base;
+    uacpi_u8 cst_cnt;
+    uacpi_u16 p_lvl2_lat;
+    uacpi_u16 p_lvl3_lat;
+    uacpi_u16 flush_size;
+    uacpi_u16 flush_stride;
+    uacpi_u8 duty_offset;
+    uacpi_u8 duty_width;
+    uacpi_u8 day_alrm;
+    uacpi_u8 mon_alrm;
+    uacpi_u8 century;
+    uacpi_u16 iapc_boot_arch;
+    uacpi_u8 rsvd;
+    uacpi_u32 flags;
     struct acpi_gas reset_reg;
-    uint8_t reset_value;
-    uint16_t arm_boot_arch;
-    uint8_t fadt_minor_verison;
-    uint64_t x_firmware_ctrl;
-    uint64_t x_dsdt;
+    uacpi_u8 reset_value;
+    uacpi_u16 arm_boot_arch;
+    uacpi_u8 fadt_minor_verison;
+    uacpi_u64 x_firmware_ctrl;
+    uacpi_u64 x_dsdt;
     struct acpi_gas x_pm1a_evt_blk;
     struct acpi_gas x_pm1b_evt_blk;
     struct acpi_gas x_pm1a_cnt_blk;
@@ -178,8 +178,8 @@ UACPI_PACKED(struct acpi_fadt {
     struct acpi_gas x_gpe1_blk;
     struct acpi_gas sleep_control_reg;
     struct acpi_gas sleep_status_reg;
-    uint64_t hypervisor_vendor_identity;
-});
+    uacpi_u64 hypervisor_vendor_identity;
+};)
 UACPI_EXPECT_SIZEOF(struct acpi_fadt, 276);
 
 // acpi_facs->flags
@@ -191,25 +191,25 @@ UACPI_EXPECT_SIZEOF(struct acpi_fadt, 276);
 
 UACPI_PACKED(struct acpi_facs {
     char signature[4];
-    uint32_t length;
-    uint32_t hardware_signature;
-    uint32_t firmware_waking_vector;
-    uint32_t global_lock;
-    uint32_t flags;
-    uint64_t x_firmware_waking_vector;
-    uint8_t version;
+    uacpi_u32 length;
+    uacpi_u32 hardware_signature;
+    uacpi_u32 firmware_waking_vector;
+    uacpi_u32 global_lock;
+    uacpi_u32 flags;
+    uacpi_u64 x_firmware_waking_vector;
+    uacpi_u8 version;
     char rsvd0[3];
-    uint32_t ospm_flags;
+    uacpi_u32 ospm_flags;
     char rsvd1[24];
-});
+};)
 UACPI_EXPECT_SIZEOF(struct acpi_facs, 64);
 
 UACPI_PACKED(struct acpi_dsdt {
     struct acpi_sdt_hdr hdr;
-    uint8_t definition_block[];
-});
+    uacpi_u8 definition_block[];
+};)
 
 UACPI_PACKED(struct acpi_ssdt {
     struct acpi_sdt_hdr hdr;
-    uint8_t definition_block[];
-});
+    uacpi_u8 definition_block[];
+};)
