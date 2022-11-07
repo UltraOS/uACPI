@@ -113,3 +113,13 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 
     return initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
 }
+
+uacpi_status uacpi_namespace_load(void)
+{
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_namespace_initialize(void)
+{
+    return UACPI_STATUS_OK;
+}
