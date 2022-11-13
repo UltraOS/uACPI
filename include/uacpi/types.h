@@ -1,3 +1,4 @@
+#pragma once
 #include <uacpi/platform/types.h>
 #include <uacpi/platform/compiler.h>
 
