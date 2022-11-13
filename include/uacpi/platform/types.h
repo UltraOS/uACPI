@@ -30,3 +30,5 @@ typedef uintptr_t uacpi_virt_addr;
 typedef size_t uacpi_size;
 
 typedef va_list uacpi_va_list;
+
+typedef char uacpi_char;
