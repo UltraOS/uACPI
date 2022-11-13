@@ -52,6 +52,13 @@ uacpi_status uacpi_namespace_load(void);
  */
 uacpi_status uacpi_namespace_initialize(void);
 
+/*
+ * Evaluate an object within the namespace and get back its value.
+ * Either root_handle or path must be valid.
+ */
+uacpi_status uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path,
+                        uacpi_args *args, uacpi_retval *ret);
+
 #ifdef __cplusplus
 }
 #endif

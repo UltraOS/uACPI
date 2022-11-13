@@ -124,3 +124,15 @@ uacpi_status uacpi_namespace_initialize(void)
 {
     return UACPI_STATUS_OK;
 }
+
+uacpi_status
+uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
+           uacpi_retval *ret)
+{
+    if (!root_handle && !path)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    UACPI_UNUSED(ret);
+    UACPI_UNUSED(args);
+    return UACPI_STATUS_OK;
+}
