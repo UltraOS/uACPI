@@ -4,6 +4,7 @@
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/tables.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
