@@ -143,7 +143,7 @@ get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
     *out_len = hdr->length;
 
     uacpi_kernel_unmap(hdr, sizeof(struct acpi_sdt_hdr));
-    
+
     if (*out_len == 0)
         return UACPI_STATUS_INVALID_TABLE_LENGTH;
 
