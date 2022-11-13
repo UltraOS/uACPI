@@ -94,7 +94,8 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
 
-    uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params, sizeof(params->rt_params));
+    uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
+                 sizeof(params->rt_params));
 
     rsdp = uacpi_kernel_map(params->rsdp, sizeof(struct acpi_rsdp));
     if (rsdp == UACPI_NULL)
