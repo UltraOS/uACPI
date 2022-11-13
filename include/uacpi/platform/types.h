@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 typedef uint8_t uacpi_u8;
 typedef uint16_t uacpi_u16;
