@@ -1,5 +1,6 @@
 #pragma once
 
+#include <uacpi/internal/context.h>
 #include <uacpi/types.h>
 #include <uacpi/status.h>
 

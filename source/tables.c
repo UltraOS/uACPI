@@ -1,5 +1,4 @@
 #include <uacpi/internal/tables.h>
-#include <uacpi/internal/context.h>
 #include <uacpi/internal/utilities.h>
 
 static union uacpi_table_signature fadt_signature = {
