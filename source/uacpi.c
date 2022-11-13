@@ -39,11 +39,11 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
                                           uacpi_size entry_size)
 {
     struct uacpi_rxsdt *rxsdt;
-    uacpi_size i, entry_bytes, map_len;
+    uacpi_size i, entry_bytes, map_len = sizeof(*rxsdt);
     uacpi_phys_addr entry_addr;
     uacpi_status ret;
 
-    rxsdt = uacpi_kernel_map(rxsdt_addr, sizeof(*rxsdt));
+    rxsdt = uacpi_kernel_map(rxsdt_addr, map_len);
     if (rxsdt == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
 
