@@ -11,7 +11,7 @@ extern "C" {
 /*
  * Bad table checksum should be considered a fatal error
  * (table load is fully aborted in this case)
- */ 
+ */
 #define UACPI_PARAM_BAD_CSUM_FATAL (1 << 0)
 
 /*
