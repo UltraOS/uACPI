@@ -45,7 +45,7 @@ UACPI_PACKED(struct acpi_gas {
     uacpi_u8 register_bit_offset;
     uacpi_u8 access_size;
     uacpi_u64 address;
-};)
+})
 UACPI_EXPECT_SIZEOF(struct acpi_gas, 12);
 
 UACPI_PACKED(struct acpi_rsdp {
@@ -60,7 +60,7 @@ UACPI_PACKED(struct acpi_rsdp {
     uacpi_u64 xsdt_addr;
     uacpi_u8 extended_checksum;
     uacpi_u8 rsvd[3];
-};)
+})
 UACPI_EXPECT_SIZEOF(struct acpi_rsdp, 36);
 
 struct acpi_sdt_hdr {
@@ -179,7 +179,7 @@ UACPI_PACKED(struct acpi_fadt {
     struct acpi_gas sleep_control_reg;
     struct acpi_gas sleep_status_reg;
     uacpi_u64 hypervisor_vendor_identity;
-};)
+})
 UACPI_EXPECT_SIZEOF(struct acpi_fadt, 276);
 
 // acpi_facs->flags
@@ -201,15 +201,15 @@ UACPI_PACKED(struct acpi_facs {
     char rsvd0[3];
     uacpi_u32 ospm_flags;
     char rsvd1[24];
-};)
+})
 UACPI_EXPECT_SIZEOF(struct acpi_facs, 64);
 
 UACPI_PACKED(struct acpi_dsdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u8 definition_block[];
-};)
+})
 
 UACPI_PACKED(struct acpi_ssdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u8 definition_block[];
-};)
+})

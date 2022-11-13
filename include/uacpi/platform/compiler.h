@@ -10,11 +10,11 @@
 
     #define UACPI_PACKED(decl)  \
         __pragma(pack(push, 1)) \
-        decl                    \
+        decl;                   \
         __pragma(pack(pop))
 #else
     #define UACPI_ALWAYS_INLINE inline __attribute__((always_inline))
-    #define UACPI_PACKED(decl) decl __attribute__((packed))
+    #define UACPI_PACKED(decl) decl __attribute__((packed));
 #endif
 
 #ifdef __GNUC__

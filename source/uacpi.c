@@ -32,7 +32,7 @@ const char *uacpi_status_to_string(uacpi_status st)
 UACPI_PACKED(struct uacpi_rxsdt {
     struct acpi_sdt_hdr;
     uacpi_u8 ptr_bytes[];
-};)
+})
 
 static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
                                           uacpi_size entry_size)
