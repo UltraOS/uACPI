@@ -1,0 +1,24 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint-python-scripts:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install flake8 & mypy
+        run: |
+          sudo apt update
+          sudo apt install python3 python3-pip
+          pip install flake8 mypy
+
+      - name: Run flake8 on the project
+        run: flake8 tests/*.py
+
+      - name: Run mypy on the project
+        run: mypy --disallow-incomplete-defs --no-implicit-optional tests/*.py
