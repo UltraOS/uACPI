@@ -35,9 +35,9 @@
     #endif
 
     #ifdef __GNUC__
-        #if __x86_64__
+        #if __x86_64__ || defined(__aarch64__)
             #define UACPI_POINTER_SIZE 8
-        #elif defined(__i386__)
+        #elif defined(__i386__) || defined(__arm__)
             #define UACPI_POINTER_SIZE 4
         #endif
     #endif
