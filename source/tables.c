@@ -186,12 +186,17 @@ uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
     if (uacpi_unlikely_error(ret))
         goto out_bad_table;
 
+    if (table->signature.as_u32 == fadt_signature.as_u32) {
+        struct acpi_fadt *fadt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
+        ret = uacpi_table_append(fadt->x_dsdt ? fadt->x_dsdt : fadt->dsdt);
+    }
+
     if (out_table == UACPI_NULL)
         do_release_table(table);
     else
         *out_table = table;
 
-    return UACPI_STATUS_OK;
+    return ret;
 
 out_bad_table:
     table->flags |= UACPI_TABLE_INVALID;
