@@ -11,6 +11,7 @@ typedef uacpi_u64 uacpi_io_addr;
 #endif
 
 typedef void *uacpi_handle;
+typedef struct uacpi_control_method uacpi_control_method;
 
 typedef struct uacpi_buffer {
     void *data;
@@ -39,6 +40,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_BUFFER    = 3,
     UACPI_OBJECT_PACKAGE   = 4,
     UACPI_OBJECT_REFERENCE = 5,
+    UACPI_OBJECT_METHOD    = 6,
 } uacpi_object_type;
 
 typedef union uacpi_object uacpi_object;
@@ -72,6 +74,10 @@ typedef struct uacpi_object_reference {
     uacpi_handle handle;
 } uacpi_object_reference;
 
+typedef struct uacpi_object_control_method {
+    uacpi_object_type type;
+    uacpi_control_method *method;
+} uacpi_object_control_method;
 typedef union uacpi_object {
     uacpi_object_type type;
 
@@ -79,6 +85,7 @@ typedef union uacpi_object {
     uacpi_object_string as_string;
     uacpi_object_buffer as_buffer;
     uacpi_object_package as_package;
+    uacpi_object_control_method as_method;
 } uacpi_object;
 
 typedef struct uacpi_args {
