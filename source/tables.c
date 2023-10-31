@@ -309,11 +309,9 @@ uacpi_table_acquire_by_type(enum uacpi_table_type type,
         };
 
         return do_search_and_acquire(&spec, out_table);
-    } else {
-        return do_acquire_table(*out_table);
     }
 
-    return UACPI_STATUS_OK;
+    return do_acquire_table(*out_table);
 }
 
 uacpi_status
