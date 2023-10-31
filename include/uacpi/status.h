@@ -15,6 +15,9 @@ typedef enum uacpi_status {
     UACPI_STATUS_INVALID_TABLE_LENGTH = 5,
     UACPI_STATUS_NOT_FOUND = 6,
     UACPI_STATUS_INVALID_ARGUMENT = 7,
+    UACPI_STATUS_OUT_OF_BOUNDS = 8,
+    UACPI_STATUS_BAD_BYTECODE = 9,
+    UACPI_STATUS_UNIMPLEMENTED = 10,
 } uacpi_status;
 
 const char *uacpi_status_to_string(uacpi_status);
