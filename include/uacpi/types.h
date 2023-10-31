@@ -95,3 +95,8 @@ typedef struct uacpi_retval {
         uacpi_object object;
     };
 } uacpi_retval;
+
+typedef union uacpi_object_name {
+    uacpi_char text[4];
+    uacpi_u32 id;
+} uacpi_object_name;
