@@ -84,7 +84,9 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
             continue;
 
         entry_addr = uacpi_truncate_phys_addr_with_warn(entry_phys_addr_large);
-        uacpi_table_append(entry_addr);
+        ret = uacpi_table_append(entry_addr);
+        if (uacpi_unlikely_error(ret))
+            return ret;
     }
 
     ret = UACPI_STATUS_OK;
