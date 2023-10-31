@@ -5,6 +5,8 @@
  * that should work for MSVC/GCC/clang.
  */
 
+#define UACPI_ALIGN(x) __declspec(align(x))
+
 #ifdef _MSC_VER
     #define UACPI_ALWAYS_INLINE __forceinline
 
