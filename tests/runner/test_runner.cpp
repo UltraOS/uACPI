@@ -2,7 +2,6 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <format>
 
 #include "helpers.h"
 
@@ -126,15 +125,15 @@ void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
 int main(int argc, char** argv)
 {
     if (argc < 4) {
-        std::cout << std::format("Usage: {} <dsdt_path> <expected_type> "
-                                 "<expected_value>", argv[0]);
+        std::cout << "Usage: " << argv[0]
+                  << "<dsdt_path> <expected_type> <expected_value>";
         return 1;
     }
 
     try {
         run_test(argv[1], string_to_object_type(argv[2]), argv[3]);
     } catch (const std::exception& ex) {
-        std::cout << std::format("ERROR: {}", ex.what());
+        std::cout << "unexpected error: " << ex.what();
         return 1;
     }
 }
