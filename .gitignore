@@ -1,0 +1,6 @@
+.DS_Store
+*.aml
+*.dsl
+.idea/
+cmake-build-*/
+build-*/
