@@ -6,6 +6,7 @@
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/tables.h>
 #include <uacpi/internal/interpreter.h>
+#include <uacpi/internal/namespace.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -151,10 +152,30 @@ uacpi_status
 uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
            uacpi_retval *ret)
 {
+    struct uacpi_namespace_node *node;
+    uacpi_object_name name;
+    uacpi_size len;
+
     if (!root_handle && !path)
         return UACPI_STATUS_INVALID_ARGUMENT;
+    if (!path)
+        return UACPI_STATUS_INVALID_ARGUMENT;
 
-    UACPI_UNUSED(ret);
-    UACPI_UNUSED(args);
-    return UACPI_STATUS_OK;
+    if (path[0] == '\\')
+        path++;
+
+    // TODO: Add support for path resolution
+    len = uacpi_strnlen(path, 4);
+    if (len < 4)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    uacpi_memcpy(&name, path, 4);
+    node = uacpi_namespace_node_find(UACPI_NULL, name);
+
+    if (node == UACPI_NULL)
+        return UACPI_STATUS_NOT_FOUND;
+    if (node->object.type != UACPI_OBJECT_METHOD)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    return uacpi_execute_control_method(node->object.as_method.method, args, ret);
 }
