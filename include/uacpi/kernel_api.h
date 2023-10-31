@@ -10,6 +10,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len);
 void uacpi_kernel_unmap(void *addr, uacpi_size len);
 
 void *uacpi_kernel_alloc(uacpi_size size);
+void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size);
 void uacpi_kernel_free(void *mem);
 
 enum uacpi_log_level {
