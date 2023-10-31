@@ -5,6 +5,7 @@
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/tables.h>
+#include <uacpi/internal/interpreter.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -126,7 +127,19 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 
 uacpi_status uacpi_namespace_load(void)
 {
-    return UACPI_STATUS_OK;
+    struct uacpi_table *tbl;
+    uacpi_status ret;
+    struct uacpi_control_method method;
+
+    ret = uacpi_table_acquire_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    method.code = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
+    method.code += sizeof(struct acpi_sdt_hdr);
+    method.size = tbl->length - sizeof(struct acpi_sdt_hdr);
+
+    return uacpi_execute_control_method(&method, NULL, NULL);
 }
 
 uacpi_status uacpi_namespace_initialize(void)
