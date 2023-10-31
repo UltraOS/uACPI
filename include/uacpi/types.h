@@ -41,6 +41,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_PACKAGE   = 4,
     UACPI_OBJECT_REFERENCE = 5,
     UACPI_OBJECT_METHOD    = 6,
+    UACPI_OBJECT_SPECIAL   = 7,
 } uacpi_object_type;
 
 typedef union uacpi_object uacpi_object;
@@ -78,6 +79,14 @@ typedef struct uacpi_object_control_method {
     uacpi_object_type type;
     uacpi_control_method *method;
 } uacpi_object_control_method;
+
+typedef struct uacpi_object_special {
+    uacpi_object_type type;
+    enum uacpi_special_type {
+        UACPI_SPECIAL_TYPE_DEBUG_OBJECT = 0,
+    } special_type;
+} uacpi_object_special;
+
 typedef union uacpi_object {
     uacpi_object_type type;
 
@@ -86,6 +95,7 @@ typedef union uacpi_object {
     uacpi_object_buffer as_buffer;
     uacpi_object_package as_package;
     uacpi_object_control_method as_method;
+    uacpi_object_special as_special;
 } uacpi_object;
 
 typedef struct uacpi_args {
