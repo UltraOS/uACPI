@@ -7,6 +7,7 @@
 enum uacpi_table_type {
     UACPI_TABLE_TYPE_FADT = 0,
     UACPI_TABLE_TYPE_DSDT = 1,
+    UACPI_TABLE_TYPE_SSDT = 2,
     UACPI_TABLE_TYPE_OEM = 0xFF
 };
 

@@ -37,6 +37,8 @@ get_table_for_type(enum uacpi_table_type type)
     case UACPI_TABLE_TYPE_FADT:
     case UACPI_TABLE_TYPE_DSDT:
         return &g_uacpi_rt_ctx.tables[type];
+    default:
+        break;
     }
 
     return UACPI_NULL;
