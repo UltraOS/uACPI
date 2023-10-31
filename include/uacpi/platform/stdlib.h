@@ -10,3 +10,4 @@
 #define uacpi_memcpy memcpy
 #define uacpi_memset memset
 #define uacpi_memcmp memcmp
+#define uacpi_strnlen strnlen
