@@ -149,8 +149,11 @@ def main() -> int:
     bin_dir = args.binary_directory
     os.makedirs(bin_dir, exist_ok=True)
 
-    test_cases = [os.path.join(test_dir, f) for f in os.listdir(test_dir)]
-
+    test_cases = [
+        os.path.join(test_dir, f)
+        for f in os.listdir(test_dir)
+        if os.path.splitext(f)[1] == ".asl"
+    ]
 
     ret = run_tests(test_cases, test_runner, args.asl_compiler, bin_dir)
     sys.exit(ret)
