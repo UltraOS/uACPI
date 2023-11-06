@@ -15,9 +15,10 @@ enum uacpi_opcode_type {
 };
 
 enum uacpi_arg_type {
-    UACPI_ARG_TYPE_NUMBER = 0,
-    UACPI_ARG_TYPE_STRING = 1,
-    UACPI_ARG_TYPE_SPECIAL = 2,
+    UACPI_ARG_TYPE_ANY = 0,
+    UACPI_ARG_TYPE_NUMBER = 1,
+    UACPI_ARG_TYPE_STRING = 2,
+    UACPI_ARG_TYPE_SPECIAL = 3,
 };
 
 enum uacpi_arg_sub_type {
