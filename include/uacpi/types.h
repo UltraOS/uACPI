@@ -17,35 +17,15 @@ typedef uacpi_u64 uacpi_io_addr;
 typedef void *uacpi_handle;
 typedef struct uacpi_control_method uacpi_control_method;
 
-typedef struct uacpi_buffer {
-    void *data;
-    uacpi_size size;
-} uacpi_buffer;
-
-/*
- * uACPI will automatically attempt to allocate the storage of neccesary
- * size with uacpi_kernel_alloc when it's needed. The buffer is considered
- * fixed size & caller-owned otherwise.
- */
-#define UACPI_DYNAMIC_BUFFER_SIZE ((uacpi_size)-1)
-
-static inline void uacpi_make_buffer_dynamic(uacpi_buffer *buf) {
-    buf->size = UACPI_DYNAMIC_BUFFER_SIZE;
-}
-
-static inline uacpi_bool uacpi_is_dynamic_buffer(const uacpi_buffer *buf) {
-    return buf->size == UACPI_DYNAMIC_BUFFER_SIZE;
-}
-
 typedef enum uacpi_object_type {
-    UACPI_OBJECT_NULL      = 0,
-    UACPI_OBJECT_INTEGER   = 1,
-    UACPI_OBJECT_STRING    = 2,
-    UACPI_OBJECT_BUFFER    = 3,
-    UACPI_OBJECT_PACKAGE   = 4,
+    UACPI_OBJECT_NULL = 0,
+    UACPI_OBJECT_INTEGER = 1,
+    UACPI_OBJECT_STRING = 2,
+    UACPI_OBJECT_BUFFER = 3,
+    UACPI_OBJECT_PACKAGE = 4,
     UACPI_OBJECT_REFERENCE = 5,
-    UACPI_OBJECT_METHOD    = 6,
-    UACPI_OBJECT_SPECIAL   = 7,
+    UACPI_OBJECT_METHOD = 6,
+    UACPI_OBJECT_SPECIAL = 7,
 } uacpi_object_type;
 
 #define UACPI_OBJECT_COMMON_HDR \
@@ -108,24 +88,15 @@ typedef union uacpi_object {
     uacpi_object_string as_string;
     uacpi_object_buffer as_buffer;
     uacpi_object_package as_package;
+    uacpi_object_reference as_reference;
     uacpi_object_control_method as_method;
     uacpi_object_special as_special;
 } uacpi_object;
 
 typedef struct uacpi_args {
-    uacpi_object *objects;
+    uacpi_object **objects;
     uacpi_size count;
 } uacpi_args;
-
-typedef struct uacpi_retval {
-    union {
-        // IN filled by the caller
-        uacpi_buffer receiving_buffer;
-
-        // OUT filled by the callee using receiving_buffer or inline capacity
-        uacpi_object object;
-    };
-} uacpi_retval;
 
 typedef union uacpi_object_name {
     uacpi_char text[4];

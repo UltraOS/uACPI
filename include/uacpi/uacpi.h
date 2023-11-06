@@ -57,7 +57,7 @@ uacpi_status uacpi_namespace_initialize(void);
  * Either root_handle or path must be valid.
  */
 uacpi_status uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path,
-                        uacpi_args *args, uacpi_retval *ret);
+                        uacpi_args *args, uacpi_object **ret);
 
 #ifdef __cplusplus
 }

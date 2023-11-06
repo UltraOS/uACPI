@@ -57,7 +57,7 @@ void validate_ret_against_expected(uacpi_object& obj,
     if (obj.type != expected_type) {
         std::string err;
         err += "returned type '";
-        err += type_to_string(obj.type);
+        err += type_to_string((uacpi_object_type)obj.type);
         err += "' doesn't match expected '";
         err += type_to_string(expected_type);
         err += "'";
@@ -75,7 +75,7 @@ void validate_ret_against_expected(uacpi_object& obj,
     } break;
     case UACPI_OBJECT_STRING: {
         auto actual_str = std::string_view(obj.as_string.text,
-                                           obj.as_string.length);
+                                           obj.as_string.length - 1);
 
         if (expected_val != actual_str)
             ret_is_wrong(expected_val, actual_str);
@@ -84,6 +84,19 @@ void validate_ret_against_expected(uacpi_object& obj,
         std::abort();
     }
 }
+
+template <typename ExprT>
+class ScopeGuard
+{
+public:
+    ScopeGuard(ExprT expr)
+        : callback(std::move(expr)) {}
+
+    ~ScopeGuard() { callback(); }
+
+private:
+    ExprT callback;
+};
 
 void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
               std::string_view expected_value)
@@ -115,11 +128,15 @@ void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
-    uacpi_retval ret {};
-    st = uacpi_eval(UACPI_NULL, "\\MAIN", UACPI_NULL, &ret);
-    ensure_ok_status(st);
+    uacpi_object* ret = UACPI_NULL;
+    auto guard = ScopeGuard(
+        [&ret] { uacpi_object_unref(ret); }
+    );
 
-    validate_ret_against_expected(ret.object, expected_type, expected_value);
+    st = uacpi_eval(UACPI_NULL, "\\MAIN", UACPI_NULL, &ret);
+
+    ensure_ok_status(st);
+    validate_ret_against_expected(*ret, expected_type, expected_value);
 }
 
 int main(int argc, char** argv)

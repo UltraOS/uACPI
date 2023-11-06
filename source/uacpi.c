@@ -150,7 +150,7 @@ uacpi_status uacpi_namespace_initialize(void)
 
 uacpi_status
 uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
-           uacpi_retval *ret)
+           uacpi_object **ret)
 {
     struct uacpi_namespace_node *node;
     uacpi_object_name name;
@@ -177,5 +177,6 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
     if (node->object.type != UACPI_OBJECT_METHOD)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return uacpi_execute_control_method(node->object.as_method.method, args, ret);
+    return uacpi_execute_control_method(node->object.as_method.method,
+                                        args, ret);
 }
