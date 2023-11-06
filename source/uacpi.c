@@ -130,7 +130,7 @@ uacpi_status uacpi_namespace_load(void)
 {
     struct uacpi_table *tbl;
     uacpi_status ret;
-    struct uacpi_control_method method;
+    struct uacpi_control_method method = { 0 };
 
     ret = uacpi_table_acquire_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
     if (uacpi_unlikely_error(ret))
