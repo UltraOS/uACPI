@@ -12,6 +12,7 @@ struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
         return ret;
 
     ret->name = name;
+    ret->object.common.refcount = 1;
     return ret;
 }
 

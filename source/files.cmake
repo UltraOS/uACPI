@@ -1,5 +1,6 @@
 uacpi_add_sources(
     tables.c
+    types.c
     uacpi.c
     utilities.c
     interpreter.c
