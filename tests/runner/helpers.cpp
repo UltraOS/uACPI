@@ -44,7 +44,7 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
 void* read_entire_file(std::string_view path)
 {
     size_t file_size = std::filesystem::file_size(path);
-    std::ifstream file(path.data());
+    std::ifstream file(path.data(), std::ios::binary);
 
     if (!file)
         throw std::runtime_error(
