@@ -42,6 +42,7 @@ struct uacpi_opcode_exec {
 struct uacpi_opcode_flow {
     enum uacpi_opcode_type type : 4;
     bool has_operand : 1;
+    uacpi_u32 start_offset, end_offset;
 };
 
 struct uacpi_opcode_create {
@@ -143,11 +144,134 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         UACPI_CREATE_OPCODE()                       \
     )                                               \
     UACPI_OP(                                       \
+        Local0Op, 0x60,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local1Op, 0x61,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local2Op, 0x62,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local3Op, 0x63,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local4Op, 0x64,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local5Op, 0x65,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local6Op, 0x66,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Local7Op, 0x67,                             \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_LOCAL    \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg0Op, 0x68,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg1Op, 0x69,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg2Op, 0x6A,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg3Op, 0x6B,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg4Op, 0x6C,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg5Op, 0x6D,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        Arg6Op, 0x6E,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_ANY,         \
+            .sub_type = UACPI_ARG_SUB_TYPE_ARG      \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         StoreOp, 0x70,                              \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
             .has_ret = UACPI_TRUE,                  \
             .operand_count = 2,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        IfOp, 0xA0,                                 \
+        UACPI_FLOW_OPCODE(                          \
+            .has_operand = UACPI_TRUE               \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        ElseOp, 0xA1,                               \
+        UACPI_FLOW_OPCODE(                          \
+            .has_operand = UACPI_FALSE              \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        WhileOp, 0xA2,                              \
+        UACPI_FLOW_OPCODE(                          \
+            .has_operand = UACPI_TRUE               \
         )                                           \
     )                                               \
     UACPI_OP(                                       \
