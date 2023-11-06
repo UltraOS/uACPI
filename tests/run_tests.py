@@ -2,7 +2,6 @@
 import subprocess
 import argparse
 import os
-import shutil
 import sys
 import platform
 from typing import List, Tuple, Optional
@@ -152,11 +151,8 @@ def main() -> int:
 
     test_cases = [os.path.join(test_dir, f) for f in os.listdir(test_dir)]
 
-    try:
-        ret = run_tests(test_cases, test_runner, args.asl_compiler, bin_dir)
-    finally:
-        shutil.rmtree(bin_dir)
 
+    ret = run_tests(test_cases, test_runner, args.asl_compiler, bin_dir)
     sys.exit(ret)
 
 
