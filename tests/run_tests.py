@@ -5,7 +5,7 @@ import os
 import shutil
 import sys
 import platform
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 def abs_path_to_current_dir() -> str:
@@ -66,14 +66,30 @@ def run_tests(
         print("FAIL")
         fail_count += 1
 
-        print("TEST OUTPUT:")
         output = ""
-        if proc.stdout:
-            output += "from STDOUT:\n"
-            output += proc.stdout.read()
-        if proc.stderr:
-            output += "from STDERR:\n"
-            output += proc.stderr.read()
+
+        def format_output(source: str, data: Optional[str]) -> str:
+            output = ""
+
+            if not data:
+                return output
+
+            output += f"\t{source}:\n"
+            output += "\n".join(["\t" + line for line in data.split("\n")])
+
+            return output
+
+        stdout = proc.stdout.read() if proc.stdout else None
+        output += format_output("stdout", stdout)
+
+        stderr = proc.stderr.read() if proc.stderr else None
+        output += format_output("stderr", stderr)
+
+        if output:
+            print("TEST OUTPUT:")
+            print(output)
+        else:
+            print("NO OUTPUT FROM TEST")
 
     print(
         f"SUMMARY: {len(cases) - fail_count}/{len(cases)} "
