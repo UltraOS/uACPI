@@ -1195,10 +1195,12 @@ static uacpi_status method_call_dispatch(struct execution_context *ctx)
 static uacpi_status maybe_dispatch_op(struct execution_context *ctx)
 {
     uacpi_status ret = UACPI_STATUS_OK;
-    struct pending_op *pop = ctx->cur_pop;
+    struct pending_op *pop;
 
     for (;;) {
-        if (!ctx->cur_pop || !op_dispatchable(ctx->cur_pop))
+        pop = ctx->cur_pop;
+
+        if (!pop || !op_dispatchable(pop))
             break;
 
         switch (pop->info.type) {
