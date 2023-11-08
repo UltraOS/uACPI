@@ -824,15 +824,51 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
     return result_store(ctx, tgt);
 }
 
+static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
+{
+    struct pending_op *pop = ctx->cur_pop;
+    struct operand *tgt;
+
+    tgt = operand_array_at(&pop->operands, 0);
+
+    switch (pop->code) {
+    case UACPI_AML_OP_IncrementOp:
+    case UACPI_AML_OP_DecrementOp: {
+        uacpi_object *obj;
+        uacpi_i32 val = pop->code == UACPI_AML_OP_IncrementOp ? +1 : -1;
+
+        if (tgt->obj->type != UACPI_OBJECT_REFERENCE)
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        obj = *operand_get_target_object(tgt);
+        if (obj->type != UACPI_OBJECT_INTEGER)
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        obj->as_integer.value += val;
+        return result_store(
+            ctx,
+            &(struct operand) { .type = OPERAND_TYPE_DEFAULT, obj }
+        );
+    }
+    default:
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+}
+
 static uacpi_status exec_dispatch(struct execution_context *ctx)
 {
     uacpi_status st = UACPI_STATUS_UNIMPLEMENTED;
     struct uacpi_opcode_exec *op = &ctx->cur_pop->info.as_exec;
 
     switch (op->operand_count) {
+    case 1:
+        if (op->has_target)
+            st = dispatch_0_arg_with_target(ctx);
+        break;
     case 2:
         if (op->has_target)
             st = dispatch_1_arg_with_target(ctx);
+        break;
     default:
         break;
     }
