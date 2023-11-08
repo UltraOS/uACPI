@@ -55,7 +55,8 @@ def run_tests(
         proc = subprocess.Popen([runner, compiled_case, rtype, value],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                universal_newlines=True)
+                                universal_newlines=True,
+                                bufsize=1024 * 1024)
         try:
             proc.wait(10)
             if proc.returncode == 0:
