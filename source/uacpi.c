@@ -129,6 +129,7 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 uacpi_status uacpi_namespace_load(void)
 {
     struct uacpi_table *tbl;
+    struct acpi_dsdt *dsdt;
     uacpi_status ret;
     struct uacpi_control_method method = { 0 };
 
@@ -136,9 +137,10 @@ uacpi_status uacpi_namespace_load(void)
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    method.code = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
-    method.code += sizeof(struct acpi_sdt_hdr);
-    method.size = tbl->length - sizeof(struct acpi_sdt_hdr);
+    dsdt = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
+    method.code = dsdt->definition_block;
+    method.size = tbl->length - sizeof(dsdt->hdr);
+    method.is_rev1 = dsdt->hdr.creator_revision < 2;
 
     return uacpi_execute_control_method(&method, NULL, NULL);
 }

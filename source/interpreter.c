@@ -940,6 +940,7 @@ static uacpi_status create_method(struct call_frame *frame)
 
     method->code = call_frame_cursor(frame);
     method->size -= frame->code_offset - base_offset;
+    method->is_rev1 = frame->method->is_rev1;
     frame->code_offset += method->size;
 
     node->object.type = UACPI_OBJECT_METHOD;
