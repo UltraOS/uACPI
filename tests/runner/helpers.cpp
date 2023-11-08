@@ -10,29 +10,26 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
                           std::string_view path)
 {
     auto& fadt = *new acpi_fadt {};
+    fadt.hdr.length = sizeof(fadt);
 
     auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
-    auto* hdr = &fadt.hdr;
-    hdr->length = sizeof(fadt);
     fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(dsdt);
-    memcpy(hdr->signature, ACPI_FADT_SIGNATURE,
+    memcpy(fadt.hdr.signature, ACPI_FADT_SIGNATURE,
            sizeof(ACPI_FADT_SIGNATURE) - 1);
 
     xsdt.fadt = &fadt;
-    hdr = &xsdt.hdr;
-
-    hdr->length = sizeof(xsdt);
-    hdr->revision = dsdt->hdr.revision;
-    memcpy(hdr->oemid, dsdt->hdr.oemid, sizeof(dsdt->hdr.oemid));
-    hdr->oem_revision = dsdt->hdr.oem_revision;
+    xsdt.hdr.length = sizeof(xsdt);
+    xsdt.hdr.revision = dsdt->hdr.revision;
+    memcpy(xsdt.hdr.oemid, dsdt->hdr.oemid, sizeof(dsdt->hdr.oemid));
+    xsdt.hdr.oem_revision = dsdt->hdr.oem_revision;
 
     if (sizeof(void*) == 4) {
-        memcpy(hdr->signature, ACPI_RSDT_SIGNATURE,
+        memcpy(xsdt.hdr.signature, ACPI_RSDT_SIGNATURE,
                sizeof(ACPI_XSDT_SIGNATURE) - 1);
 
         rsdp.rsdt_addr = reinterpret_cast<size_t>(&xsdt);
     } else {
-        memcpy(hdr->signature, ACPI_XSDT_SIGNATURE,
+        memcpy(xsdt.hdr.signature, ACPI_XSDT_SIGNATURE,
                sizeof(ACPI_XSDT_SIGNATURE) - 1);
 
         rsdp.xsdt_addr = reinterpret_cast<size_t>(&xsdt);
