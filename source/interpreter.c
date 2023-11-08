@@ -115,6 +115,7 @@ struct call_frame {
      */
     struct pending_op_array pending_ops;
     struct flow_frame_array flows;
+    struct flow_frame *last_while;
 
     uacpi_u32 code_offset;
 };
@@ -616,6 +617,7 @@ static uacpi_status begin_flow_execution(struct execution_context *ctx)
         break;
     case UACPI_AML_OP_WhileOp:
         flow_frame->type = FLOW_FRAME_WHILE;
+        cur_frame->last_while = flow_frame;
         break;
     default:
         flow_frame_array_pop(&cur_frame->flows);
@@ -651,6 +653,33 @@ static uacpi_status predicate_evaluate(struct operand *operand, uacpi_bool *res)
     return UACPI_STATUS_OK;
 }
 
+static struct flow_frame *find_last_while_flow(struct flow_frame_array *flows)
+{
+    uacpi_size i;
+
+    i = flow_frame_array_size(flows);
+    while (i-- > 0) {
+        struct flow_frame *flow;
+
+        flow = flow_frame_array_at(flows, i);
+        if (flow->type == FLOW_FRAME_WHILE)
+            return flow;
+    }
+
+    return UACPI_NULL;
+}
+
+static void frame_reset_post_end_flow(struct execution_context *ctx,
+                                      uacpi_bool reset_last_while)
+{
+    struct call_frame *frame = ctx->cur_frame;
+    flow_frame_array_pop(&frame->flows);
+    ctx->cur_flow = flow_frame_array_last(&frame->flows);
+
+    if (reset_last_while)
+        frame->last_while = find_last_while_flow(&frame->flows);
+}
+
 static uacpi_status flow_dispatch(struct execution_context *ctx)
 {
     uacpi_status ret;
@@ -658,6 +687,21 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
     struct pending_op *pop = ctx->cur_pop;
 
     switch (pop->code) {
+    case UACPI_AML_OP_BreakOp: {
+        struct flow_frame *flow;
+
+        for (;;) {
+            flow = flow_frame_array_last(&cur_frame->flows);
+            if (flow != cur_frame->last_while) {
+                flow_frame_array_pop(&cur_frame->flows);
+                continue;
+            }
+
+            cur_frame->code_offset = flow->end;
+            frame_reset_post_end_flow(ctx, UACPI_TRUE);
+            return UACPI_STATUS_OK;
+        }
+    }
     case UACPI_AML_OP_ReturnOp: {
         uacpi_object *dst = UACPI_NULL;
 
@@ -1042,6 +1086,9 @@ static uacpi_status flow_init(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
 
     switch (frame->cur_op.code) {
+    case UACPI_AML_OP_BreakOp:
+        if (frame->last_while == UACPI_NULL)
+            return UACPI_STATUS_BAD_BYTECODE;
     case UACPI_AML_OP_ReturnOp:
         call_frame_advance_pc(frame);
         break;
@@ -1290,8 +1337,7 @@ static uacpi_bool maybe_end_flow(struct execution_context *ctx)
         ret = UACPI_TRUE;
     }
 
-    flow_frame_array_pop(&cur_frame->flows);
-    ctx->cur_flow = flow_frame_array_last(&cur_frame->flows);
+    frame_reset_post_end_flow(ctx, flow->type == FLOW_FRAME_WHILE);
     return ret;
 }
 

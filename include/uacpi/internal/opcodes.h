@@ -298,6 +298,12 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        BreakOp, 0xA5,                              \
+        UACPI_FLOW_OPCODE(                          \
+            .has_operand = UACPI_FALSE              \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         DebugOp, UACPI_EXT_OP(0x31),                \
         UACPI_ARG_OPCODE(                           \
             .arg_type = UACPI_ARG_TYPE_SPECIAL,     \
