@@ -755,7 +755,7 @@ static uacpi_status reference_store(struct operand *dst, struct operand *src)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status operand_store(struct operand *dst, struct operand *src)
+static uacpi_status operand_store(struct operand *dst, uacpi_object *src)
 {
     uacpi_object **dst_obj;
 
@@ -764,8 +764,28 @@ static uacpi_status operand_store(struct operand *dst, struct operand *src)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     uacpi_object_unref(*dst_obj);
-    *dst_obj = src->obj;
-    uacpi_object_ref(src->obj);
+    *dst_obj = src;
+    uacpi_object_ref(src);
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status result_store(struct execution_context *ctx,
+                                 struct operand *res)
+{
+    uacpi_status ret;
+    struct operand *ret_tgt = UACPI_NULL;
+
+    ret = exec_get_ret_target(ctx, &ret_tgt);
+    if (ret == UACPI_STATUS_NOT_FOUND)
+        ret = UACPI_STATUS_OK;
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    if (ret_tgt) {
+        ret_tgt->type = res->type;
+        return operand_store(ret_tgt, res->obj);
+    }
+
     return UACPI_STATUS_OK;
 }
 
@@ -798,22 +818,10 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
     }
     }
 
-    if (ret == UACPI_STATUS_OK) {
-        struct operand *ret_tgt = UACPI_NULL;
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-        ret = exec_get_ret_target(ctx, &ret_tgt);
-        if (ret == UACPI_STATUS_NOT_FOUND)
-            ret = UACPI_STATUS_OK;
-        if (ret != UACPI_STATUS_OK)
-            return ret;
-
-        if (ret_tgt) {
-            ret_tgt->type = tgt->type;
-            return operand_store(ret_tgt, tgt);
-        }
-    }
-
-    return ret;
+    return result_store(ctx, tgt);
 }
 
 static uacpi_status exec_dispatch(struct execution_context *ctx)
