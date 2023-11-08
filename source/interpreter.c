@@ -1068,6 +1068,7 @@ static uacpi_status flow_init(struct execution_context *ctx)
             uacpi_kernel_log(UACPI_LOG_TRACE,
                              "Else skipped because an If was taken earlier\n");
             frame->code_offset = flow->end_offset;
+            return UACPI_STATUS_OK;
         }
         break;
     }
