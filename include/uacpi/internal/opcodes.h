@@ -274,6 +274,12 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        ContinueOp, 0x9F,                           \
+        UACPI_FLOW_OPCODE(                          \
+            .has_operand = UACPI_FALSE              \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         IfOp, 0xA0,                                 \
         UACPI_FLOW_OPCODE(                          \
             .has_operand = UACPI_TRUE               \

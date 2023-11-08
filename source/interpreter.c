@@ -687,6 +687,7 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
     struct pending_op *pop = ctx->cur_pop;
 
     switch (pop->code) {
+    case UACPI_AML_OP_ContinueOp:
     case UACPI_AML_OP_BreakOp: {
         struct flow_frame *flow;
 
@@ -697,7 +698,10 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
                 continue;
             }
 
-            cur_frame->code_offset = flow->end;
+            if (pop->code == UACPI_AML_OP_BreakOp)
+                cur_frame->code_offset = flow->end;
+            else
+                cur_frame->code_offset = flow->begin;
             frame_reset_post_end_flow(ctx, UACPI_TRUE);
             return UACPI_STATUS_OK;
         }
@@ -1086,6 +1090,7 @@ static uacpi_status flow_init(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
 
     switch (frame->cur_op.code) {
+    case UACPI_AML_OP_ContinueOp:
     case UACPI_AML_OP_BreakOp:
         if (frame->last_while == UACPI_NULL)
             return UACPI_STATUS_BAD_BYTECODE;
