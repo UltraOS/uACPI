@@ -88,7 +88,7 @@ static void free_chain(uacpi_object *obj)
 void uacpi_object_unref(uacpi_object *obj)
 {
     uacpi_object *this_obj = obj;
-    uacpi_u32 parent_refcount, chain_depth = 0;
+    uacpi_u32 parent_refcount;
     uacpi_object_common *common;
 
     if (!obj)
@@ -110,7 +110,6 @@ void uacpi_object_unref(uacpi_object *obj)
         }
 
         parent_refcount = common->refcount--;
-        chain_depth++;
 
         if (obj->type == UACPI_OBJECT_REFERENCE) {
             obj = obj->as_reference.object;

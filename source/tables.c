@@ -135,7 +135,6 @@ get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
                                         uacpi_u32 *out_len)
 {
     struct acpi_sdt_hdr *hdr;
-    uacpi_status ret;
 
     hdr = uacpi_kernel_map(phys_addr, sizeof(struct acpi_sdt_hdr));
     if (!hdr)
