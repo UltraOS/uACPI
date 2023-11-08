@@ -56,15 +56,17 @@ def run_tests(
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 universal_newlines=True)
-        proc.wait(10)
+        try:
+            proc.wait(10)
+            if proc.returncode == 0:
+                print("OK")
+                continue
+        except subprocess.TimeoutExpired:
+            print("TIMEOUT")
+        else:
+            print("FAIL")
 
-        if proc.returncode == 0:
-            print("OK")
-            continue
-
-        print("FAIL")
         fail_count += 1
-
         output = ""
 
         def format_output(source: str, data: Optional[str]) -> str:
