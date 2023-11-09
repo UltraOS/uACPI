@@ -55,10 +55,9 @@ def run_tests(
         proc = subprocess.Popen([runner, compiled_case, rtype, value],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                universal_newlines=True,
-                                bufsize=1024 * 1024)
+                                universal_newlines=True)
         try:
-            proc.wait(10)
+            stdout, stderr = proc.communicate(timeout=10)
             if proc.returncode == 0:
                 print("OK")
                 continue
@@ -81,10 +80,7 @@ def run_tests(
 
             return output
 
-        stdout = proc.stdout.read() if proc.stdout else None
         output += format_output("stdout", stdout)
-
-        stderr = proc.stderr.read() if proc.stderr else None
         output += format_output("stderr", stderr)
 
         if output:
