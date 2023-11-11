@@ -37,6 +37,13 @@ struct uacpi_runtime_context {
     struct uacpi_table *extra_tables;
     uacpi_size table_count;
 
+    /*
+     * This is a per-table value but we mimic the NT implementation:
+     * treat all other definition blocks as if they were the same revision
+     * as DSDT.
+     */
+    uacpi_bool is_rev1;
+
     struct uacpi_params params;
 };
 

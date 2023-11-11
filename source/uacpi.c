@@ -104,6 +104,8 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
 
+    g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
+
     uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
                  sizeof(params->rt_params));
 
@@ -140,7 +142,6 @@ uacpi_status uacpi_namespace_load(void)
     dsdt = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
     method.code = dsdt->definition_block;
     method.size = tbl->length - sizeof(dsdt->hdr);
-    method.is_rev1 = dsdt->hdr.creator_revision < 2;
 
     return uacpi_execute_control_method(&method, NULL, NULL);
 }

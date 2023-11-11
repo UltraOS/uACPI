@@ -190,6 +190,11 @@ uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
         ret = uacpi_table_append(fadt->x_dsdt ? fadt->x_dsdt : fadt->dsdt);
     }
 
+    if (table->signature.as_u32 == dsdt_signature.as_u32) {
+        struct acpi_dsdt *dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
+        g_uacpi_rt_ctx.is_rev1 = dsdt->hdr.revision < 2;
+    }
+
     if (out_table == UACPI_NULL)
         do_release_table(table);
     else

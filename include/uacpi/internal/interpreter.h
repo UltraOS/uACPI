@@ -10,7 +10,6 @@ struct uacpi_control_method {
     uacpi_u8 sync_level : 4;
     uacpi_u8 args : 3;
     uacpi_u8 is_serialized : 1;
-    uacpi_u8 is_rev1 : 1;
 };
 
 uacpi_status uacpi_execute_control_method(struct uacpi_control_method *method,
