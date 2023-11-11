@@ -30,6 +30,7 @@ typedef enum uacpi_object_type {
 
 #define UACPI_OBJECT_COMMON_HDR \
     uacpi_u8 type;              \
+    uacpi_u8 flags;             \
     uacpi_u32 refcount;         \
 
 typedef union uacpi_object uacpi_object;

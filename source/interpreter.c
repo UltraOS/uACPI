@@ -4,35 +4,119 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/platform/stdlib.h>
 #include <uacpi/kernel_api.h>
+#include <uacpi/internal/context.h>
 
-enum operand_type {
-    OPERAND_TYPE_DEFAULT,
+enum reference_kind {
+    /*
+     * Stores to this reference type change the referenced object.
+     * The reference is created with this kind when a RefOf result is stored
+     * in an object. Detailed explanation below.
+     */
+    REFERENCE_KIND_REFOF = 0,
 
     /*
-     * Rebindable reference, stores change the object itself.
+     * Reference to a local variable, stores go into the referenced object
+     * _unless_ the referenced object is a REFERENCE_KIND_REFOF. In that case,
+     * the reference is unwound one more level as if the expression was
+     * Store(..., DerefOf(ArgX))
      */
-    OPERAND_TYPE_LOCAL_REF,
+    REFERENCE_KIND_LOCAL = 1,
 
     /*
-     * Non-rebindable reference, stores go directly
-     * into the referenced object.
+     * Reference to an argument. Same semantics for stores as
+     * REFERENCE_KIND_LOCAL.
      */
-    OPERAND_TYPE_ARG_REF,
+    REFERENCE_KIND_ARG = 2,
 
     /*
-     * Reference to a named object, stores have to go
-     * through implicit conversion unless CopyObject is used.
+     * Reference to a named object. Same semantics as REFERENCE_KIND_LOCAL.
      */
-    OPERAND_TYPE_NAMED_REF,
+    REFERENCE_KIND_NAMED = 3,
 };
 
-struct operand {
-    enum operand_type type;
-    uacpi_object *obj;
-};
+/*
+ * The implementation of references:
+ *
+ * Bytecode OPs like ArgX and LocalX are always converted to reference objects
+ * for simplicity, the assigned reference kind is REFERENCE_KIND_LOCAL and
+ * REFERENCE_KIND_ARG respectively and the referenced object is either
+ * a member of call_frame::locals or call_frame::args.
+ *
+ * A call to RefOf generates a new reference object of type
+ * REFERENCE_KIND_NORMAL that references the provided object dereferenced
+ * according to rules specified above object_deref_implicit.
+ *
+ * Now for the more complicated part - dereferencing (implicit or via DerefOf):
+ *
+ * Every dereference either explicit or implicit has to unwind the reference
+ * chain all the way to the bottom, this is done to mimic the implementation
+ * used in the NT kernel (which is what all AML code is tested against by
+ * default)
+ *
+ * Let's break down a few examples:
+ *
+ * 1. Local0 = 123
+ * Local0 is converted to a REFERENCE_KIND_LOCAL where the referenced object is
+ * set to call_frame->locals[0].
+ *
+ * DerefOf(Local0) works as following:
+ *     1. Dereference the reference to local via object_deref_if_internal.
+ *     2. The resulting object is not a reference, this is an error.
+ *
+ * 2. Local1 = 123; Local0 = RefOf(Local1)
+ * In the example above Local0 is broken down as following:
+ *     Local0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_LOCAL)
+ *     |
+ *     v
+ *     call_frame->locals[0] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
+ *     |
+ *     v
+ *     call_frame->locals[1] (UACPI_OBJECT_INTEGER)
+ *
+ * DerefOf(Local0) works as following:
+ *     1. Dereference the reference to local via object_deref_if_internal.
+ *     2. Start unwinding via unwind_reference()
+ *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
+*            (call_frame->locals[1])
+ *         - Current object is not a reference, so it's the result of
+ *           the DerefOf -- we're done.
+ *
+ * 3. MAIN(123)
+ * In this example Arg0 is broken down as following:
+ *     Arg0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_ARG)
+ *     |
+ *     v
+ *     call_frame->args[0] (UACPI_OBJECT_INTEGER)
+ *
+ * 4. Local0 = 123; Local1 = RefOf(Local0); MAIN(RefOf(Local1))
+ * In this example Arg0 is broken down as following:
+ *     Arg0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_ARG)
+ *     |
+ *     v
+ *     call_frame->args[0] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
+ *     |
+ *     v
+ *     prev_call_frame->locals[1] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
+ *     |
+ *     v
+ *     prev_call_frame->locals[0] (UACPI_OBJECT_INTEGER)
+ *
+ * DerefOf(Arg0) works as following:
+ *     1. Dereference the reference to arg via object_deref_if_internal.
+ *     2. Start unwinding via unwind_reference()
+ *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
+ *           (prev_call_frame->locals[1])
+ *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
+ *           (prev_call_frame->locals[0])
+ *         - Current object is not a reference, so it's the result of
+ *           the DerefOf -- we're done.
+ *
+ * Store(..., ArgX/LocalX) automatically dereferences as if by DerefOf in the
+ * example above.
+ */
 
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE(operand_array, struct operand, 8)
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(operand_array, struct operand, static)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(operand_array, uacpi_object*, 8)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(operand_array, uacpi_object*, static)
 
 struct op {
     uacpi_aml_op code;
@@ -92,8 +176,8 @@ struct call_frame {
     struct uacpi_control_method *method;
     struct op cur_op;
 
-    struct operand args[7];
-    struct operand locals[8];
+    uacpi_object *args[7];
+    uacpi_object *locals[8];
 
     /*
      * Each op with operands gets a 'pending op', e.g. for the following code:
@@ -275,25 +359,25 @@ uacpi_status peek_op(struct call_frame *frame)
     return UACPI_STATUS_OK;
 }
 
-uacpi_status pop_operand_alloc(struct pending_op *pop, struct operand **out_operand)
+uacpi_status pop_operand_alloc(struct pending_op *pop, uacpi_object **out_operand)
 {
-    struct operand *operand;
+    uacpi_object **operand;
 
-    operand = operand_array_calloc(&pop->operands);
+    operand = operand_array_alloc(&pop->operands);
     if (operand == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    operand->obj = uacpi_create_object(UACPI_OBJECT_NULL);
-    if (operand->obj == UACPI_NULL) {
+    *operand = uacpi_create_object(UACPI_OBJECT_NULL);
+    if (*operand == UACPI_NULL) {
         operand_array_pop(&pop->operands);
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    *out_operand = operand;
+    *out_operand = *operand;
     return UACPI_STATUS_OK;
 }
 
-uacpi_status next_arg(struct call_frame *frame, struct operand **out_operand)
+uacpi_status next_arg(struct call_frame *frame, uacpi_object **out_operand)
 {
     struct pending_op *pop;
 
@@ -305,20 +389,6 @@ uacpi_status next_arg(struct call_frame *frame, struct operand **out_operand)
     return pop_operand_alloc(pop, out_operand);
 }
 
-static uacpi_status next_arg_unwrapped(struct call_frame *frame,
-                                       uacpi_object **out_obj)
-{
-    uacpi_status ret;
-    struct operand *operand;
-
-    ret = next_arg(frame, &operand);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    *out_obj = operand->obj;
-    return UACPI_STATUS_OK;
-}
-
 uacpi_status get_string(struct call_frame *frame)
 {
     uacpi_status ret;
@@ -326,7 +396,7 @@ uacpi_status get_string(struct call_frame *frame)
     char *string;
     size_t length;
 
-    ret = next_arg_unwrapped(frame, &obj);
+    ret = next_arg(frame, &obj);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -375,7 +445,12 @@ static uacpi_status copy_object_try_elide(uacpi_object *dst, uacpi_object *src)
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
+    if (dst->type == UACPI_OBJECT_REFERENCE)
+        uacpi_object_unref(dst->as_reference.object);
+
     switch (src->type) {
+    case UACPI_OBJECT_NULL:
+        break;
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING:
         ret = copy_buffer(dst, src);
@@ -390,9 +465,14 @@ static uacpi_status copy_object_try_elide(uacpi_object *dst, uacpi_object *src)
         dst->as_special.special_type = src->as_special.special_type;
         break;
     case UACPI_OBJECT_REFERENCE: {
-        uacpi_object_reference *ref = &src->as_reference;
+        uacpi_u32 refs_to_add = dst->common.refcount;
+        uacpi_object_reference *ref = &dst->as_reference;
+
+        dst->common.flags = src->common.flags;
         ref->object = src->as_reference.object;
-        uacpi_object_ref(ref->object);
+
+        while (refs_to_add-- > 0)
+            uacpi_object_ref(ref->object);
         break;
     } default:
         ret = UACPI_STATUS_UNIMPLEMENTED;
@@ -404,30 +484,18 @@ static uacpi_status copy_object_try_elide(uacpi_object *dst, uacpi_object *src)
     return ret;
 }
 
-static uacpi_object *object_unwrap(uacpi_object *object)
+static uacpi_object *object_deref_if_internal(uacpi_object *object)
 {
-    if (object->type != UACPI_OBJECT_REFERENCE)
+    if (object->type != UACPI_OBJECT_REFERENCE ||
+        object->common.flags == REFERENCE_KIND_REFOF)
         return object;
 
     return object->as_reference.object;
 }
 
-static uacpi_object *operand_unwrap(struct operand *operand,
-                                    uacpi_bool only_if_internal_ref)
+static uacpi_status copy_retval(uacpi_object *dst, uacpi_object *src)
 {
-    if (operand->type == OPERAND_TYPE_LOCAL_REF ||
-        operand->type == OPERAND_TYPE_ARG_REF)
-        goto unwrap_ref;
-    if (only_if_internal_ref)
-        return operand->obj;
-
-unwrap_ref:
-    return object_unwrap(operand->obj);
-}
-
-static uacpi_status copy_retval(uacpi_object *dst, struct operand *src)
-{
-    return copy_object_try_elide(dst, operand_unwrap(src, UACPI_TRUE));
+    return copy_object_try_elide(dst, object_deref_if_internal(src));
 }
 
 static uacpi_status get_arg_or_local_ref(
@@ -435,17 +503,17 @@ static uacpi_status get_arg_or_local_ref(
 )
 {
     uacpi_status ret;
-    struct operand *src, *dst;
-    enum operand_type ref_type;
+    uacpi_object **src, *dst;
+    enum reference_kind kind;
 
     switch (sub_type) {
     case UACPI_ARG_SUB_TYPE_LOCAL:
         src = &frame->locals[frame->cur_op.code - UACPI_AML_OP_Local0Op];
-        ref_type = OPERAND_TYPE_LOCAL_REF;
+        kind = REFERENCE_KIND_LOCAL;
         break;
     case UACPI_ARG_SUB_TYPE_ARG:
         src = &frame->args[frame->cur_op.code - UACPI_AML_OP_Arg0Op];
-        ref_type = OPERAND_TYPE_ARG_REF;
+        kind = REFERENCE_KIND_ARG;
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -456,16 +524,16 @@ static uacpi_status get_arg_or_local_ref(
         return ret;
 
     // Access to an uninitialized local or arg, hopefully a store incoming
-    if (src->obj == UACPI_NULL) {
-        src->obj = uacpi_create_object(UACPI_OBJECT_NULL);
-        if (uacpi_unlikely(src->obj == UACPI_NULL))
+    if (*src == UACPI_NULL) {
+        *src = uacpi_create_object(UACPI_OBJECT_NULL);
+        if (uacpi_unlikely(*src == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    dst->type = ref_type;
-    dst->obj->type = UACPI_OBJECT_REFERENCE;
-    dst->obj->as_reference.object = src->obj;
-    uacpi_object_ref(src->obj);
+    dst->common.flags = kind;
+    dst->type = UACPI_OBJECT_REFERENCE;
+    dst->as_reference.object = *src;
+    uacpi_object_ref(*src);
 
     return ret;
 }
@@ -477,7 +545,7 @@ uacpi_status get_number(struct call_frame *frame)
     void *data;
     uacpi_u8 bytes;
 
-    ret = next_arg_unwrapped(frame, &obj);
+    ret = next_arg(frame, &obj);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -521,7 +589,7 @@ uacpi_status get_special(struct call_frame *frame)
     uacpi_status ret;
     uacpi_object *obj;
 
-    ret = next_arg_unwrapped(frame, &obj);
+    ret = next_arg(frame, &obj);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -536,7 +604,7 @@ uacpi_status get_special(struct call_frame *frame)
 }
 
 static uacpi_status method_get_ret_target(struct execution_context *ctx,
-                                          struct operand **out_operand)
+                                          uacpi_object **out_operand)
 {
     uacpi_size depth;
 
@@ -563,7 +631,7 @@ static uacpi_status method_get_ret_target(struct execution_context *ctx,
 }
 
 static uacpi_status exec_get_ret_target(struct execution_context *ctx,
-                                        struct operand **out_operand)
+                                        uacpi_object **out_operand)
 {
     uacpi_size depth;
     struct pending_op_array *pops = &ctx->cur_frame->pending_ops;
@@ -583,18 +651,17 @@ static uacpi_status exec_get_ret_target(struct execution_context *ctx,
 static uacpi_status method_get_ret_object(struct execution_context *ctx,
                                           uacpi_object **out_obj)
 {
-    struct operand *operand;
     uacpi_status ret;
 
-    ret = method_get_ret_target(ctx, &operand);
+    ret = method_get_ret_target(ctx, out_obj);
     if (ret == UACPI_STATUS_NOT_FOUND) {
         *out_obj = ctx->ret;
         return UACPI_STATUS_OK;
     }
-    if (ret != UACPI_STATUS_OK || operand == UACPI_NULL)
+    if (ret != UACPI_STATUS_OK || *out_obj == UACPI_NULL)
         return ret;
 
-    *out_obj = operand_unwrap(operand, UACPI_TRUE);
+    *out_obj = object_deref_if_internal(*out_obj);
     return UACPI_STATUS_OK;
 }
 
@@ -641,11 +708,11 @@ static uacpi_status handle_predicate_result(struct execution_context *ctx,
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status predicate_evaluate(struct operand *operand, uacpi_bool *res)
+static uacpi_status predicate_evaluate(uacpi_object *operand, uacpi_bool *res)
 {
     uacpi_object *unwrapped_obj;
 
-    unwrapped_obj = operand_unwrap(operand, UACPI_TRUE);
+    unwrapped_obj = object_deref_if_internal(operand);
     if (unwrapped_obj->type != UACPI_OBJECT_INTEGER)
         return UACPI_STATUS_BAD_BYTECODE;
 
@@ -717,7 +784,7 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
         if (dst == UACPI_NULL)
             return UACPI_STATUS_OK;
 
-        return copy_retval(dst, operand_array_at(&pop->operands, 0));
+        return copy_retval(dst, *operand_array_at(&pop->operands, 0));
     }
     case UACPI_AML_OP_ElseOp:
         return begin_flow_execution(ctx);
@@ -725,7 +792,7 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
     case UACPI_AML_OP_WhileOp: {
         uacpi_bool res;
 
-        ret = predicate_evaluate(operand_array_at(&pop->operands, 0), &res);
+        ret = predicate_evaluate(*operand_array_at(&pop->operands, 0), &res);
         if (uacpi_unlikely_error(ret))
             return ret;
 
@@ -736,27 +803,31 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
     }
 }
 
-static uacpi_status special_store(struct operand *dst, struct operand *src)
+static uacpi_status special_store(uacpi_object *dst, uacpi_object *src)
 {
-    uacpi_object *unwrapped_src;
-
-    if (dst->obj->as_special.special_type != UACPI_SPECIAL_TYPE_DEBUG_OBJECT)
+    if (dst->as_special.special_type != UACPI_SPECIAL_TYPE_DEBUG_OBJECT)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    unwrapped_src = operand_unwrap(src, UACPI_TRUE);
+    src = object_deref_if_internal(src);
 
-    switch (unwrapped_src->type) {
+    switch (src->type) {
     case UACPI_OBJECT_STRING:
         uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, String] %s\n",
-                         unwrapped_src->as_string.text);
+                         src->as_string.text);
         break;
     case UACPI_OBJECT_INTEGER:
-        uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%016llX\n",
-                         unwrapped_src->as_integer.value);
+        if (g_uacpi_rt_ctx.is_rev1) {
+            uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%08llX\n",
+                             src->as_integer.value);
+        } else {
+            uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%016llX\n",
+                             src->as_integer.value);
+        }
         break;
     case UACPI_OBJECT_REFERENCE:
         uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Reference] Object @%p\n",
-                         unwrapped_src);
+                         src);
+        break;
     default:
         return UACPI_STATUS_UNIMPLEMENTED;
     }
@@ -764,64 +835,90 @@ static uacpi_status special_store(struct operand *dst, struct operand *src)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_object **operand_get_target_object(struct operand *dst)
+/*
+ * NOTE: this function returns the slot in the parent object at which the
+ *       child object is stored.
+ */
+uacpi_object **reference_unwind(uacpi_object *obj)
 {
-    switch (dst->type) {
-    case OPERAND_TYPE_DEFAULT:
-    case OPERAND_TYPE_LOCAL_REF:
-        if (dst->obj->type == UACPI_OBJECT_REFERENCE)
-            return &dst->obj->as_reference.object;
+    uacpi_object *parent = obj;
 
-        return &dst->obj;
-    case OPERAND_TYPE_ARG_REF: {
-        uacpi_object **dst_obj;
+    while (obj) {
+        if (obj->type != UACPI_OBJECT_REFERENCE)
+            return &parent->as_reference.object;
 
-        dst_obj = &dst->obj->as_reference.object;
-        if ((*dst_obj)->type != UACPI_OBJECT_REFERENCE)
-            return dst_obj;
-
-        return &((*dst_obj)->as_reference.object);
-    } default:
-        return UACPI_NULL;
+        parent = obj;
+        obj = parent->as_reference.object;
     }
+
+    // This should be unreachable
+    return UACPI_NULL;
 }
 
-static uacpi_status reference_store(struct operand *dst, struct operand *src)
+/*
+ * Object implicit dereferencing [Store(..., obj)/Increment(obj),...] behavior:
+ * RefOf -> the bottom-most referenced object
+ * LocalX/ArgX -> object stored at LocalX if LocalX is not a reference,
+ *                otherwise goto RefOf case.
+ * NAME -> object stored at NAME
+ *
+ * NOTE: this function returns the slot in the parent object at which the
+ *       child object is stored.
+ */
+static uacpi_object **object_deref_implicit(uacpi_object *obj)
 {
-    uacpi_object **dst_obj;
-    uacpi_object **src_obj;
+    if (obj->common.flags != REFERENCE_KIND_REFOF) {
+        if (obj->common.flags == REFERENCE_KIND_NAMED ||
+            obj->as_reference.object->type != UACPI_OBJECT_REFERENCE)
+            return &obj->as_reference.object;
 
-    dst_obj = operand_get_target_object(dst);
-    if (uacpi_unlikely(dst_obj == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
+        obj = obj->as_reference.object;
+    }
 
-    src_obj = operand_get_target_object(src);
-    if (uacpi_unlikely(dst_obj == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    return reference_unwind(obj);
+}
 
-    copy_object_try_elide(*dst_obj, *src_obj);
+/*
+ * Explicit dereferencing [DerefOf] behavior:
+ * Simply grabs the bottom-most object that is not a reference.
+ * This mimics the behavior of NT Acpi.sys: any DerfOf fetches
+ * the bottom-most reference. Note that this is different from
+ * ACPICA where DerefOf dereferences one level.
+ */
+static uacpi_status object_deref_explicit(uacpi_object *obj,
+                                          uacpi_object **out_obj)
+{
+    obj = object_deref_if_internal(obj);
+
+    if (obj->type != UACPI_OBJECT_REFERENCE)
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    *out_obj = *reference_unwind(obj);
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status operand_store(struct operand *dst, uacpi_object *src)
+static uacpi_status reference_store(uacpi_object *dst, uacpi_object *src)
 {
-    uacpi_object **dst_obj;
+    uacpi_object **dst_slot;
+    uacpi_object *src_obj;
 
-    dst_obj = operand_get_target_object(dst);
-    if (uacpi_unlikely(dst_obj == UACPI_NULL))
+    dst_slot = object_deref_implicit(dst);
+    if (uacpi_unlikely(dst_slot == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    uacpi_object_unref(*dst_obj);
-    *dst_obj = src;
-    uacpi_object_ref(src);
+    src_obj = object_deref_if_internal(src);
+    if (uacpi_unlikely(dst_slot == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    copy_object_try_elide(*dst_slot, src_obj);
     return UACPI_STATUS_OK;
 }
 
 static uacpi_status result_store(struct execution_context *ctx,
-                                 struct operand *res)
+                                 uacpi_object *res)
 {
     uacpi_status ret;
-    struct operand *ret_tgt = UACPI_NULL;
+    uacpi_object *ret_tgt = UACPI_NULL;
 
     ret = exec_get_ret_target(ctx, &ret_tgt);
     if (ret == UACPI_STATUS_NOT_FOUND)
@@ -829,10 +926,8 @@ static uacpi_status result_store(struct execution_context *ctx,
     if (ret != UACPI_STATUS_OK)
         return ret;
 
-    if (ret_tgt) {
-        ret_tgt->type = res->type;
-        return operand_store(ret_tgt, res->obj);
-    }
+    if (ret_tgt)
+        return copy_object_try_elide(ret_tgt, res);
 
     return UACPI_STATUS_OK;
 }
@@ -841,14 +936,14 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
 {
     uacpi_status ret = UACPI_STATUS_UNIMPLEMENTED;
     struct pending_op *pop = ctx->cur_pop;
-    struct operand *arg0, *tgt;
+    uacpi_object *arg0, *tgt;
 
-    arg0 = operand_array_at(&pop->operands, 0);
-    tgt = operand_array_at(&pop->operands, 1);
+    arg0 = *operand_array_at(&pop->operands, 0);
+    tgt = *operand_array_at(&pop->operands, 1);
 
     switch (pop->code) {
     case UACPI_AML_OP_StoreOp: {
-        switch (tgt->obj->type) {
+        switch (tgt->type) {
         case UACPI_OBJECT_SPECIAL:
             ret = special_store(tgt, arg0);
             break;
@@ -857,7 +952,8 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
             break;
         default:
             // TODO: expand on why it's broken
-            uacpi_kernel_log(UACPI_LOG_WARN, "Broken store(?)");
+            uacpi_kernel_log(UACPI_LOG_WARN, "Attempted store to an rvalue\n");
+            ret = UACPI_STATUS_BAD_BYTECODE;
             break;
         }
         break;
@@ -874,33 +970,37 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
 
 static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
 {
+    uacpi_status ret;
     struct pending_op *pop = ctx->cur_pop;
-    struct operand *tgt;
+    uacpi_object *tgt, *res;
+    uacpi_bool unref_res = UACPI_FALSE;
 
-    tgt = operand_array_at(&pop->operands, 0);
+    tgt = *operand_array_at(&pop->operands, 0);
+    if (tgt->type != UACPI_OBJECT_REFERENCE)
+        return UACPI_STATUS_BAD_BYTECODE;
 
     switch (pop->code) {
     case UACPI_AML_OP_IncrementOp:
     case UACPI_AML_OP_DecrementOp: {
-        uacpi_object *obj;
         uacpi_i32 val = pop->code == UACPI_AML_OP_IncrementOp ? +1 : -1;
 
-        if (tgt->obj->type != UACPI_OBJECT_REFERENCE)
+        res = *object_deref_implicit(tgt);
+        if (res->type != UACPI_OBJECT_INTEGER)
             return UACPI_STATUS_BAD_BYTECODE;
 
-        obj = *operand_get_target_object(tgt);
-        if (obj->type != UACPI_OBJECT_INTEGER)
-            return UACPI_STATUS_BAD_BYTECODE;
-
-        obj->as_integer.value += val;
-        return result_store(
-            ctx,
-            &(struct operand) { .type = OPERAND_TYPE_DEFAULT, obj }
-        );
+        res->as_integer.value += val;
+        break;
     }
     default:
         return UACPI_STATUS_UNIMPLEMENTED;
     }
+
+    ret = result_store(ctx, res);
+
+    if (unref_res)
+        uacpi_object_unref(res);
+
+    return ret;
 }
 
 static uacpi_status exec_dispatch(struct execution_context *ctx)
@@ -1180,12 +1280,8 @@ static void operand_array_release(struct operand_array *operands)
 {
     uacpi_size i;
 
-    for (i = 0; i < operand_array_size(operands); ++i) {
-        struct operand *operand;
-
-        operand = operand_array_at(operands, i);
-        uacpi_object_unref(operand->obj);
-    }
+    for (i = 0; i < operand_array_size(operands); ++i)
+        uacpi_object_unref(*operand_array_at(operands, i));
 
     operand_array_clear(operands);
 }
@@ -1198,9 +1294,9 @@ static void call_frame_clear(struct call_frame *frame)
     flow_frame_array_clear(&frame->flows);
 
     for (i = 0; i < 7; ++i)
-        uacpi_object_unref(frame->args[i].obj);
+        uacpi_object_unref(frame->args[i]);
     for (i = 0; i < 8; ++i)
-        uacpi_object_unref(frame->locals[i].obj);
+        uacpi_object_unref(frame->locals[i]);
 }
 
 static void ctx_reload_post_dispatch(struct execution_context *ctx)
@@ -1255,11 +1351,10 @@ static void frame_push_args(struct call_frame *frame,
     uacpi_size i;
 
     for (i = 0; i < operand_array_size(&invocation->operands); ++i) {
-        frame->args[i].obj = operand_unwrap(
-            operand_array_at(&invocation->operands, i),
-            UACPI_TRUE
+        frame->args[i] = object_deref_if_internal(
+            *operand_array_at(&invocation->operands, i)
         );
-        uacpi_object_ref(frame->args[i].obj);
+        uacpi_object_ref(frame->args[i]);
     }
 }
 
@@ -1383,7 +1478,7 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
         }
 
         for (i = 0; i < method->args; ++i) {
-            ctx->cur_frame->args[i].obj = args->objects[i];
+            ctx->cur_frame->args[i] = args->objects[i];
             uacpi_object_ref(args->objects[i]);
         }
     } else if (method->args) {
