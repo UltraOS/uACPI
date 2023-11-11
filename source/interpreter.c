@@ -538,6 +538,14 @@ static uacpi_status get_arg_or_local_ref(
     return ret;
 }
 
+static void truncate_number_if_needed(uacpi_object *obj)
+{
+    if (!g_uacpi_rt_ctx.is_rev1)
+        return;
+
+    obj->as_integer.value &= 0xFFFFFFFF;
+}
+
 uacpi_status get_number(struct call_frame *frame)
 {
     uacpi_status ret;
@@ -577,6 +585,7 @@ uacpi_status get_number(struct call_frame *frame)
 
     obj->as_integer.value = 0;
     uacpi_memcpy(&obj->as_integer.value, data, bytes);
+    truncate_number_if_needed(obj);
     frame->code_offset += bytes;
 
 out:
@@ -989,6 +998,7 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
             return UACPI_STATUS_BAD_BYTECODE;
 
         res->as_integer.value += val;
+        truncate_number_if_needed(res);
         break;
     }
     case UACPI_AML_OP_RefOfOp:
