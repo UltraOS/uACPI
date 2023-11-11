@@ -13,6 +13,10 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.hdr.length = sizeof(fadt);
 
     auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
+    // Always force the signature to DSDT as that's what we're building
+    memcpy(dsdt->hdr.signature, ACPI_DSDT_SIGNATURE,
+           sizeof(ACPI_DSDT_SIGNATURE) - 1);
+
     fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(dsdt);
     memcpy(fadt.hdr.signature, ACPI_FADT_SIGNATURE,
            sizeof(ACPI_FADT_SIGNATURE) - 1);
