@@ -258,6 +258,14 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        RefOfOp, 0x71,                              \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 1,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         IncrementOp, 0x75,                          \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
@@ -267,6 +275,14 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
     )                                               \
     UACPI_OP(                                       \
         DecrementOp, 0x76,                          \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 1,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        DeRefOfOp, 0x83,                            \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
             .has_ret = UACPI_TRUE,                  \

@@ -991,6 +991,20 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
         res->as_integer.value += val;
         break;
     }
+    case UACPI_AML_OP_RefOfOp:
+        res = uacpi_create_object(UACPI_OBJECT_REFERENCE);
+        if (uacpi_unlikely(res == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        res->as_reference.object = object_deref_if_internal(tgt);
+        uacpi_object_ref(res->as_reference.object);
+        unref_res = UACPI_TRUE;
+        break;
+    case UACPI_AML_OP_DeRefOfOp:
+        ret = object_deref_explicit(tgt, &res);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+        break;
     default:
         return UACPI_STATUS_UNIMPLEMENTED;
     }
