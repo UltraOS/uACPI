@@ -51,7 +51,7 @@ def run_tests(
         name, rtype, value = get_case_name_and_expected_result(case)
         compiled_case = compile_case(compiler, case, bin_dir)
 
-        print(f"{os.path.basename(case)}:{name}...", end=" ")
+        print(f"{os.path.basename(case)}:{name}...", end=" ", flush=True)
         proc = subprocess.Popen([runner, compiled_case, rtype, value],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
