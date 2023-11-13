@@ -1547,8 +1547,34 @@ static void frame_push_args(struct call_frame *frame,
     }
 }
 
+static uacpi_status push_new_frame(struct execution_context *ctx,
+                                   struct call_frame **out_frame)
+{
+    struct call_frame_array *call_stack = &ctx->call_stack;
+    struct call_frame *prev_frame;
+
+    *out_frame = call_frame_array_calloc(call_stack);
+    if (uacpi_unlikely(*out_frame == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    /*
+     * Allocating a new frame might have reallocated the dynamic buffer so our
+     * execution_context members might now be pointing to freed memory.
+     * Refresh them here.
+     */
+    prev_frame = call_frame_array_at(call_stack,
+                                     call_frame_array_size(call_stack) - 2);
+    ctx->cur_frame = prev_frame;
+    ctx->cur_pop = pending_op_array_last(&prev_frame->pending_ops);
+    ctx->cur_flow = flow_frame_array_last(&prev_frame->flows);
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status method_call_dispatch(struct execution_context *ctx)
 {
+    uacpi_status ret;
+
     struct uacpi_opcode_info *info = &ctx->cur_pop->info;
     struct uacpi_namespace_node *node = info->as_method_call.node;
     struct uacpi_control_method *method = node->object.as_method.method;
@@ -1558,14 +1584,14 @@ static uacpi_status method_call_dispatch(struct execution_context *ctx)
                        != method->args))
         return UACPI_STATUS_BAD_BYTECODE;
 
-    frame = call_frame_array_calloc(&ctx->call_stack);
-    if (frame == UACPI_NULL)
-        return UACPI_STATUS_OUT_OF_MEMORY;
+    ret = push_new_frame(ctx, &frame);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     frame_push_args(frame, ctx->cur_pop);
     ctx_reload_post_dispatch(ctx);
-    ctx->cur_frame = frame;
 
+    ctx->cur_frame = frame;
     ctx->cur_frame->method = method;
     ctx->cur_pop = UACPI_NULL;
 
