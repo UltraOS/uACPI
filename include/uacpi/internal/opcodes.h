@@ -290,6 +290,14 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        CopyObjectOp, 0x9D,                         \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 2,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         ContinueOp, 0x9F,                           \
         UACPI_FLOW_OPCODE(                          \
             .has_operand = UACPI_FALSE              \

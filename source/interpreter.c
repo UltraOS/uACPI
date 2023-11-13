@@ -441,12 +441,79 @@ static uacpi_status copy_buffer(uacpi_object *dst, uacpi_object *src)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status copy_object_try_elide(uacpi_object *dst, uacpi_object *src)
+struct object_storage_as_buffer {
+    void *ptr;
+    uacpi_size len;
+};
+
+static uacpi_status get_object_storage(uacpi_object *obj,
+                                       struct object_storage_as_buffer *out_buf)
+{
+    switch (obj->type) {
+    case UACPI_OBJECT_INTEGER:
+        out_buf->len = g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
+        out_buf->ptr = &obj->as_integer.value;
+        break;
+    case UACPI_OBJECT_STRING:
+        out_buf->len = obj->as_string.length ? obj->as_string.length - 1 : 0;
+        out_buf->ptr = obj->as_string.text;
+        break;
+    case UACPI_OBJECT_BUFFER:
+        out_buf->ptr = obj->as_buffer.data;
+        out_buf->len = obj->as_buffer.size;
+        break;
+    case UACPI_OBJECT_REFERENCE:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    default:
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+/*
+ * The word "implicit cast" here is only because it's called that in
+ * the specification. In reality, we just copy one buffer to another
+ * because that's what NT does.
+ */
+static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
+                                                     uacpi_object *src)
+{
+    uacpi_status ret;
+    struct object_storage_as_buffer src_buf, dst_buf;
+    uacpi_size bytes_to_copy;
+
+    ret = get_object_storage(src, &src_buf);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = get_object_storage(dst, &dst_buf);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    bytes_to_copy = UACPI_MIN(src_buf.len, dst_buf.len);
+    uacpi_memcpy(dst_buf.ptr, src_buf.ptr, bytes_to_copy);
+    uacpi_memzero((uacpi_u8*)dst_buf.ptr + bytes_to_copy,
+                  dst_buf.len - bytes_to_copy);
+
+    return ret;
+}
+
+static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
+                                               uacpi_object *src)
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
-    if (dst->type == UACPI_OBJECT_REFERENCE)
-        uacpi_object_unref(dst->as_reference.object);
+    if (dst->type == UACPI_OBJECT_REFERENCE) {
+        uacpi_u32 refs_to_remove = dst->common.refcount;
+        while (refs_to_remove--)
+            uacpi_object_unref(dst->as_reference.object);
+    } else if (dst->type == UACPI_OBJECT_STRING ||
+               dst->type == UACPI_OBJECT_BUFFER) {
+        uacpi_kernel_free(dst->as_buffer.data);
+        dst->as_buffer.data = NULL;
+        dst->as_buffer.size = 0;
+    }
 
     switch (src->type) {
     case UACPI_OBJECT_NULL:
@@ -486,16 +553,18 @@ static uacpi_status copy_object_try_elide(uacpi_object *dst, uacpi_object *src)
 
 static uacpi_object *object_deref_if_internal(uacpi_object *object)
 {
-    if (object->type != UACPI_OBJECT_REFERENCE ||
-        object->common.flags == REFERENCE_KIND_REFOF)
-        return object;
+    for (;;) {
+        if (object->type != UACPI_OBJECT_REFERENCE ||
+            object->common.flags == REFERENCE_KIND_REFOF)
+            return object;
 
-    return object->as_reference.object;
+        object = object->as_reference.object;
+    }
 }
 
 static uacpi_status copy_retval(uacpi_object *dst, uacpi_object *src)
 {
-    return copy_object_try_elide(dst, object_deref_if_internal(src));
+    return object_overwrite_try_elide(dst, object_deref_if_internal(src));
 }
 
 static uacpi_status get_arg_or_local_ref(
@@ -654,7 +723,8 @@ static uacpi_status exec_get_ret_target(struct execution_context *ctx,
         return pop_operand_alloc(pop, out_operand);
     }
 
-    return UACPI_STATUS_NOT_FOUND;
+    *out_operand = UACPI_NULL;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status method_get_ret_object(struct execution_context *ctx,
@@ -906,82 +976,158 @@ static uacpi_status object_deref_explicit(uacpi_object *obj,
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status reference_store(uacpi_object *dst, uacpi_object *src)
+/*
+ * Breakdown of what happens here:
+ *
+ * CopyObject(..., Obj) where Obj is:
+ * 1. LocalX -> Overwrite LocalX.
+ * 2. NAME -> Overwrite NAME.
+ * 3. ArgX -> Overwrite ArgX unless ArgX is a reference, in that case
+ *            overwrite the referenced object.
+ * 4. RefOf -> Not allowed here.
+ */
+ static uacpi_status copy_object_to_reference(uacpi_object *dst,
+                                              uacpi_object *src)
 {
     uacpi_object **dst_slot;
     uacpi_object *src_obj;
 
-    dst_slot = object_deref_implicit(dst);
-    if (uacpi_unlikely(dst_slot == UACPI_NULL))
+    switch (dst->common.flags) {
+    case REFERENCE_KIND_ARG: {
+        uacpi_object *referenced_obj;
+
+        referenced_obj = object_deref_if_internal(dst);
+        if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
+            referenced_obj->common.flags == REFERENCE_KIND_REFOF) {
+            dst_slot = reference_unwind(referenced_obj);
+            break;
+        }
+
+        // FALLTHROUGH intended here
+    }
+    case REFERENCE_KIND_LOCAL:
+    case REFERENCE_KIND_NAMED:
+        dst_slot = &dst->as_reference.object;
+        break;
+    default:
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     src_obj = object_deref_if_internal(src);
-    if (uacpi_unlikely(dst_slot == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
-    copy_object_try_elide(*dst_slot, src_obj);
-    return UACPI_STATUS_OK;
+    return object_overwrite_try_elide(*dst_slot, src_obj);
 }
 
-static uacpi_status result_store(struct execution_context *ctx,
-                                 uacpi_object *res)
+/*
+ * if Store(..., Obj) where Obj is:
+ * 1. LocalX -> OVERWRITE unless the object is a reference, in that
+ *              case store to the referenced object _with_ implicit
+ *              cast.
+ * 2. ArgX -> OVERWRITE unless the object is a reference, in that
+ *            case OVERWRITE the referenced object.
+ * 3. NAME -> Store with implicit cast.
+ * 4. RefOf -> Not allowed here.
+ */
+static uacpi_status store_to_reference(uacpi_object *dst,
+                                       uacpi_object *src)
 {
-    uacpi_status ret;
-    uacpi_object *ret_tgt = UACPI_NULL;
+    uacpi_object **dst_slot;
+    uacpi_object *src_obj;
+    uacpi_bool overwrite = UACPI_FALSE;
 
-    ret = exec_get_ret_target(ctx, &ret_tgt);
-    if (ret == UACPI_STATUS_NOT_FOUND)
-        ret = UACPI_STATUS_OK;
-    if (ret != UACPI_STATUS_OK)
-        return ret;
+    switch (dst->common.flags) {
+    case REFERENCE_KIND_LOCAL:
+    case REFERENCE_KIND_ARG: {
+        uacpi_object *referenced_obj;
 
-    if (ret_tgt)
-        return copy_object_try_elide(ret_tgt, res);
+        referenced_obj = object_deref_if_internal(dst);
+        if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
+            referenced_obj->common.flags == REFERENCE_KIND_REFOF) {
+            dst_slot = reference_unwind(referenced_obj);
+            overwrite = dst->common.flags == REFERENCE_KIND_ARG;
+            break;
+        }
 
-    return UACPI_STATUS_OK;
+        overwrite = UACPI_TRUE;
+        dst_slot = &dst->as_reference.object;
+        break;
+    }
+    case REFERENCE_KIND_NAMED:
+        dst_slot = reference_unwind(dst);
+        break;
+    }
+
+    src_obj = object_deref_if_internal(src);
+
+    if (!overwrite) {
+        overwrite = (*dst_slot)->type == src_obj->type ||
+                    (*dst_slot)->type == UACPI_OBJECT_NULL;
+    }
+
+    if (overwrite)
+        return object_overwrite_try_elide(*dst_slot, src_obj);
+
+    return object_assign_with_implicit_cast(*dst_slot, src_obj);
 }
 
 static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
 {
-    uacpi_status ret = UACPI_STATUS_UNIMPLEMENTED;
+    uacpi_status ret;
     struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *arg0, *tgt;
+    uacpi_object *arg0, *tgt, *ret_tgt;
 
     arg0 = *operand_array_at(&pop->operands, 0);
     tgt = *operand_array_at(&pop->operands, 1);
 
+    ret = exec_get_ret_target(ctx, &ret_tgt);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    // Someone wants the return value, ref it so that it's not moved into tgt
+    if (ret_tgt)
+        uacpi_object_ref(arg0);
+
     switch (pop->code) {
-    case UACPI_AML_OP_StoreOp: {
-        switch (tgt->type) {
-        case UACPI_OBJECT_SPECIAL:
+    case UACPI_AML_OP_StoreOp:
+    case UACPI_AML_OP_CopyObjectOp: {
+        if (tgt->type == UACPI_OBJECT_SPECIAL) {
             ret = special_store(tgt, arg0);
             break;
-        case UACPI_OBJECT_REFERENCE:
-            ret = reference_store(tgt, arg0);
-            break;
-        default:
-            // TODO: expand on why it's broken
-            uacpi_kernel_log(UACPI_LOG_WARN, "Attempted store to an rvalue\n");
+        }
+
+        if (tgt->type != UACPI_OBJECT_REFERENCE ||
+            tgt->common.flags == REFERENCE_KIND_REFOF) {
+            uacpi_kernel_log(UACPI_LOG_WARN, "Target is not a SuperName\n");
             ret = UACPI_STATUS_BAD_BYTECODE;
             break;
         }
-        break;
-    default:
+
+        if (pop->code == UACPI_AML_OP_StoreOp)
+            ret = store_to_reference(tgt, arg0);
+        else
+            ret = copy_object_to_reference(tgt, arg0);
         break;
     }
+    default:
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+        break;
     }
 
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    return result_store(ctx, tgt);
+    if (ret_tgt) {
+        uacpi_object_unref(arg0);
+        return object_overwrite_try_elide(ret_tgt, arg0);
+    }
+
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
 {
     uacpi_status ret;
     struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *tgt, *res;
+    uacpi_object *tgt, *res, *ret_tgt;
     uacpi_bool unref_res = UACPI_FALSE;
 
     tgt = *operand_array_at(&pop->operands, 0);
@@ -1019,7 +1165,9 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
         return UACPI_STATUS_UNIMPLEMENTED;
     }
 
-    ret = result_store(ctx, res);
+    ret = exec_get_ret_target(ctx, &ret_tgt);
+    if (uacpi_likely_success(ret) && ret_tgt)
+        object_overwrite_try_elide(ret_tgt, res);
 
     if (unref_res)
         uacpi_object_unref(res);
@@ -1375,9 +1523,26 @@ static void frame_push_args(struct call_frame *frame,
     uacpi_size i;
 
     for (i = 0; i < operand_array_size(&invocation->operands); ++i) {
-        frame->args[i] = object_deref_if_internal(
-            *operand_array_at(&invocation->operands, i)
-        );
+        uacpi_object *obj = *operand_array_at(&invocation->operands, i);
+        frame->args[i] = obj;
+
+        /*
+         * If argument is a LocalX or ArgX and the referenced type is an
+         * integer then we just copy the object
+         */
+        if (obj->type != UACPI_OBJECT_REFERENCE)
+            goto next;
+        if (obj->common.flags != REFERENCE_KIND_LOCAL &&
+            obj->common.flags != REFERENCE_KIND_ARG)
+            goto next;
+
+        obj = object_deref_if_internal(obj);
+        if (obj->type != UACPI_OBJECT_INTEGER)
+            goto next;
+
+        object_overwrite_try_elide(frame->args[i], obj);
+
+    next:
         uacpi_object_ref(frame->args[i]);
     }
 }
