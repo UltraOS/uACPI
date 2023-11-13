@@ -27,8 +27,13 @@ def compile_case(compiler: str, case: str, bin_dir: str) -> str:
     case_aml_name = os.path.basename(case).rsplit(".", 1)[0] + ".aml"
     out_case = os.path.join(bin_dir, case_aml_name)
 
-    proc = subprocess.Popen([compiler, "-p", out_case, case],
-                            stdout=subprocess.PIPE,
+    ignored_warnings = [
+        # Warning 3144 Method Local is set but never used
+        "-vw", "3144",
+    ]
+
+    args = [compiler, *ignored_warnings, "-p", out_case, case]
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE,
                             universal_newlines=True)
 
     proc.wait(10)
