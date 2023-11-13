@@ -30,6 +30,8 @@ def compile_case(compiler: str, case: str, bin_dir: str) -> str:
     ignored_warnings = [
         # Warning 3144 Method Local is set but never used
         "-vw", "3144",
+        # Remark 2098 Recursive method call
+        "-vw", "2098",
     ]
 
     args = [compiler, *ignored_warnings, "-p", out_case, case]
