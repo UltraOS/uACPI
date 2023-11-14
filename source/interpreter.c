@@ -1214,6 +1214,62 @@ static uacpi_status dispatch_1_arg(struct execution_context *ctx)
     return ret;
 }
 
+static uacpi_status dispatch_2_arg(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct pending_op *pop = ctx->cur_pop;
+    uacpi_object *arg0, *arg1, *ret_tgt;
+
+    arg0 = *operand_array_at(&pop->operands, 0);
+    arg1 = *operand_array_at(&pop->operands, 1);
+
+    arg0 = object_deref_if_internal(arg0);
+    arg1 = object_deref_if_internal(arg1);
+
+    ret = exec_get_ret_target(ctx, &ret_tgt);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    switch (pop->code) {
+    case UACPI_AML_OP_LEqualOp: {
+        uacpi_bool result;
+
+        if (arg0->type != arg1->type)
+            return UACPI_STATUS_BAD_BYTECODE;
+        if (!ret_tgt)
+            return UACPI_STATUS_OK;
+
+        switch (arg0->type) {
+        case UACPI_OBJECT_INTEGER:
+            result = arg0->as_integer.value == arg1->as_integer.value;
+            break;
+        case UACPI_OBJECT_STRING:
+        case UACPI_OBJECT_BUFFER:
+            result = arg0->as_buffer.size == arg1->as_buffer.size;
+            if (result) {
+                result = uacpi_memcmp(
+                    arg0->as_buffer.data,
+                    arg1->as_buffer.data,
+                    arg0->as_buffer.size
+                ) == 0;
+            }
+            break;
+        default:
+            return UACPI_STATUS_BAD_BYTECODE;
+        }
+
+        ret_tgt->type = UACPI_OBJECT_INTEGER;
+        ret_tgt->as_integer.value = result ? ones() : 0;
+        break;
+    }
+    default:
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+        break;
+    }
+
+    return ret;
+}
+
 static uacpi_status exec_dispatch(struct execution_context *ctx)
 {
     uacpi_status st = UACPI_STATUS_UNIMPLEMENTED;
@@ -1229,6 +1285,8 @@ static uacpi_status exec_dispatch(struct execution_context *ctx)
     case 2:
         if (op->has_target)
             st = dispatch_1_arg_with_target(ctx);
+        else
+            st = dispatch_2_arg(ctx);
         break;
     default:
         break;

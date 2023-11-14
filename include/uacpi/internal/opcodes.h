@@ -298,6 +298,14 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        LEqualOp, 0x93,                             \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_FALSE,              \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 2,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         CopyObjectOp, 0x9D,                         \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
