@@ -20,8 +20,8 @@ uacpi_object_type string_to_object_type(std::string_view str)
 std::string_view type_to_string(uacpi_object_type type)
 {
     switch (type) {
-    case UACPI_OBJECT_NULL:
-        return "null";
+    case UACPI_OBJECT_UNINITIALIZED:
+        return "uninitialized";
     case UACPI_OBJECT_INTEGER:
         return "integer";
     case UACPI_OBJECT_STRING:

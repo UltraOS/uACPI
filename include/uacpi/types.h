@@ -18,7 +18,7 @@ typedef void *uacpi_handle;
 typedef struct uacpi_control_method uacpi_control_method;
 
 typedef enum uacpi_object_type {
-    UACPI_OBJECT_NULL = 0,
+    UACPI_OBJECT_UNINITIALIZED = 0,
     UACPI_OBJECT_INTEGER = 1,
     UACPI_OBJECT_STRING = 2,
     UACPI_OBJECT_BUFFER = 3,
