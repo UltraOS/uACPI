@@ -1178,7 +1178,7 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
 
     ret = exec_get_ret_target(ctx, &ret_tgt);
     if (uacpi_likely_success(ret) && ret_tgt)
-        object_overwrite_try_elide(ret_tgt, res);
+        ret = object_overwrite_try_elide(ret_tgt, res);
 
     if (unref_res)
         uacpi_object_unref(res);
