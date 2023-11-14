@@ -343,6 +343,13 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
     UACPI_OP(                                       \
         UACPIInternalOpMethodCall, 0xFE,            \
         UACPI_METHOD_CALL_OPCODE()                  \
+    )                                               \
+    UACPI_OP(                                       \
+        OnesOp, 0xFF,                               \
+        UACPI_ARG_OPCODE(                           \
+            .arg_type = UACPI_ARG_TYPE_NUMBER,      \
+            .sub_type = UACPI_ARG_SUB_TYPE_CONSTANT \
+        )                                           \
     )
 
 enum uacpi_aml_op {

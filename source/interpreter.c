@@ -615,6 +615,11 @@ static void truncate_number_if_needed(uacpi_object *obj)
     obj->as_integer.value &= 0xFFFFFFFF;
 }
 
+static uacpi_u64 ones()
+{
+    return g_uacpi_rt_ctx.is_rev1 ? 0xFFFFFFFF : 0xFFFFFFFFFFFFFFFF;
+}
+
 uacpi_status get_number(struct call_frame *frame)
 {
     uacpi_status ret;
@@ -634,6 +639,9 @@ uacpi_status get_number(struct call_frame *frame)
         goto out;
     case UACPI_AML_OP_OneOp:
         obj->as_integer.value = 1;
+        goto out;
+    case UACPI_AML_OP_OnesOp:
+        obj->as_integer.value = ones();
         goto out;
     case UACPI_AML_OP_BytePrefix:
         bytes = 1;
