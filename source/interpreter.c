@@ -1183,6 +1183,37 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
     return ret;
 }
 
+static uacpi_status dispatch_1_arg(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct pending_op *pop = ctx->cur_pop;
+    uacpi_object *arg, *ret_tgt;
+
+    arg = *operand_array_at(&pop->operands, 0);
+    arg = object_deref_if_internal(arg);
+
+    ret = exec_get_ret_target(ctx, &ret_tgt);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    switch (pop->code) {
+    case UACPI_AML_OP_LnotOp:
+        if (arg->type != UACPI_OBJECT_INTEGER)
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        if (ret_tgt) {
+            ret_tgt->type = UACPI_OBJECT_INTEGER;
+            ret_tgt->as_integer.value = arg->as_integer.value ? 0 : ones();
+        }
+        break;
+    default:
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+        break;
+    }
+
+    return ret;
+}
+
 static uacpi_status exec_dispatch(struct execution_context *ctx)
 {
     uacpi_status st = UACPI_STATUS_UNIMPLEMENTED;
@@ -1192,6 +1223,8 @@ static uacpi_status exec_dispatch(struct execution_context *ctx)
     case 1:
         if (op->has_target)
             st = dispatch_0_arg_with_target(ctx);
+        else
+            st = dispatch_1_arg(ctx);
         break;
     case 2:
         if (op->has_target)
