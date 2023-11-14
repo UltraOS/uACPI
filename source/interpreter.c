@@ -367,7 +367,7 @@ uacpi_status pop_operand_alloc(struct pending_op *pop, uacpi_object **out_operan
     if (operand == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    *operand = uacpi_create_object(UACPI_OBJECT_NULL);
+    *operand = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
     if (*operand == UACPI_NULL) {
         operand_array_pop(&pop->operands);
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -516,7 +516,7 @@ static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
     }
 
     switch (src->type) {
-    case UACPI_OBJECT_NULL:
+    case UACPI_OBJECT_UNINITIALIZED:
         break;
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING:
@@ -594,7 +594,7 @@ static uacpi_status get_arg_or_local_ref(
 
     // Access to an uninitialized local or arg, hopefully a store incoming
     if (*src == UACPI_NULL) {
-        *src = uacpi_create_object(UACPI_OBJECT_NULL);
+        *src = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
         if (uacpi_unlikely(*src == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
     }
@@ -898,6 +898,9 @@ static uacpi_status special_store(uacpi_object *dst, uacpi_object *src)
     src = object_deref_if_internal(src);
 
     switch (src->type) {
+    case UACPI_OBJECT_UNINITIALIZED:
+        uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Uninitialized]\n");
+        break;
     case UACPI_OBJECT_STRING:
         uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, String] %s\n",
                          src->as_string.text);
@@ -1068,7 +1071,7 @@ static uacpi_status store_to_reference(uacpi_object *dst,
 
     if (!overwrite) {
         overwrite = (*dst_slot)->type == src_obj->type ||
-                    (*dst_slot)->type == UACPI_OBJECT_NULL;
+                    (*dst_slot)->type == UACPI_OBJECT_UNINITIALIZED;
     }
 
     if (overwrite)
@@ -1767,7 +1770,7 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     if (ret != UACPI_NULL) {
-        ctx->ret = uacpi_create_object(UACPI_OBJECT_NULL);
+        ctx->ret = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
         if (uacpi_unlikely(ctx->ret == UACPI_NULL)) {
             st = UACPI_STATUS_OUT_OF_MEMORY;
             goto out;
@@ -1855,7 +1858,7 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
     }
 
 out:
-    if (ret && ctx->ret->type != UACPI_OBJECT_NULL) {
+    if (ret && ctx->ret->type != UACPI_OBJECT_UNINITIALIZED) {
         uacpi_object_ref(ctx->ret);
         *ret = ctx->ret;
     }
