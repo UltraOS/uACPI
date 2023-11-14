@@ -1187,6 +1187,131 @@ static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
     return ret;
 }
 
+static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
+                           uacpi_object *ret, uacpi_aml_op op)
+{
+    uacpi_u64 lhs, rhs, res;
+    uacpi_bool should_negate = UACPI_FALSE;
+
+    lhs = arg0->as_integer.value;
+    rhs = arg1->as_integer.value;
+
+    switch (op)
+    {
+    case UACPI_AML_OP_AddOp:
+        res = lhs + rhs;
+        break;
+    case UACPI_AML_OP_SubtractOp:
+        res = lhs - rhs;
+        break;
+    case UACPI_AML_OP_MultiplyOp:
+        res = lhs * rhs;
+        break;
+    case UACPI_AML_OP_ShiftLeftOp:
+    case UACPI_AML_OP_ShiftRightOp:
+        if (rhs <= (g_uacpi_rt_ctx.is_rev1 ? 31 : 63)) {
+            if (op == UACPI_AML_OP_ShiftLeftOp)
+                res = lhs << rhs;
+            else
+                res = lhs >> rhs;
+        } else {
+            res = 0;
+        }
+        break;
+    case UACPI_AML_OP_NandOp:
+        should_negate = UACPI_TRUE;
+    case UACPI_AML_OP_AndOp:
+        res = rhs & lhs;
+        break;
+    case UACPI_AML_OP_NorOp:
+        should_negate = UACPI_TRUE;
+    case UACPI_AML_OP_OrOp:
+        res = rhs | lhs;
+        break;
+    case UACPI_AML_OP_XorOp:
+        res = rhs ^ lhs;
+        break;
+    case UACPI_AML_OP_ModOp:
+        res = lhs % rhs;
+        break;
+    default:
+        break;
+    }
+
+    if (should_negate)
+        res = ~res;
+
+    ret->as_integer.value = res;
+    truncate_number_if_needed(ret);
+}
+
+static uacpi_status dispatch_3_arg_with_target(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct pending_op *pop = ctx->cur_pop;
+    uacpi_object *arg0, *arg1, *tgt, *temp_result, *ret_tgt;
+
+    arg0 = *operand_array_at(&pop->operands, 0);
+    arg1 = *operand_array_at(&pop->operands, 1);
+    tgt = *operand_array_at(&pop->operands, 2);
+
+    temp_result = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+    if (uacpi_unlikely(temp_result == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    switch (pop->code) {
+    case UACPI_AML_OP_AddOp:
+    case UACPI_AML_OP_SubtractOp:
+    case UACPI_AML_OP_MultiplyOp:
+    case UACPI_AML_OP_ShiftLeftOp:
+    case UACPI_AML_OP_ShiftRightOp:
+    case UACPI_AML_OP_NandOp:
+    case UACPI_AML_OP_AndOp:
+    case UACPI_AML_OP_NorOp:
+    case UACPI_AML_OP_OrOp:
+    case UACPI_AML_OP_XorOp:
+    case UACPI_AML_OP_ModOp:
+        arg0 = object_deref_if_internal(arg0);
+        arg1 = object_deref_if_internal(arg1);
+
+        if (arg0->type != UACPI_OBJECT_INTEGER ||
+            arg1->type != UACPI_OBJECT_INTEGER) {
+            return UACPI_STATUS_BAD_BYTECODE;
+        }
+        temp_result->type = UACPI_OBJECT_INTEGER;
+
+        do_binary_math(arg0, arg1, temp_result, pop->code);
+        break;
+    default:
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+        break;
+    }
+
+    switch (tgt->type) {
+    case UACPI_OBJECT_SPECIAL:
+        ret = special_store(tgt, temp_result);
+        break;
+    case UACPI_OBJECT_REFERENCE:
+        ret = store_to_reference(tgt, temp_result);
+        break;
+    case UACPI_OBJECT_INTEGER:
+        // NULL target
+        if (tgt->as_integer.value == 0)
+            break;
+    default:
+        ret = UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    if (uacpi_likely_success(ret)) {
+        ret = exec_get_ret_target(ctx, &ret_tgt);
+        if (uacpi_likely_success(ret) && ret_tgt)
+            ret = object_overwrite_try_elide(ret_tgt, temp_result);
+    }
+
+    uacpi_object_unref(temp_result);
+    return ret;
+}
+
 static uacpi_status dispatch_1_arg(struct execution_context *ctx)
 {
     uacpi_status ret;
@@ -1292,6 +1417,9 @@ static uacpi_status exec_dispatch(struct execution_context *ctx)
         else
             st = dispatch_2_arg(ctx);
         break;
+    case 3:
+        if (op->has_target)
+            st = dispatch_3_arg_with_target(ctx);
     default:
         break;
     }

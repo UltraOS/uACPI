@@ -266,6 +266,22 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        AddOp, 0x72,                                \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        SubtractOp, 0x74,                           \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         IncrementOp, 0x75,                          \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
@@ -282,11 +298,83 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
         )                                           \
     )                                               \
     UACPI_OP(                                       \
+        MultiplyOp, 0x77,                           \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        ShiftLeftOp, 0x79,                          \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        ShiftRightOp, 0x7A,                         \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        AndOp, 0x7B,                                \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        NandOp, 0x7C,                               \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        OrOp, 0x7D,                                 \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        NorOp, 0x7E,                                \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        XorOp, 0x7F,                                \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
         DeRefOfOp, 0x83,                            \
         UACPI_EXEC_OPCODE(                          \
             .has_target = UACPI_TRUE,               \
             .has_ret = UACPI_TRUE,                  \
             .operand_count = 1,                     \
+        )                                           \
+    )                                               \
+    UACPI_OP(                                       \
+        ModOp, 0x85,                                \
+        UACPI_EXEC_OPCODE(                          \
+            .has_target = UACPI_TRUE,               \
+            .has_ret = UACPI_TRUE,                  \
+            .operand_count = 3,                     \
         )                                           \
     )                                               \
     UACPI_OP(                                       \
