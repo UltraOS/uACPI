@@ -321,6 +321,7 @@ static struct uacpi_opcode_info *opcode_table_find_op(uacpi_aml_op op)
         }
     }
 
+    uacpi_kernel_log(UACPI_LOG_WARN, "Unimplemented opcode 0x%016X\n", op);
     return UACPI_NULL;
 }
 
