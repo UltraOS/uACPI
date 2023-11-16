@@ -518,6 +518,7 @@ static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
 
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
+    case UACPI_OBJECT_DEBUG:
         break;
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING:
@@ -528,9 +529,6 @@ static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
         break;
     case UACPI_OBJECT_METHOD:
         dst->as_method.method = src->as_method.method;
-        break;
-    case UACPI_OBJECT_SPECIAL:
-        dst->as_special.special_type = src->as_special.special_type;
         break;
     case UACPI_OBJECT_REFERENCE: {
         uacpi_u32 refs_to_add = dst->common.refcount;
@@ -671,7 +669,7 @@ out:
     return UACPI_STATUS_OK;
 }
 
-uacpi_status get_special(struct call_frame *frame)
+uacpi_status get_debug(struct call_frame *frame)
 {
     uacpi_status ret;
     uacpi_object *obj;
@@ -682,11 +680,10 @@ uacpi_status get_special(struct call_frame *frame)
 
     switch (frame->cur_op.code) {
     case UACPI_AML_OP_DebugOp:
-        obj->as_special.type = UACPI_OBJECT_SPECIAL;
-        obj->as_special.special_type = UACPI_SPECIAL_TYPE_DEBUG_OBJECT;
+        obj->type = UACPI_OBJECT_DEBUG;
         return UACPI_STATUS_OK;
     default:
-        return UACPI_STATUS_UNIMPLEMENTED;
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 }
 
@@ -891,11 +888,8 @@ static uacpi_status flow_dispatch(struct execution_context *ctx)
     }
 }
 
-static uacpi_status special_store(uacpi_object *dst, uacpi_object *src)
+static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
 {
-    if (dst->as_special.special_type != UACPI_SPECIAL_TYPE_DEBUG_OBJECT)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     src = object_deref_if_internal(src);
 
     switch (src->type) {
@@ -1101,8 +1095,8 @@ static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
     switch (pop->code) {
     case UACPI_AML_OP_StoreOp:
     case UACPI_AML_OP_CopyObjectOp: {
-        if (tgt->type == UACPI_OBJECT_SPECIAL) {
-            ret = special_store(tgt, arg0);
+        if (tgt->type == UACPI_OBJECT_DEBUG) {
+            ret = debug_store(tgt, arg0);
             break;
         }
 
@@ -1288,8 +1282,8 @@ static uacpi_status dispatch_3_arg_with_target(struct execution_context *ctx)
     }
 
     switch (tgt->type) {
-    case UACPI_OBJECT_SPECIAL:
-        ret = special_store(tgt, temp_result);
+    case UACPI_OBJECT_DEBUG:
+        ret = debug_store(tgt, temp_result);
         break;
     case UACPI_OBJECT_REFERENCE:
         ret = store_to_reference(tgt, temp_result);
@@ -1669,8 +1663,8 @@ static uacpi_status get_arg(struct call_frame *frame)
     case UACPI_ARG_TYPE_STRING:
         ret = get_string(frame);
         break;
-    case UACPI_ARG_TYPE_SPECIAL:
-        ret = get_special(frame);
+    case UACPI_ARG_TYPE_DEBUG:
+        ret = get_debug(frame);
         break;
     default:
         break;
