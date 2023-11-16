@@ -23,9 +23,10 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_STRING = 2,
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
-    UACPI_OBJECT_REFERENCE = 5,
-    UACPI_OBJECT_METHOD = 6,
-    UACPI_OBJECT_SPECIAL = 7,
+    UACPI_OBJECT_METHOD = 8,
+    UACPI_OBJECT_DEBUG = 16,
+
+    UACPI_OBJECT_REFERENCE = 20,
 } uacpi_object_type;
 
 #define UACPI_OBJECT_COMMON_HDR \
@@ -68,15 +69,9 @@ typedef struct uacpi_object_control_method {
     uacpi_control_method *method;
 } uacpi_object_control_method;
 
-enum uacpi_special_type {
-    UACPI_SPECIAL_TYPE_DEBUG_OBJECT = 1,
-    UACPI_SPECIAL_TYPE_TIMER_OBJECT = 2,
-};
-
-typedef struct uacpi_object_special {
+typedef struct uacpi_object_debug {
     UACPI_OBJECT_COMMON_HDR
-    uacpi_u8 special_type;
-} uacpi_object_special;
+} uacpi_object_debug;
 
 typedef struct uacpi_object_common {
     UACPI_OBJECT_COMMON_HDR
@@ -91,7 +86,7 @@ typedef union uacpi_object {
     uacpi_object_package as_package;
     uacpi_object_reference as_reference;
     uacpi_object_control_method as_method;
-    uacpi_object_special as_special;
+    uacpi_object_debug as_debug;
 } uacpi_object;
 
 typedef struct uacpi_args {

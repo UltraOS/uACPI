@@ -18,7 +18,7 @@ enum uacpi_arg_type {
     UACPI_ARG_TYPE_ANY = 0,
     UACPI_ARG_TYPE_NUMBER = 1,
     UACPI_ARG_TYPE_STRING = 2,
-    UACPI_ARG_TYPE_SPECIAL = 3,
+    UACPI_ARG_TYPE_DEBUG = 3,
 };
 
 enum uacpi_arg_sub_type {
@@ -440,7 +440,7 @@ extern struct uacpi_opcode_info uacpi_opcode_table[];
     UACPI_OP(                                       \
         DebugOp, UACPI_EXT_OP(0x31),                \
         UACPI_ARG_OPCODE(                           \
-            .arg_type = UACPI_ARG_TYPE_SPECIAL,     \
+            .arg_type = UACPI_ARG_TYPE_DEBUG,       \
             .sub_type = UACPI_ARG_SUB_TYPE_CONSTANT \
         )                                           \
     )                                               \
