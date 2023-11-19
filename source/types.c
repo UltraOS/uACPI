@@ -45,6 +45,8 @@ static void free_object(uacpi_object *obj)
     if (obj->type == UACPI_OBJECT_STRING ||
         obj->type == UACPI_OBJECT_BUFFER)
         uacpi_kernel_free(obj->as_buffer.data);
+    if (obj->type == UACPI_OBJECT_METHOD)
+        uacpi_kernel_free(obj->as_method.method);
 
     uacpi_kernel_free(obj);
 }

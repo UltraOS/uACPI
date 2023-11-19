@@ -4,7 +4,7 @@
 #include <uacpi/status.h>
 
 struct uacpi_control_method {
-    uacpi_object_type type;
+    struct uacpi_namespace_node *node;
     uacpi_u8 *code;
     uacpi_u32 size;
     uacpi_u8 sync_level : 4;

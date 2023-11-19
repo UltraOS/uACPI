@@ -35,187 +35,102 @@ enum reference_kind {
 };
 
 /*
- * The implementation of references:
- *
- * Bytecode OPs like ArgX and LocalX are always converted to reference objects
- * for simplicity, the assigned reference kind is REFERENCE_KIND_LOCAL and
- * REFERENCE_KIND_ARG respectively and the referenced object is either
- * a member of call_frame::locals or call_frame::args.
- *
- * A call to RefOf generates a new reference object of type
- * REFERENCE_KIND_NORMAL that references the provided object dereferenced
- * according to rules specified above object_deref_implicit.
- *
- * Now for the more complicated part - dereferencing (implicit or via DerefOf):
- *
- * Every dereference either explicit or implicit has to unwind the reference
- * chain all the way to the bottom, this is done to mimic the implementation
- * used in the NT kernel (which is what all AML code is tested against by
- * default)
- *
- * Let's break down a few examples:
- *
- * 1. Local0 = 123
- * Local0 is converted to a REFERENCE_KIND_LOCAL where the referenced object is
- * set to call_frame->locals[0].
- *
- * DerefOf(Local0) works as following:
- *     1. Dereference the reference to local via object_deref_if_internal.
- *     2. The resulting object is not a reference, this is an error.
- *
- * 2. Local1 = 123; Local0 = RefOf(Local1)
- * In the example above Local0 is broken down as following:
- *     Local0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_LOCAL)
- *     |
- *     v
- *     call_frame->locals[0] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
- *     |
- *     v
- *     call_frame->locals[1] (UACPI_OBJECT_INTEGER)
- *
- * DerefOf(Local0) works as following:
- *     1. Dereference the reference to local via object_deref_if_internal.
- *     2. Start unwinding via unwind_reference()
- *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
-*            (call_frame->locals[1])
- *         - Current object is not a reference, so it's the result of
- *           the DerefOf -- we're done.
- *
- * 3. MAIN(123)
- * In this example Arg0 is broken down as following:
- *     Arg0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_ARG)
- *     |
- *     v
- *     call_frame->args[0] (UACPI_OBJECT_INTEGER)
- *
- * 4. Local0 = 123; Local1 = RefOf(Local0); MAIN(RefOf(Local1))
- * In this example Arg0 is broken down as following:
- *     Arg0 (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_ARG)
- *     |
- *     v
- *     call_frame->args[0] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
- *     |
- *     v
- *     prev_call_frame->locals[1] (UACPI_OBJECT_REFERENCE, REFERENCE_KIND_REFOF)
- *     |
- *     v
- *     prev_call_frame->locals[0] (UACPI_OBJECT_INTEGER)
- *
- * DerefOf(Arg0) works as following:
- *     1. Dereference the reference to arg via object_deref_if_internal.
- *     2. Start unwinding via unwind_reference()
- *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
- *           (prev_call_frame->locals[1])
- *         - Current object is REFERENCE_KIND_REFOF, take the referenced object
- *           (prev_call_frame->locals[0])
- *         - Current object is not a reference, so it's the result of
- *           the DerefOf -- we're done.
- *
- * Store(..., ArgX/LocalX) automatically dereferences as if by DerefOf in the
- * example above.
+ * TODO: Write a note here explaining how references are currently implemented
+ *       and how some of the edge cases are handled.
  */
 
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE(operand_array, uacpi_object*, 8)
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(operand_array, uacpi_object*, static)
-
-struct op {
-    uacpi_aml_op code;
-    struct uacpi_opcode_info info;
+enum item_type {
+    ITEM_NONE = 0,
+    ITEM_NAMESPACE_NODE,
+    ITEM_OBJECT,
+    ITEM_EMPTY_OBJECT,
+    ITEM_PACKAGE_LENGTH,
+    ITEM_IMMEDIATE,
 };
 
-struct pending_op {
-    uacpi_aml_op code;
-    struct uacpi_opcode_info info;
-    struct operand_array operands;
+struct package_length {
+    uacpi_u32 begin;
+    uacpi_u32 end;
 };
 
-static uacpi_bool op_dispatchable(struct pending_op *pop)
-{
-    uacpi_u8 tgt_count;
-    struct uacpi_opcode_info *info = &pop->info;
+struct item {
+    uacpi_u8 type;
+    union {
+        uacpi_object *obj;
+        struct uacpi_namespace_node *node;
+        struct package_length pkg;
+        uacpi_u64 immediate;
+        uacpi_u8 immediate_bytes[8];
+    };
+};
 
-    switch (info->type) {
-    case UACPI_OPCODE_TYPE_EXEC:
-        tgt_count = info->as_exec.operand_count;
-        break;
-    case UACPI_OPCODE_TYPE_FLOW:
-        tgt_count = info->as_flow.has_operand;
-        break;
-    case UACPI_OPCODE_TYPE_METHOD_CALL:
-        tgt_count = info->as_method_call.node->object.as_method.method->args;
-        break;
-    default:
-        return UACPI_FALSE;
-    }
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(item_array, struct item, 8)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(item_array, struct item, static)
 
-    return operand_array_size(&pop->operands) == tgt_count;
-}
+struct op_context {
+    uacpi_u8 pc;
+    uacpi_bool preempted;
 
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE(pending_op_array, struct pending_op, 4)
+    /*
+     * == 0 -> none
+     * >= 1 -> item[idx - 1]
+     */
+    uacpi_u8 tracked_pkg_idx;
+
+    const struct uacpi_op_spec *op;
+    struct item_array items;
+};
+
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(op_context_array, struct op_context, 8)
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
-    pending_op_array, struct pending_op, static
+    op_context_array, struct op_context, static
 )
 
-enum flow_frame_type {
-    FLOW_FRAME_IF = 1,
-    FLOW_FRAME_ELSE = 2,
-    FLOW_FRAME_WHILE = 3,
+static struct op_context *op_context_array_one_before_last(
+    struct op_context_array *arr
+)
+{
+    uacpi_size size;
+
+    size = op_context_array_size(arr);
+
+    if (size < 2)
+        return UACPI_NULL;
+
+    return op_context_array_at(arr, size - 2);
+}
+
+enum code_block_type {
+    CODE_BLOCK_IF = 1,
+    CODE_BLOCK_ELSE = 2,
+    CODE_BLOCK_WHILE = 3,
+    CODE_BLOCK_SCOPE = 4,
 };
 
-struct flow_frame {
-    enum flow_frame_type type;
+struct code_block {
+    enum code_block_type type;
     uacpi_u32 begin, end;
+    struct uacpi_namespace_node *node;
 };
 
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE(flow_frame_array, struct flow_frame, 6)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(code_block_array, struct code_block, 8)
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
-    flow_frame_array, struct flow_frame, static
+    code_block_array, struct code_block, static
 )
 
 struct call_frame {
     struct uacpi_control_method *method;
-    struct op cur_op;
 
     uacpi_object *args[7];
     uacpi_object *locals[8];
 
-    /*
-     * Each op with operands gets a 'pending op', e.g. for the following code:
-     * ---------------------------------------------------------------
-     * Return (GETX(GETY(ADD(5, GETZ()))))
-     * ---------------------------------------------------------------
-     * The op contexts would look like this:
-     * cur_pop[0] = ReturnOp, expected_args = 1, args = <pending>
-     * cur_pop[1] = MethodCall (GETX), expected_args = 1, args = <pending>
-     * cur_pop[2] = MethodCall (GETY), expected_args = 1, args = <pending>
-     * cur_pop[3] = AddOp, expected_args = 2, args[0] = 5, args[1] = <pending>
-     * GETZ (currently being executed)
-     *
-     * The idea is that as soon as a 'pending op' gets its
-     * arg_count == target_arg_count it is dispatched (aka executed) right
-     * away, in a sort of "tetris" way. This allows us to guarantee left to
-     * right execution (same as ACPICA) and also zero stack usage as all of
-     * this logic happens within one function.
-     */
-    struct pending_op_array pending_ops;
-    struct flow_frame_array flows;
-    struct flow_frame *last_while;
+    struct op_context_array pending_ops;
+    struct code_block_array code_blocks;
+    struct code_block *last_while;
+    struct uacpi_namespace_node *cur_scope;
 
     uacpi_u32 code_offset;
 };
-
-static uacpi_size op_size(struct op *op)
-{
-    if ((op->code >> 8) == UACPI_EXT_PREFIX)
-        return 2;
-
-    return 1;
-}
-
-static void call_frame_advance_pc(struct call_frame *frame)
-{
-    frame->code_offset += op_size(&frame->cur_op);
-}
 
 static void *call_frame_cursor(struct call_frame *frame)
 {
@@ -237,38 +152,36 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
     call_frame_array, struct call_frame, static
 )
 
+// NOTE: Try to keep size under 2 pages
 struct execution_context {
     uacpi_object *ret;
     struct call_frame_array call_stack;
 
     struct call_frame *cur_frame;
-    struct flow_frame *cur_flow;
+    struct code_block *cur_block;
     struct uacpi_control_method *cur_method;
-    struct pending_op *cur_pop;
+    const struct uacpi_op_spec *cur_op;
+    struct op_context *prev_op_ctx;
+    struct op_context *cur_op_ctx;
 
     uacpi_bool skip_else;
 };
 
 #define AML_READ(ptr, offset) (*(((uacpi_u8*)(code)) + offset))
 
-static uacpi_status parse_name(struct call_frame *frame,
-                               uacpi_object_name *out_name)
+/*
+ * LeadNameChar := ‘A’-‘Z’ | ‘_’
+ * DigitChar := ‘0’ - ‘9’
+ * NameChar := DigitChar | LeadNameChar
+ * ‘A’-‘Z’ := 0x41 - 0x5A
+ * ‘_’ := 0x5F
+ * ‘0’-‘9’ := 0x30 - 0x39
+ */
+static uacpi_status parse_nameseg(uacpi_u8 *cursor,
+                                  uacpi_object_name *out_name)
 {
     uacpi_size i;
-    uacpi_char *cursor;
 
-    i = call_frame_code_bytes_left(frame);
-    if (uacpi_unlikely(i < 4))
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    /*
-     * This is all we support for now:
-     *‘A’-‘Z’ := 0x41 - 0x5A
-     * ‘_’ := 0x5F
-     *‘0’-‘9’ := 0x30 - 0x39
-     */
-
-    cursor = call_frame_cursor(frame);
     for (i = 0; i < 4; ++i) {
         uacpi_char data = cursor[i];
 
@@ -283,124 +196,206 @@ static uacpi_status parse_name(struct call_frame *frame,
     }
 
     uacpi_memcpy(&out_name->id, cursor, 4);
-    frame->code_offset += 4;
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status resolve_method_call(struct call_frame *frame)
+/*
+ * -------------------------------------------------------------
+ * RootChar := ‘\’
+ * ParentPrefixChar := ‘^’
+ * ‘\’ := 0x5C
+ * ‘^’ := 0x5E
+ * ------------------------------------------------------------
+ * NameSeg := <leadnamechar namechar namechar namechar>
+ * NameString := <rootchar namepath> | <prefixpath namepath>
+ * PrefixPath := Nothing | <’^’ prefixpath>
+ * NamePath := NameSeg | DualNamePath | MultiNamePath | NullName
+ * DualNamePath := DualNamePrefix NameSeg NameSeg
+ * MultiNamePath := MultiNamePrefix SegCount NameSeg(SegCount)
+ */
+
+enum resolve_behavior {
+    RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS,
+    RESOLVE_FAIL_IF_DOESNT_EXIST,
+};
+
+static uacpi_status resolve_name_string(
+    struct call_frame *frame,
+    enum resolve_behavior behavior,
+    struct uacpi_namespace_node **out_node
+)
 {
     uacpi_status ret;
-    uacpi_object_name name;
-    struct uacpi_opcode_method_call *mc = &frame->cur_op.info.as_method_call;
+    uacpi_u8 *cursor;
+    uacpi_size bytes_left, namesegs;
+    struct uacpi_namespace_node *parent, *cur_node = frame->cur_scope;
+    uacpi_char prev_char = 0;
+    uacpi_bool just_one_nameseg = UACPI_TRUE;
 
-    ret = parse_name(frame, &name);
-    if (uacpi_unlikely_error(ret))
-        return ret;
+    bytes_left = call_frame_code_bytes_left(frame);
+    cursor = call_frame_cursor(frame);
 
-    mc->node = uacpi_namespace_node_find(UACPI_NULL, name);
-    if (mc->node == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
+    for (;;) {
+        if (uacpi_unlikely(bytes_left == 0))
+            return UACPI_STATUS_BAD_BYTECODE;
 
+        switch (*cursor) {
+        case '\\':
+            if (prev_char == '^')
+                return UACPI_STATUS_BAD_BYTECODE;
+
+            cur_node = UACPI_NULL;
+            break;
+        case '^':
+            // Tried to go behind root
+            if (uacpi_unlikely(cur_node == UACPI_NULL))
+                return UACPI_STATUS_BAD_BYTECODE;
+
+            cur_node = cur_node->parent;
+            break;
+        default:
+            break;
+        }
+
+        prev_char = *cursor;
+
+        switch (prev_char) {
+        case '^':
+        case '\\':
+            just_one_nameseg = UACPI_FALSE;
+            cursor++;
+            bytes_left--;
+            break;
+        default:
+            break;
+        }
+
+        if (prev_char != '^')
+            break;
+    }
+
+    // At least a NullName byte is expected here
+    if (uacpi_unlikely(bytes_left == 0))
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    bytes_left--;
+    switch (*cursor++)
+    {
+    case UACPI_DUAL_NAME_PREFIX:
+        namesegs = 2;
+        just_one_nameseg = UACPI_FALSE;
+        break;
+    case UACPI_MULTI_NAME_PREFIX:
+        if (uacpi_unlikely(bytes_left == 0))
+            return UACPI_STATUS_BAD_BYTECODE;
+        namesegs = *cursor;
+        cursor++;
+        bytes_left--;
+        just_one_nameseg = UACPI_FALSE;
+        break;
+    case UACPI_NULL_NAME:
+        if (behavior == RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS ||
+            just_one_nameseg)
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        goto out;
+    default:
+        /*
+         * Might be an invalid byte, but assume single nameseg for now,
+         * the code below will validate it for us.
+         */
+        cursor--;
+        bytes_left++;
+        namesegs = 1;
+        break;
+    }
+
+    if (uacpi_unlikely((namesegs * 4) > bytes_left))
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    for (; namesegs; cursor += 4, namesegs--) {
+        uacpi_object_name name;
+
+        ret = parse_nameseg(cursor, &name);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        parent = cur_node;
+        cur_node = uacpi_namespace_node_find(parent, name);
+
+        switch (behavior) {
+        case RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS:
+            if (namesegs == 1) {
+                if (cur_node)
+                    return UACPI_STATUS_BAD_BYTECODE;
+
+                // Create the node and link to parent but don't install YET
+                cur_node = uacpi_namespace_node_alloc(
+                    name,
+                    UACPI_OBJECT_UNINITIALIZED
+                );
+                cur_node->parent = parent;
+            }
+            break;
+        case RESOLVE_FAIL_IF_DOESNT_EXIST:
+            if (just_one_nameseg) {
+                while (!cur_node && parent) {
+                    cur_node = parent;
+                    parent = cur_node->parent;
+
+                    cur_node = uacpi_namespace_node_find(parent, name);
+                }
+            }
+            break;
+        default:
+            return UACPI_STATUS_INVALID_ARGUMENT;
+        }
+
+        if (cur_node == UACPI_NULL)
+            return UACPI_STATUS_NOT_FOUND;
+    }
+
+out:
+    frame->code_offset = cursor - frame->method->code;
+    *out_node = cur_node;
     return UACPI_STATUS_OK;
 }
 
-static uacpi_bool is_op_method_call(uacpi_aml_op op)
-{
-    return op == '\\' || op == '/' || op == '.' ||
-          (op >= 'A' && op <= 'Z');
-}
-
-// Temporary until we have a proper opcode table
-static struct uacpi_opcode_info *opcode_table_find_op(uacpi_aml_op op)
-{
-    uacpi_size i;
-
-    for (i = 0; uacpi_opcode_table[i].name; ++i) {
-        if (uacpi_opcode_table[i].code == op) {
-            return &uacpi_opcode_table[i];
-        }
-    }
-
-    uacpi_kernel_log(UACPI_LOG_WARN, "Unimplemented opcode 0x%016X\n", op);
-    return UACPI_NULL;
-}
-
-uacpi_status peek_op(struct call_frame *frame)
+uacpi_status get_op(struct execution_context *ctx)
 {
     uacpi_aml_op op;
+    struct call_frame *frame = ctx->cur_frame;
     void *code = frame->method->code;
-    uacpi_size size = frame->method->size, offset = frame->code_offset;
-    struct uacpi_opcode_info *info;
+    uacpi_size size = frame->method->size;
 
-    if (uacpi_unlikely(offset >= size))
+    if (uacpi_unlikely(frame->code_offset >= size))
         return UACPI_STATUS_OUT_OF_BOUNDS;
 
-    op = AML_READ(code, offset++);
+    op = AML_READ(code, frame->code_offset++);
     if (op == UACPI_EXT_PREFIX) {
-        if (uacpi_unlikely(offset >= size))
+        if (uacpi_unlikely(frame->code_offset >= size))
             return UACPI_STATUS_OUT_OF_BOUNDS;
 
         op <<= 8;
-        op |= AML_READ(code, offset);
-    } else if (is_op_method_call(op)) {
-        op = UACPI_AML_OP_UACPIInternalOpMethodCall;
+        op |= AML_READ(code, frame->code_offset++);
     }
 
-    info = opcode_table_find_op(op);
-    if (info == UACPI_NULL)
-        return UACPI_STATUS_UNIMPLEMENTED;
-
-    frame->cur_op.code = op;
-    frame->cur_op.info = *info;
-
-    if (op == UACPI_AML_OP_UACPIInternalOpMethodCall) {
-        return resolve_method_call(frame);
-    }
-
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status pop_operand_alloc(struct pending_op *pop, uacpi_object **out_operand)
-{
-    uacpi_object **operand;
-
-    operand = operand_array_alloc(&pop->operands);
-    if (operand == UACPI_NULL)
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
-    *operand = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
-    if (*operand == UACPI_NULL) {
-        operand_array_pop(&pop->operands);
-        return UACPI_STATUS_OUT_OF_MEMORY;
-    }
-
-    *out_operand = *operand;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status next_arg(struct call_frame *frame, uacpi_object **out_operand)
-{
-    struct pending_op *pop;
-
-    pop = pending_op_array_last(&frame->pending_ops);
-    // Just a stray argument in the bytecode
-    if (pop == UACPI_NULL)
+    ctx->cur_op = uacpi_get_op_spec(op);
+    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED))
         return UACPI_STATUS_BAD_BYTECODE;
 
-    return pop_operand_alloc(pop, out_operand);
+    return UACPI_STATUS_OK;
 }
 
-uacpi_status get_string(struct call_frame *frame)
+uacpi_status handle_string(struct execution_context *ctx)
 {
-    uacpi_status ret;
+    struct call_frame *frame = ctx->cur_frame;
     uacpi_object *obj;
+
     char *string;
     size_t length;
 
-    ret = next_arg(frame, &obj);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
+    obj = item_array_last(&ctx->cur_op_ctx->items)->obj;
     string = call_frame_cursor(frame);
 
     // TODO: sanitize string for valid UTF-8
@@ -409,7 +404,7 @@ uacpi_status get_string(struct call_frame *frame)
     if (string[length++] != 0x00)
         return UACPI_STATUS_BAD_BYTECODE;
 
-    obj->as_string.type = UACPI_OBJECT_STRING;
+    obj->type = UACPI_OBJECT_STRING;
     obj->as_string.text = uacpi_kernel_alloc(length);
     if (uacpi_unlikely(obj->as_string.text == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -420,12 +415,25 @@ uacpi_status get_string(struct call_frame *frame)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status copy_buffer(uacpi_object *dst, uacpi_object *src)
+enum assign_by {
+    // Deep copy
+    ASSIGN_BY_COPY,
+
+    // Shallow copy
+    ASSIGN_BY_MOVE,
+
+    // Attempt to shallow copy with fallback
+    ASSIGN_BY_MOVE_IF_POSSIBLE,
+};
+
+static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
+                                  enum assign_by behavior)
 {
     struct uacpi_object_buffer *src_buf = &src->as_buffer;
     struct uacpi_object_buffer *dst_buf = &dst->as_buffer;
 
-    if (src->common.refcount == 1) {
+    if (behavior == ASSIGN_BY_MOVE ||
+       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE && src->common.refcount == 1)) {
         dst_buf->data = src_buf->data;
         dst_buf->size = src_buf->size;
         src_buf->data = UACPI_NULL;
@@ -500,8 +508,8 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     return ret;
 }
 
-static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
-                                               uacpi_object *src)
+static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
+                                  enum assign_by behavior)
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
@@ -516,13 +524,20 @@ static uacpi_status object_overwrite_try_elide(uacpi_object *dst,
         dst->as_buffer.size = 0;
     }
 
+    if (behavior == ASSIGN_BY_MOVE && uacpi_unlikely(src->common.refcount != 1)) {
+        uacpi_kernel_log(UACPI_LOG_WARN,
+                         "Tried to move an object (%p) with %u references, "
+                         "converting to copy\n", src, src->common.refcount);
+        behavior = ASSIGN_BY_COPY;
+    }
+
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
     case UACPI_OBJECT_DEBUG:
         break;
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING:
-        ret = copy_buffer(dst, src);
+        ret = assign_buffer(dst, src, behavior);
         break;
     case UACPI_OBJECT_INTEGER:
         dst->as_integer.value = src->as_integer.value;
@@ -561,35 +576,28 @@ static uacpi_object *object_deref_if_internal(uacpi_object *object)
     }
 }
 
-static uacpi_status copy_retval(uacpi_object *dst, uacpi_object *src)
-{
-    return object_overwrite_try_elide(dst, object_deref_if_internal(src));
-}
+enum argx_or_localx {
+    ARGX,
+    LOCALX,
+};
 
-static uacpi_status get_arg_or_local_ref(
-    struct call_frame *frame, enum uacpi_arg_sub_type sub_type
+static uacpi_status handle_arg_or_local(
+    struct execution_context *ctx,
+    uacpi_size idx, enum argx_or_localx type
 )
 {
-    uacpi_status ret;
     uacpi_object **src, *dst;
     enum reference_kind kind;
 
-    switch (sub_type) {
-    case UACPI_ARG_SUB_TYPE_LOCAL:
-        src = &frame->locals[frame->cur_op.code - UACPI_AML_OP_Local0Op];
-        kind = REFERENCE_KIND_LOCAL;
-        break;
-    case UACPI_ARG_SUB_TYPE_ARG:
-        src = &frame->args[frame->cur_op.code - UACPI_AML_OP_Arg0Op];
-        kind = REFERENCE_KIND_ARG;
-        break;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
+    dst = item_array_last(&ctx->cur_op_ctx->items)->obj;
 
-    ret = next_arg(frame, &dst);
-    if (uacpi_unlikely_error(ret))
-        return ret;
+    if (type == ARGX) {
+        src = &ctx->cur_frame->args[idx];
+        kind = REFERENCE_KIND_ARG;
+    } else {
+        src = &ctx->cur_frame->locals[idx];
+        kind = REFERENCE_KIND_LOCAL;
+    }
 
     // Access to an uninitialized local or arg, hopefully a store incoming
     if (*src == UACPI_NULL) {
@@ -603,7 +611,42 @@ static uacpi_status get_arg_or_local_ref(
     dst->as_reference.object = *src;
     uacpi_object_ref(*src);
 
-    return ret;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_local(struct execution_context *ctx)
+{
+    uacpi_size idx;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+
+    idx = op_ctx->op->code - UACPI_AML_OP_Local0Op;
+    return handle_arg_or_local(ctx, idx, LOCALX);
+}
+
+static uacpi_status handle_arg(struct execution_context *ctx)
+{
+    uacpi_size idx;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+
+    idx = op_ctx->op->code - UACPI_AML_OP_Arg0Op;
+    return handle_arg_or_local(ctx, idx, ARGX);
+}
+
+static uacpi_status handle_named_object(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_namespace_node *src;
+    uacpi_object *dst;
+
+    src = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
+    dst = item_array_at(&ctx->cur_op_ctx->items, 1)->obj;
+
+    dst->type = UACPI_OBJECT_REFERENCE;
+    dst->common.flags = REFERENCE_KIND_NAMED;
+    dst->as_reference.object = src->object;
+    uacpi_object_ref(src->object);
+
+    return UACPI_STATUS_OK;
 }
 
 static void truncate_number_if_needed(uacpi_object *obj)
@@ -619,74 +662,6 @@ static uacpi_u64 ones()
     return g_uacpi_rt_ctx.is_rev1 ? 0xFFFFFFFF : 0xFFFFFFFFFFFFFFFF;
 }
 
-uacpi_status get_number(struct call_frame *frame)
-{
-    uacpi_status ret;
-    uacpi_object *obj;
-    void *data;
-    uacpi_u8 bytes;
-
-    ret = next_arg(frame, &obj);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    data = call_frame_cursor(frame);
-
-    switch (frame->cur_op.code) {
-    case UACPI_AML_OP_ZeroOp:
-        obj->as_integer.value = 0;
-        goto out;
-    case UACPI_AML_OP_OneOp:
-        obj->as_integer.value = 1;
-        goto out;
-    case UACPI_AML_OP_OnesOp:
-        obj->as_integer.value = ones();
-        goto out;
-    case UACPI_AML_OP_BytePrefix:
-        bytes = 1;
-        break;
-    case UACPI_AML_OP_WordPrefix:
-        bytes = 2;
-        break;
-    case UACPI_AML_OP_DWordPrefix:
-        bytes = 4;
-        break;
-    case UACPI_AML_OP_QWordPrefix:
-        bytes = 8;
-        break;
-    }
-
-    if (call_frame_code_bytes_left(frame) < bytes)
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    obj->as_integer.value = 0;
-    uacpi_memcpy(&obj->as_integer.value, data, bytes);
-    truncate_number_if_needed(obj);
-    frame->code_offset += bytes;
-
-out:
-    obj->type = UACPI_OBJECT_INTEGER;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status get_debug(struct call_frame *frame)
-{
-    uacpi_status ret;
-    uacpi_object *obj;
-
-    ret = next_arg(frame, &obj);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    switch (frame->cur_op.code) {
-    case UACPI_AML_OP_DebugOp:
-        obj->type = UACPI_OBJECT_DEBUG;
-        return UACPI_STATUS_OK;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
-}
-
 static uacpi_status method_get_ret_target(struct execution_context *ctx,
                                           uacpi_object **out_operand)
 {
@@ -695,11 +670,11 @@ static uacpi_status method_get_ret_target(struct execution_context *ctx,
     // Check if we're targeting the previous call frame
     depth = call_frame_array_size(&ctx->call_stack);
     if (depth > 1) {
-        struct pending_op *pop;
+        struct op_context *op_ctx;
         struct call_frame *frame;
 
         frame = call_frame_array_at(&ctx->call_stack, depth - 2);
-        depth = pending_op_array_size(&frame->pending_ops);
+        depth = op_context_array_size(&frame->pending_ops);
 
         // Ok, no one wants the return value at call site. Discard it.
         if (!depth) {
@@ -707,30 +682,12 @@ static uacpi_status method_get_ret_target(struct execution_context *ctx,
             return UACPI_STATUS_OK;
         }
 
-        pop = pending_op_array_at(&frame->pending_ops, depth - 1);
-        return pop_operand_alloc(pop, out_operand);
+        op_ctx = op_context_array_at(&frame->pending_ops, depth - 1);
+        *out_operand = item_array_last(&op_ctx->items)->obj;
+        return UACPI_STATUS_OK;
     }
 
     return UACPI_STATUS_NOT_FOUND;
-}
-
-static uacpi_status exec_get_ret_target(struct execution_context *ctx,
-                                        uacpi_object **out_operand)
-{
-    uacpi_size depth;
-    struct pending_op_array *pops = &ctx->cur_frame->pending_ops;
-
-    // Check if we have a pending op looking for args
-    depth = pending_op_array_size(pops);
-    if (depth > 1) {
-        struct pending_op *pop;
-
-        pop = pending_op_array_at(pops, depth - 2);
-        return pop_operand_alloc(pop, out_operand);
-    }
-
-    *out_operand = UACPI_NULL;
-    return UACPI_STATUS_OK;
 }
 
 static uacpi_status method_get_ret_object(struct execution_context *ctx,
@@ -750,141 +707,90 @@ static uacpi_status method_get_ret_object(struct execution_context *ctx,
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status begin_flow_execution(struct execution_context *ctx)
-{
-    struct call_frame *cur_frame = ctx->cur_frame;
-    struct uacpi_opcode_flow *op;
-    struct flow_frame *flow_frame;
-
-    flow_frame = flow_frame_array_alloc(&cur_frame->flows);
-    if (uacpi_unlikely(flow_frame == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
-    switch (ctx->cur_pop->code) {
-    case UACPI_AML_OP_IfOp:
-        flow_frame->type = FLOW_FRAME_IF;
-        break;
-    case UACPI_AML_OP_ElseOp:
-        flow_frame->type = FLOW_FRAME_ELSE;
-        break;
-    case UACPI_AML_OP_WhileOp:
-        flow_frame->type = FLOW_FRAME_WHILE;
-        cur_frame->last_while = flow_frame;
-        break;
-    default:
-        flow_frame_array_pop(&cur_frame->flows);
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
-
-    op = &ctx->cur_pop->info.as_flow;
-    flow_frame->begin = op->start_offset;
-    flow_frame->end = op->end_offset;
-    ctx->cur_flow = flow_frame;
-    return UACPI_STATUS_OK;
-}
-
-static uacpi_status handle_predicate_result(struct execution_context *ctx,
-                                            uacpi_bool result)
-{
-    if (result)
-        return begin_flow_execution(ctx);
-
-    ctx->cur_frame->code_offset = ctx->cur_pop->info.as_flow.end_offset;
-    return UACPI_STATUS_OK;
-}
-
-static uacpi_status predicate_evaluate(uacpi_object *operand, uacpi_bool *res)
-{
-    uacpi_object *unwrapped_obj;
-
-    unwrapped_obj = object_deref_if_internal(operand);
-    if (unwrapped_obj->type != UACPI_OBJECT_INTEGER)
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    *res = unwrapped_obj->as_integer.value != 0;
-    return UACPI_STATUS_OK;
-}
-
-static struct flow_frame *find_last_while_flow(struct flow_frame_array *flows)
+static struct code_block *find_last_block(struct code_block_array *blocks,
+                                          enum code_block_type type)
 {
     uacpi_size i;
 
-    i = flow_frame_array_size(flows);
+    i = code_block_array_size(blocks);
     while (i-- > 0) {
-        struct flow_frame *flow;
+        struct code_block *block;
 
-        flow = flow_frame_array_at(flows, i);
-        if (flow->type == FLOW_FRAME_WHILE)
-            return flow;
+        block = code_block_array_at(blocks, i);
+        if (block->type == type)
+            return block;
     }
 
     return UACPI_NULL;
 }
 
-static void frame_reset_post_end_flow(struct execution_context *ctx,
-                                      uacpi_bool reset_last_while)
+static void update_scope(struct call_frame *frame)
 {
-    struct call_frame *frame = ctx->cur_frame;
-    flow_frame_array_pop(&frame->flows);
-    ctx->cur_flow = flow_frame_array_last(&frame->flows);
+    struct code_block *block;
 
-    if (reset_last_while)
-        frame->last_while = find_last_while_flow(&frame->flows);
+    block = find_last_block(&frame->code_blocks, CODE_BLOCK_SCOPE);
+    if (block == UACPI_NULL) {
+        frame->cur_scope = UACPI_NULL;
+        return;
+    }
+
+    frame->cur_scope = block->node;
 }
 
-static uacpi_status flow_dispatch(struct execution_context *ctx)
+static uacpi_status begin_block_execution(struct execution_context *ctx)
 {
-    uacpi_status ret;
     struct call_frame *cur_frame = ctx->cur_frame;
-    struct pending_op *pop = ctx->cur_pop;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct package_length *pkg;
+    struct code_block *block;
 
-    switch (pop->code) {
-    case UACPI_AML_OP_ContinueOp:
-    case UACPI_AML_OP_BreakOp: {
-        struct flow_frame *flow;
+    block = code_block_array_alloc(&cur_frame->code_blocks);
+    if (uacpi_unlikely(block == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
 
-        for (;;) {
-            flow = flow_frame_array_last(&cur_frame->flows);
-            if (flow != cur_frame->last_while) {
-                flow_frame_array_pop(&cur_frame->flows);
-                continue;
-            }
-
-            if (pop->code == UACPI_AML_OP_BreakOp)
-                cur_frame->code_offset = flow->end;
-            else
-                cur_frame->code_offset = flow->begin;
-            frame_reset_post_end_flow(ctx, UACPI_TRUE);
-            return UACPI_STATUS_OK;
-        }
-    }
-    case UACPI_AML_OP_ReturnOp: {
-        uacpi_object *dst = UACPI_NULL;
-
-        cur_frame->code_offset = cur_frame->method->size;
-        ret = method_get_ret_object(ctx, &dst);
-
-        if (uacpi_unlikely_error(ret))
-            return ret;
-        if (dst == UACPI_NULL)
-            return UACPI_STATUS_OK;
-
-        return copy_retval(dst, *operand_array_at(&pop->operands, 0));
-    }
-    case UACPI_AML_OP_ElseOp:
-        return begin_flow_execution(ctx);
+    switch (op_ctx->op->code) {
     case UACPI_AML_OP_IfOp:
-    case UACPI_AML_OP_WhileOp: {
-        uacpi_bool res;
-
-        ret = predicate_evaluate(*operand_array_at(&pop->operands, 0), &res);
-        if (uacpi_unlikely_error(ret))
-            return ret;
-
-        return handle_predicate_result(ctx, res);
-    }
+        block->type = CODE_BLOCK_IF;
+        break;
+    case UACPI_AML_OP_ElseOp:
+        block->type = CODE_BLOCK_ELSE;
+        break;
+    case UACPI_AML_OP_WhileOp:
+        block->type = CODE_BLOCK_WHILE;
+        break;
+    case UACPI_AML_OP_ScopeOp:
+        block->type = CODE_BLOCK_SCOPE;
+        block->node = item_array_at(&op_ctx->items, 1)->node;
+        break;
     default:
-        return UACPI_STATUS_UNIMPLEMENTED;
+        code_block_array_pop(&cur_frame->code_blocks);
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
+
+    // -1 because we want to re-evaluate at the start of the op next time
+    block->begin = pkg->begin - 1;
+    block->end = pkg->end;
+    ctx->cur_block = block;
+
+    cur_frame->last_while = find_last_block(&cur_frame->code_blocks,
+                                            CODE_BLOCK_WHILE);
+    update_scope(cur_frame);
+    return UACPI_STATUS_OK;
+}
+
+static void frame_reset_post_end_block(struct execution_context *ctx,
+                                       enum code_block_type type)
+{
+    struct call_frame *frame = ctx->cur_frame;
+    code_block_array_pop(&frame->code_blocks);
+    ctx->cur_block = code_block_array_last(&frame->code_blocks);
+
+    if (type == CODE_BLOCK_WHILE) {
+        frame->last_while = find_last_block(&frame->code_blocks, type);
+    } else if (type == CODE_BLOCK_SCOPE) {
+        update_scope(frame);
     }
 }
 
@@ -946,40 +852,18 @@ uacpi_object **reference_unwind(uacpi_object *obj)
  * LocalX/ArgX -> object stored at LocalX if LocalX is not a reference,
  *                otherwise goto RefOf case.
  * NAME -> object stored at NAME
- *
- * NOTE: this function returns the slot in the parent object at which the
- *       child object is stored.
  */
-static uacpi_object **object_deref_implicit(uacpi_object *obj)
+static uacpi_object *object_deref_implicit(uacpi_object *obj)
 {
     if (obj->common.flags != REFERENCE_KIND_REFOF) {
         if (obj->common.flags == REFERENCE_KIND_NAMED ||
             obj->as_reference.object->type != UACPI_OBJECT_REFERENCE)
-            return &obj->as_reference.object;
+            return obj->as_reference.object;
 
         obj = obj->as_reference.object;
     }
 
-    return reference_unwind(obj);
-}
-
-/*
- * Explicit dereferencing [DerefOf] behavior:
- * Simply grabs the bottom-most object that is not a reference.
- * This mimics the behavior of NT Acpi.sys: any DerfOf fetches
- * the bottom-most reference. Note that this is different from
- * ACPICA where DerefOf dereferences one level.
- */
-static uacpi_status object_deref_explicit(uacpi_object *obj,
-                                          uacpi_object **out_obj)
-{
-    obj = object_deref_if_internal(obj);
-
-    if (obj->type != UACPI_OBJECT_REFERENCE)
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    *out_obj = *reference_unwind(obj);
-    return UACPI_STATUS_OK;
+    return *reference_unwind(obj);
 }
 
 /*
@@ -1020,7 +904,7 @@ static uacpi_status object_deref_explicit(uacpi_object *obj,
     }
 
     src_obj = object_deref_if_internal(src);
-    return object_overwrite_try_elide(*dst_slot, src_obj);
+    return object_assign(*dst_slot, src_obj, ASSIGN_BY_MOVE);
 }
 
 /*
@@ -1060,6 +944,8 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     case REFERENCE_KIND_NAMED:
         dst_slot = reference_unwind(dst);
         break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     src_obj = object_deref_if_internal(src);
@@ -1070,119 +956,55 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     }
 
     if (overwrite)
-        return object_overwrite_try_elide(*dst_slot, src_obj);
+        return object_assign(*dst_slot, src_obj, ASSIGN_BY_MOVE);
 
     return object_assign_with_implicit_cast(*dst_slot, src_obj);
 }
 
-static uacpi_status dispatch_1_arg_with_target(struct execution_context *ctx)
+static uacpi_status handle_inc_dec(struct execution_context *ctx)
 {
-    uacpi_status ret;
-    struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *arg0, *tgt, *ret_tgt;
+    uacpi_object *obj;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
 
-    arg0 = *operand_array_at(&pop->operands, 0);
-    tgt = *operand_array_at(&pop->operands, 1);
+    obj = item_array_at(&op_ctx->items, 0)->obj;
 
-    ret = exec_get_ret_target(ctx, &ret_tgt);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    // Someone wants the return value, ref it so that it's not moved into tgt
-    if (ret_tgt)
-        uacpi_object_ref(arg0);
-
-    switch (pop->code) {
-    case UACPI_AML_OP_StoreOp:
-    case UACPI_AML_OP_CopyObjectOp: {
-        if (tgt->type == UACPI_OBJECT_DEBUG) {
-            ret = debug_store(tgt, arg0);
-            break;
-        }
-
-        if (tgt->type != UACPI_OBJECT_REFERENCE ||
-            tgt->common.flags == REFERENCE_KIND_REFOF) {
-            uacpi_kernel_log(UACPI_LOG_WARN, "Target is not a SuperName\n");
-            ret = UACPI_STATUS_BAD_BYTECODE;
-            break;
-        }
-
-        if (pop->code == UACPI_AML_OP_StoreOp)
-            ret = store_to_reference(tgt, arg0);
-        else
-            ret = copy_object_to_reference(tgt, arg0);
-        break;
-    }
-    default:
-        ret = UACPI_STATUS_UNIMPLEMENTED;
-        break;
-    }
-
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    if (ret_tgt) {
-        uacpi_object_unref(arg0);
-        return object_overwrite_try_elide(ret_tgt, arg0);
-    }
+    if (op_ctx->op->code == UACPI_AML_OP_IncrementOp)
+        obj->as_integer.value++;
+    else
+        obj->as_integer.value--;
 
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status dispatch_0_arg_with_target(struct execution_context *ctx)
+static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
 {
-    uacpi_status ret;
-    struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *tgt, *res, *ret_tgt;
-    uacpi_bool unref_res = UACPI_FALSE;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *dst, *src;
 
-    tgt = *operand_array_at(&pop->operands, 0);
-    if (tgt->type != UACPI_OBJECT_REFERENCE)
-        return UACPI_STATUS_BAD_BYTECODE;
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
 
-    switch (pop->code) {
-    case UACPI_AML_OP_IncrementOp:
-    case UACPI_AML_OP_DecrementOp: {
-        uacpi_i32 val = pop->code == UACPI_AML_OP_IncrementOp ? +1 : -1;
-
-        res = *object_deref_implicit(tgt);
-        if (res->type != UACPI_OBJECT_INTEGER)
-            return UACPI_STATUS_BAD_BYTECODE;
-
-        res->as_integer.value += val;
-        truncate_number_if_needed(res);
-        break;
-    }
-    case UACPI_AML_OP_RefOfOp:
-        res = uacpi_create_object(UACPI_OBJECT_REFERENCE);
-        if (uacpi_unlikely(res == UACPI_NULL))
-            return UACPI_STATUS_OUT_OF_MEMORY;
-
-        res->as_reference.object = object_deref_if_internal(tgt);
-        uacpi_object_ref(res->as_reference.object);
-        unref_res = UACPI_TRUE;
-        break;
-    case UACPI_AML_OP_DeRefOfOp:
-        ret = object_deref_explicit(tgt, &res);
-        if (uacpi_unlikely_error(ret))
-            return ret;
-        break;
-    default:
-        return UACPI_STATUS_UNIMPLEMENTED;
+    if (op_ctx->op->code == UACPI_AML_OP_DerefOfOp) {
+        /*
+         * Explicit dereferencing [DerefOf] behavior:
+         * Simply grabs the bottom-most object that is not a reference.
+         * This mimics the behavior of NT Acpi.sys: any DerfOf fetches
+         * the bottom-most reference. Note that this is different from
+         * ACPICA where DerefOf dereferences one level.
+         */
+        src = *reference_unwind(src);
+        return object_assign(dst, src, ASSIGN_BY_COPY);
     }
 
-    ret = exec_get_ret_target(ctx, &ret_tgt);
-    if (uacpi_likely_success(ret) && ret_tgt)
-        ret = object_overwrite_try_elide(ret_tgt, res);
-
-    if (unref_res)
-        uacpi_object_unref(res);
-
-    return ret;
+    dst->type = UACPI_OBJECT_REFERENCE;
+    dst->as_reference.object = src;
+    uacpi_object_ref(src);
+    return UACPI_STATUS_OK;
 }
 
 static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
-                           uacpi_object *ret, uacpi_aml_op op)
+                           uacpi_object *tgt0, uacpi_object *tgt1,
+                           uacpi_aml_op op)
 {
     uacpi_u64 lhs, rhs, res;
     uacpi_bool should_negate = UACPI_FALSE;
@@ -1225,6 +1047,14 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
     case UACPI_AML_OP_XorOp:
         res = rhs ^ lhs;
         break;
+    case UACPI_AML_OP_DivideOp:
+        if (uacpi_likely(rhs > 0)) {
+            tgt1->as_integer.value = lhs / rhs;
+        } else {
+            uacpi_kernel_log(UACPI_LOG_WARN, "Attempted division by zero!\n");
+            tgt1->as_integer.value = 0;
+        }
+        // FALLTHROUGH intended here
     case UACPI_AML_OP_ModOp:
         res = lhs % rhs;
         break;
@@ -1235,190 +1065,81 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
     if (should_negate)
         res = ~res;
 
-    ret->as_integer.value = res;
-    truncate_number_if_needed(ret);
+    tgt0->as_integer.value = res;
 }
 
-static uacpi_status dispatch_3_arg_with_target(struct execution_context *ctx)
+static uacpi_status handle_binary_math(struct execution_context *ctx)
 {
-    uacpi_status ret;
-    struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *arg0, *arg1, *tgt, *temp_result, *ret_tgt;
+    uacpi_object *arg0, *arg1, *tgt0, *tgt1;
+    struct item_array *items = &ctx->cur_op_ctx->items;
+    uacpi_aml_op op = ctx->cur_op_ctx->op->code;
 
-    arg0 = *operand_array_at(&pop->operands, 0);
-    arg1 = *operand_array_at(&pop->operands, 1);
-    tgt = *operand_array_at(&pop->operands, 2);
+    arg0 = item_array_at(items, 0)->obj;
+    arg1 = item_array_at(items, 1)->obj;
 
-    temp_result = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
-    if (uacpi_unlikely(temp_result == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
-    switch (pop->code) {
-    case UACPI_AML_OP_AddOp:
-    case UACPI_AML_OP_SubtractOp:
-    case UACPI_AML_OP_MultiplyOp:
-    case UACPI_AML_OP_ShiftLeftOp:
-    case UACPI_AML_OP_ShiftRightOp:
-    case UACPI_AML_OP_NandOp:
-    case UACPI_AML_OP_AndOp:
-    case UACPI_AML_OP_NorOp:
-    case UACPI_AML_OP_OrOp:
-    case UACPI_AML_OP_XorOp:
-    case UACPI_AML_OP_ModOp:
-        arg0 = object_deref_if_internal(arg0);
-        arg1 = object_deref_if_internal(arg1);
-
-        if (arg0->type != UACPI_OBJECT_INTEGER ||
-            arg1->type != UACPI_OBJECT_INTEGER) {
-            return UACPI_STATUS_BAD_BYTECODE;
-        }
-        temp_result->type = UACPI_OBJECT_INTEGER;
-
-        do_binary_math(arg0, arg1, temp_result, pop->code);
-        break;
-    default:
-        ret = UACPI_STATUS_UNIMPLEMENTED;
-        break;
+    if (op == UACPI_AML_OP_DivideOp) {
+        tgt0 = item_array_at(items, 4)->obj;
+        tgt1 = item_array_at(items, 5)->obj;
+    } else {
+        tgt0 = item_array_at(items, 3)->obj;
+        tgt1 = UACPI_NULL;
     }
 
-    switch (tgt->type) {
-    case UACPI_OBJECT_DEBUG:
-        ret = debug_store(tgt, temp_result);
-        break;
-    case UACPI_OBJECT_REFERENCE:
-        ret = store_to_reference(tgt, temp_result);
-        break;
+    do_binary_math(arg0, arg1, tgt0, tgt1, op);
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_logical_not(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src, *dst;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    dst->type = UACPI_OBJECT_INTEGER;
+    dst->as_integer.value = src->as_integer.value ? 0 : ones();
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_logical_equality(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *lhs, *rhs, *dst;
+    uacpi_bool res;
+
+    lhs = item_array_at(&op_ctx->items, 0)->obj;
+    rhs = item_array_at(&op_ctx->items, 1)->obj;
+    dst = item_array_at(&op_ctx->items, 2)->obj;
+
+    // TODO: typecheck at parse time
+    if (lhs->type != rhs->type)
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    switch (lhs->type) {
     case UACPI_OBJECT_INTEGER:
-        // NULL target
-        if (tgt->as_integer.value == 0)
-            break;
-    default:
-        ret = UACPI_STATUS_BAD_BYTECODE;
-    }
-
-    if (uacpi_likely_success(ret)) {
-        ret = exec_get_ret_target(ctx, &ret_tgt);
-        if (uacpi_likely_success(ret) && ret_tgt)
-            ret = object_overwrite_try_elide(ret_tgt, temp_result);
-    }
-
-    uacpi_object_unref(temp_result);
-    return ret;
-}
-
-static uacpi_status dispatch_1_arg(struct execution_context *ctx)
-{
-    uacpi_status ret;
-    struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *arg, *ret_tgt;
-
-    arg = *operand_array_at(&pop->operands, 0);
-    arg = object_deref_if_internal(arg);
-
-    ret = exec_get_ret_target(ctx, &ret_tgt);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    switch (pop->code) {
-    case UACPI_AML_OP_LnotOp:
-        if (arg->type != UACPI_OBJECT_INTEGER)
-            return UACPI_STATUS_BAD_BYTECODE;
-
-        if (ret_tgt) {
-            ret_tgt->type = UACPI_OBJECT_INTEGER;
-            ret_tgt->as_integer.value = arg->as_integer.value ? 0 : ones();
+        res = lhs->as_integer.value == rhs->as_integer.value;
+        break;
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER:
+        res = lhs->as_buffer.size == rhs->as_buffer.size;
+        if (res) {
+            res = uacpi_memcmp(
+                lhs->as_buffer.data,
+                rhs->as_buffer.data,
+                lhs->as_buffer.size
+            ) == 0;
         }
         break;
     default:
-        ret = UACPI_STATUS_UNIMPLEMENTED;
-        break;
+        // TODO: Type check at parse time
+        return UACPI_STATUS_BAD_BYTECODE;
     }
 
-    return ret;
-}
-
-static uacpi_status dispatch_2_arg(struct execution_context *ctx)
-{
-    uacpi_status ret;
-    struct pending_op *pop = ctx->cur_pop;
-    uacpi_object *arg0, *arg1, *ret_tgt;
-
-    arg0 = *operand_array_at(&pop->operands, 0);
-    arg1 = *operand_array_at(&pop->operands, 1);
-
-    arg0 = object_deref_if_internal(arg0);
-    arg1 = object_deref_if_internal(arg1);
-
-    ret = exec_get_ret_target(ctx, &ret_tgt);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    switch (pop->code) {
-    case UACPI_AML_OP_LEqualOp: {
-        uacpi_bool result;
-
-        if (arg0->type != arg1->type)
-            return UACPI_STATUS_BAD_BYTECODE;
-        if (!ret_tgt)
-            return UACPI_STATUS_OK;
-
-        switch (arg0->type) {
-        case UACPI_OBJECT_INTEGER:
-            result = arg0->as_integer.value == arg1->as_integer.value;
-            break;
-        case UACPI_OBJECT_STRING:
-        case UACPI_OBJECT_BUFFER:
-            result = arg0->as_buffer.size == arg1->as_buffer.size;
-            if (result) {
-                result = uacpi_memcmp(
-                    arg0->as_buffer.data,
-                    arg1->as_buffer.data,
-                    arg0->as_buffer.size
-                ) == 0;
-            }
-            break;
-        default:
-            return UACPI_STATUS_BAD_BYTECODE;
-        }
-
-        ret_tgt->type = UACPI_OBJECT_INTEGER;
-        ret_tgt->as_integer.value = result ? ones() : 0;
-        break;
-    }
-    default:
-        ret = UACPI_STATUS_UNIMPLEMENTED;
-        break;
-    }
-
-    return ret;
-}
-
-static uacpi_status exec_dispatch(struct execution_context *ctx)
-{
-    uacpi_status st = UACPI_STATUS_UNIMPLEMENTED;
-    struct uacpi_opcode_exec *op = &ctx->cur_pop->info.as_exec;
-
-    switch (op->operand_count) {
-    case 1:
-        if (op->has_target)
-            st = dispatch_0_arg_with_target(ctx);
-        else
-            st = dispatch_1_arg(ctx);
-        break;
-    case 2:
-        if (op->has_target)
-            st = dispatch_1_arg_with_target(ctx);
-        else
-            st = dispatch_2_arg(ctx);
-        break;
-    case 3:
-        if (op->has_target)
-            st = dispatch_3_arg_with_target(ctx);
-    default:
-        break;
-    }
-
-    return st;
+    dst->type = UACPI_OBJECT_INTEGER;
+    dst->as_integer.value = res ? ones() : 0;
+    return UACPI_STATUS_OK;
 }
 
 /*
@@ -1432,41 +1153,44 @@ static uacpi_status exec_dispatch(struct execution_context *ctx)
  *   <bit 3-0: least significant package length nybble>
  */
 static uacpi_status parse_package_length(struct call_frame *frame,
-                                         uacpi_u32 *out_size)
+                                         struct package_length *out_pkg)
 {
-    uacpi_u32 left;
-    uacpi_u8 want_bytes = 1;
-    uacpi_u8 *data;
+    uacpi_u32 left, size;
+    uacpi_u8 *data, marker_length;
+
+    out_pkg->begin = frame->code_offset;
+    marker_length = 1;
 
     left = call_frame_code_bytes_left(frame);
     if (uacpi_unlikely(left < 1))
         return UACPI_STATUS_BAD_BYTECODE;
 
     data = call_frame_cursor(frame);
-    want_bytes += *data >> 6;
+    marker_length += *data >> 6;
 
-    if (uacpi_unlikely(left < want_bytes))
+    if (uacpi_unlikely(left < marker_length))
         return UACPI_STATUS_BAD_BYTECODE;
 
-    switch (want_bytes) {
+    switch (marker_length) {
     case 1:
-        *out_size = *data & 0b111111;
+        size = *data & 0b111111;
         break;
     case 2:
     case 3:
     case 4: {
         uacpi_u32 temp_byte = 0;
 
-        *out_size = *data & 0b1111;
-        uacpi_memcpy(&temp_byte, data + 1, want_bytes - 1);
+        size = *data & 0b1111;
+        uacpi_memcpy(&temp_byte, data + 1, marker_length - 1);
 
-        // want_bytes - 1 is at most 3, so this shift is safe
-        *out_size |= temp_byte << 4;
+        // marker_length - 1 is at most 3, so this shift is safe
+        size |= temp_byte << 4;
         break;
     }
     }
 
-    frame->code_offset += want_bytes;
+    frame->code_offset += marker_length;
+    out_pkg->end = out_pkg->begin + size;
     return UACPI_STATUS_OK;
 }
 
@@ -1478,159 +1202,128 @@ static uacpi_status parse_package_length(struct call_frame *frame,
  * //   1 Serialized
  * // bit 4-7: SyncLevel (0x00-0x0f)
  */
-uacpi_status parse_method_flags(struct call_frame *frame, uacpi_control_method *method)
+void init_method_flags(uacpi_control_method *method, uacpi_u8 flags_byte)
 {
-    uacpi_u8 flags_byte;
-
-    if (!call_frame_has_code(frame))
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    flags_byte = *(uacpi_u8*)call_frame_cursor(frame);
     method->args = flags_byte & 0b111;
     method->is_serialized = (flags_byte >> 3) & 1;
     method->sync_level = flags_byte >> 4;
-
-    frame->code_offset++;
-    return UACPI_STATUS_OK;
 }
 
-static uacpi_status create_method(struct call_frame *frame)
+static uacpi_status handle_create_method(struct execution_context *ctx)
 {
-    uacpi_status ret;
-    struct uacpi_control_method *method = UACPI_NULL;
-    struct uacpi_namespace_node *node = UACPI_NULL;
-
-    uacpi_object_name name;
-    uacpi_size base_offset;
-
-    base_offset = ++frame->code_offset;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_control_method *method;
+    struct package_length *pkg;
+    struct uacpi_namespace_node *node;
+    uacpi_u32 method_begin_offset;
 
     method = uacpi_kernel_alloc(sizeof(*method));
     if (uacpi_unlikely(method == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    ret = parse_package_length(frame, &method->size);
-    if (uacpi_unlikely_error(ret))
-        goto err_out;
+    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
+    node = item_array_at(&op_ctx->items, 1)->node;
+    init_method_flags(method, item_array_at(&op_ctx->items, 2)->immediate);
 
-    ret = parse_name(frame, &name);
-    if (uacpi_unlikely_error(ret))
-        goto err_out;
+    method_begin_offset = item_array_at(&op_ctx->items, 3)->immediate;
+    method->code = ctx->cur_frame->method->code;
+    method->code += method_begin_offset;
+    method->size = pkg->end - method_begin_offset;
 
-    node = uacpi_namespace_node_alloc(name);
-    if (uacpi_unlikely(node == UACPI_NULL)) {
-        ret = UACPI_STATUS_OUT_OF_MEMORY;
-        goto err_out;
+    if (uacpi_unlikely(method->size == 0)) {
+        uacpi_kernel_log(UACPI_LOG_WARN, "Tried to create an empty method\n");
+        uacpi_kernel_free(method);
+        return UACPI_STATUS_BAD_BYTECODE;
     }
 
-    ret = parse_method_flags(frame, method);
-    if (uacpi_unlikely_error(ret))
-        goto err_out;
 
-    method->code = call_frame_cursor(frame);
-    method->size -= frame->code_offset - base_offset;
-    frame->code_offset += method->size;
-
-    node->object.type = UACPI_OBJECT_METHOD;
-    node->object.as_method.method = method;
-
-    ret = uacpi_node_install(UACPI_NULL, node);
-    if (uacpi_unlikely_error(ret))
-        goto err_out;
-
-    ret = UACPI_STATUS_OK;
-    return ret;
-
-err_out:
-    uacpi_kernel_free(method);
-    uacpi_namespace_node_free(node);
-    return ret;
-}
-
-static uacpi_status create_dispatch(struct call_frame *frame)
-{
-    switch (frame->cur_op.code) {
-    case UACPI_AML_OP_MethodOp:
-        return create_method(frame);
-    default:
-        return UACPI_STATUS_UNIMPLEMENTED;
-    }
-}
-
-static uacpi_status pop_prime(struct execution_context *ctx)
-{
-    struct pending_op *pop;
-    struct call_frame *frame = ctx->cur_frame;
-
-    pop = pending_op_array_calloc(&frame->pending_ops);
-    if (uacpi_unlikely(pop == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
-    pop->code = frame->cur_op.code;
-    pop->info = frame->cur_op.info;
-    ctx->cur_pop = pop;
+    node->object->type = UACPI_OBJECT_METHOD;
+    node->object->as_method.method = method;
+    method->node = node;
 
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status method_call_init(struct execution_context *ctx)
-{
-    return pop_prime(ctx);
-}
-
-static uacpi_status flow_init(struct execution_context *ctx)
+static uacpi_status handle_control_flow(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
 
-    if (pending_op_array_size(&ctx->cur_frame->pending_ops) != 0)
-        return UACPI_STATUS_BAD_BYTECODE;
+    for (;;) {
+        if (ctx->cur_block != frame->last_while) {
+            frame_reset_post_end_block(ctx, ctx->cur_block->type);
+            continue;
+        }
 
-    switch (frame->cur_op.code) {
-    case UACPI_AML_OP_ContinueOp:
-    case UACPI_AML_OP_BreakOp:
-        if (frame->last_while == UACPI_NULL)
-            return UACPI_STATUS_BAD_BYTECODE;
-    case UACPI_AML_OP_ReturnOp:
-        call_frame_advance_pc(frame);
+        if (op_ctx->op->code == UACPI_AML_OP_BreakOp)
+            frame->code_offset = ctx->cur_block->end;
+        else
+            frame->code_offset = ctx->cur_block->begin;
+        frame_reset_post_end_block(ctx, ctx->cur_block->type);
+        break;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_code_block(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct package_length *pkg;
+    uacpi_bool skip_block;
+
+    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
+
+    switch (op_ctx->op->code) {
+    case UACPI_AML_OP_ElseOp:
+        skip_block = ctx->skip_else;
+        break;
+    case UACPI_AML_OP_ScopeOp:
+        skip_block = UACPI_FALSE;
         break;
     case UACPI_AML_OP_IfOp:
-    case UACPI_AML_OP_ElseOp:
     case UACPI_AML_OP_WhileOp: {
-        struct uacpi_opcode_flow *flow;
-        uacpi_status st;
-        uacpi_u32 len;
+        uacpi_object *operand;
 
-        flow = &frame->cur_op.info.as_flow;
-        flow->start_offset = ctx->cur_frame->code_offset++;
-
-        st = parse_package_length(ctx->cur_frame, &len);
-        if (uacpi_unlikely_error(st))
-            return st;
-
-        // +1 because size of the op is not included in the package length
-        flow->end_offset = flow->start_offset + len + 1;
-        if (uacpi_unlikely(flow->end_offset < flow->start_offset))
-            return UACPI_STATUS_BAD_BYTECODE;
-
-        if (frame->cur_op.code == UACPI_AML_OP_ElseOp && ctx->skip_else) {
-            uacpi_kernel_log(UACPI_LOG_TRACE,
-                             "Else skipped because an If was taken earlier\n");
-            frame->code_offset = flow->end_offset;
-            return UACPI_STATUS_OK;
-        }
+        operand = item_array_at(&op_ctx->items, 1)->obj;
+        skip_block = operand->as_integer.value == 0;
         break;
     }
     default:
-        break;
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    return pop_prime(ctx);
+    if (skip_block) {
+        ctx->cur_frame->code_offset = pkg->end;
+        return UACPI_STATUS_OK;
+    }
+
+    return begin_block_execution(ctx);
 }
 
-static uacpi_status exec_init(struct execution_context *ctx)
+static uacpi_status handle_return(struct execution_context *ctx)
 {
-    call_frame_advance_pc(ctx->cur_frame);
-    return pop_prime(ctx);
+    uacpi_status ret;
+    uacpi_object *dst = UACPI_NULL;
+
+    ctx->cur_frame->code_offset = ctx->cur_frame->method->size;
+    ret = method_get_ret_object(ctx, &dst);
+
+    if (uacpi_unlikely_error(ret))
+        return ret;
+    if (dst == UACPI_NULL)
+        return UACPI_STATUS_OK;
+
+    /*
+     * Should be possible to move here if method returns a literal
+     * like Return(Buffer { ... }), otherwise we have to copy just to
+     * be safe.
+     */
+    return object_assign(
+        dst,
+        item_array_at(&ctx->cur_op_ctx->items, 0)->obj,
+        ASSIGN_BY_MOVE_IF_POSSIBLE
+    );
 }
 
 static void execution_context_release(struct execution_context *ctx)
@@ -1641,54 +1334,12 @@ static void execution_context_release(struct execution_context *ctx)
     uacpi_kernel_free(ctx);
 }
 
-static uacpi_status get_arg(struct call_frame *frame)
-{
-    uacpi_status ret = UACPI_STATUS_UNIMPLEMENTED;
-    struct uacpi_opcode_arg *op = &frame->cur_op.info.as_arg;
-
-    switch (op->arg_type) {
-    case UACPI_ARG_TYPE_ANY:
-        switch (op->sub_type) {
-        case UACPI_ARG_SUB_TYPE_LOCAL:
-        case UACPI_ARG_SUB_TYPE_ARG:
-            ret = get_arg_or_local_ref(frame, op->sub_type);
-            break;
-        default:
-            break;
-        }
-        break;
-    case UACPI_ARG_TYPE_NUMBER:
-        ret = get_number(frame);
-        break;
-    case UACPI_ARG_TYPE_STRING:
-        ret = get_string(frame);
-        break;
-    case UACPI_ARG_TYPE_DEBUG:
-        ret = get_debug(frame);
-        break;
-    default:
-        break;
-    }
-
-    return ret;
-}
-
-static void operand_array_release(struct operand_array *operands)
-{
-    uacpi_size i;
-
-    for (i = 0; i < operand_array_size(operands); ++i)
-        uacpi_object_unref(*operand_array_at(operands, i));
-
-    operand_array_clear(operands);
-}
-
 static void call_frame_clear(struct call_frame *frame)
 {
     uacpi_size i;
 
-    pending_op_array_clear(&frame->pending_ops);
-    flow_frame_array_clear(&frame->flows);
+    op_context_array_clear(&frame->pending_ops);
+    code_block_array_clear(&frame->code_blocks);
 
     for (i = 0; i < 7; ++i)
         uacpi_object_unref(frame->args[i]);
@@ -1696,60 +1347,54 @@ static void call_frame_clear(struct call_frame *frame)
         uacpi_object_unref(frame->locals[i]);
 }
 
-static void ctx_reload_post_dispatch(struct execution_context *ctx)
+static void refresh_ctx_pointers(struct execution_context *ctx)
 {
-    operand_array_release(&ctx->cur_pop->operands);
-    pending_op_array_pop(&ctx->cur_frame->pending_ops);
+    struct call_frame *frame = ctx->cur_frame;
 
-    ctx->cur_pop = pending_op_array_last(&ctx->cur_frame->pending_ops);
+    if (frame == UACPI_NULL) {
+        ctx->cur_op_ctx = UACPI_NULL;
+        ctx->prev_op_ctx = UACPI_NULL;
+        ctx->cur_block = UACPI_NULL;
+        return;
+    }
+
+    ctx->cur_op_ctx = op_context_array_last(&frame->pending_ops);
+    ctx->prev_op_ctx = op_context_array_one_before_last(&frame->pending_ops);
+    ctx->cur_block = code_block_array_last(&frame->code_blocks);
 }
 
-static void ctx_reload_post_ret(struct execution_context* ctx)
+static void ctx_reload_post_ret(struct execution_context *ctx)
 {
-    if (ctx->cur_pop)
-        operand_array_release(&ctx->cur_pop->operands);
-
     call_frame_clear(ctx->cur_frame);
     call_frame_array_pop(&ctx->call_stack);
 
     ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
-    if (ctx->cur_frame) {
-        ctx->cur_pop = pending_op_array_last(&ctx->cur_frame->pending_ops);
-        ctx->cur_flow = flow_frame_array_last(&ctx->cur_frame->flows);
-    } else {
-        ctx->cur_pop = UACPI_NULL;
-        ctx->cur_flow = UACPI_NULL;
-    }
+    refresh_ctx_pointers(ctx);
+}
+
+static bool ctx_has_non_preempted_op(struct execution_context *ctx)
+{
+    return ctx->cur_op_ctx && !ctx->cur_op_ctx->preempted;
 }
 
 #define UACPI_OP_TRACING
 
-static void trace_op(struct op *op)
+static void trace_op(const struct uacpi_op_spec *op)
 {
 #ifdef UACPI_OP_TRACING
-    if (op->code == UACPI_AML_OP_UACPIInternalOpMethodCall) {
-        uacpi_char buf[5];
-
-        buf[4] = '\0';
-        uacpi_memcpy(buf, op->info.as_method_call.node->name.text, 4);
-        uacpi_kernel_log(UACPI_LOG_TRACE, "Processing MethodCall to '%s'\n",
-                         buf);
-        return;
-    }
-
-    uacpi_kernel_log(UACPI_LOG_TRACE, "Processing Op '%s'\n",
-                     op->info.name);
+    uacpi_kernel_log(UACPI_LOG_TRACE, "Processing Op '%s' (0x%04X)\n",
+                     op->name, op->code);
 #endif
 }
 
 static void frame_push_args(struct call_frame *frame,
-                            struct pending_op *invocation)
+                            struct op_context *op_ctx)
 {
     uacpi_size i;
 
-    for (i = 0; i < operand_array_size(&invocation->operands); ++i) {
-        uacpi_object *obj = *operand_array_at(&invocation->operands, i);
-        frame->args[i] = obj;
+    for (i = 1; i < item_array_size(&op_ctx->items); ++i) {
+        uacpi_object *obj = item_array_at(&op_ctx->items, i)->obj;
+        frame->args[i - 1] = obj;
 
         /*
          * If argument is a LocalX or ArgX and the referenced type is an
@@ -1765,11 +1410,28 @@ static void frame_push_args(struct call_frame *frame,
         if (obj->type != UACPI_OBJECT_INTEGER)
             goto next;
 
-        object_overwrite_try_elide(frame->args[i], obj);
+        object_assign(frame->args[i - 1], obj, ASSIGN_BY_COPY);
 
     next:
-        uacpi_object_ref(frame->args[i]);
+        uacpi_object_ref(frame->args[i - 1]);
     }
+}
+
+static uacpi_status frame_setup_base_scope(struct call_frame *frame,
+                                           struct uacpi_control_method *method)
+{
+    struct code_block *block;
+
+    block = code_block_array_alloc(&frame->code_blocks);
+    if (uacpi_unlikely(block == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    block->type = CODE_BLOCK_SCOPE;
+    block->node = method->node;
+    block->begin = 0;
+    block->end = method->size;
+    frame->cur_scope = method->node;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status push_new_frame(struct execution_context *ctx,
@@ -1790,94 +1452,656 @@ static uacpi_status push_new_frame(struct execution_context *ctx,
     prev_frame = call_frame_array_at(call_stack,
                                      call_frame_array_size(call_stack) - 2);
     ctx->cur_frame = prev_frame;
-    ctx->cur_pop = pending_op_array_last(&prev_frame->pending_ops);
-    ctx->cur_flow = flow_frame_array_last(&prev_frame->flows);
+    refresh_ctx_pointers(ctx);
 
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status method_call_dispatch(struct execution_context *ctx)
+static uacpi_bool maybe_end_block(struct execution_context *ctx)
 {
-    uacpi_status ret;
-
-    struct uacpi_opcode_info *info = &ctx->cur_pop->info;
-    struct uacpi_namespace_node *node = info->as_method_call.node;
-    struct uacpi_control_method *method = node->object.as_method.method;
-    struct call_frame *frame;
-
-    if (uacpi_unlikely(operand_array_size(&ctx->cur_pop->operands)
-                       != method->args))
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    ret = push_new_frame(ctx, &frame);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    frame_push_args(frame, ctx->cur_pop);
-    ctx_reload_post_dispatch(ctx);
-
-    ctx->cur_frame = frame;
-    ctx->cur_frame->method = method;
-    ctx->cur_pop = UACPI_NULL;
-
-    return UACPI_STATUS_OK;
-}
-
-static uacpi_status maybe_dispatch_op(struct execution_context *ctx)
-{
-    uacpi_status ret = UACPI_STATUS_OK;
-    struct pending_op *pop;
-
-    for (;;) {
-        pop = ctx->cur_pop;
-
-        if (!pop || !op_dispatchable(pop))
-            break;
-
-        switch (pop->info.type) {
-        case UACPI_OPCODE_TYPE_FLOW:
-            ret = flow_dispatch(ctx);
-            break;
-        case UACPI_OPCODE_TYPE_EXEC:
-            ret = exec_dispatch(ctx);
-            break;
-        case UACPI_OPCODE_TYPE_METHOD_CALL:
-            return method_call_dispatch(ctx);
-        default:
-            ret = UACPI_STATUS_UNIMPLEMENTED;
-        }
-
-        if (ret != UACPI_STATUS_OK)
-            break;
-
-        ctx_reload_post_dispatch(ctx);
-    }
-
-    return ret;
-}
-
-static uacpi_bool maybe_end_flow(struct execution_context *ctx)
-{
-    struct flow_frame *flow = ctx->cur_flow;
+    struct code_block *block = ctx->cur_block;
     struct call_frame *cur_frame = ctx->cur_frame;
     uacpi_bool ret = UACPI_FALSE;
 
-    if (!flow)
+    if (!block)
         return ret;
-    if (cur_frame->code_offset != flow->end)
+    if (cur_frame->code_offset != block->end)
         return ret;
 
     ctx->skip_else = UACPI_FALSE;
 
-    if (flow->type == FLOW_FRAME_WHILE) {
-        cur_frame->code_offset = flow->begin;
-    } else if (flow->type == FLOW_FRAME_IF) {
+    if (block->type == CODE_BLOCK_WHILE) {
+        cur_frame->code_offset = block->begin;
+    } else if (block->type == CODE_BLOCK_IF) {
         ctx->skip_else = UACPI_TRUE;
         ret = UACPI_TRUE;
     }
 
-    frame_reset_post_end_flow(ctx, flow->type == FLOW_FRAME_WHILE);
+    frame_reset_post_end_block(ctx, block->type);
     return ret;
+}
+
+static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
+{
+    uacpi_status ret;
+
+    switch (dst->type) {
+    case UACPI_OBJECT_DEBUG:
+        ret = debug_store(dst, src);
+        break;
+    case UACPI_OBJECT_REFERENCE:
+        ret = store_to_reference(dst, src);
+        break;
+    case UACPI_OBJECT_INTEGER:
+        // NULL target
+        if (dst->as_integer.value == 0) {
+            ret = UACPI_STATUS_OK;
+            break;
+        }
+    default:
+        ret = UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    return ret;
+}
+
+static uacpi_status handle_copy_object_or_store(struct execution_context *ctx)
+{
+    uacpi_object *src, *dst;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (op_ctx->op->code == UACPI_AML_OP_StoreOp)
+        return store_to_target(dst, src);
+
+    return copy_object_to_reference(dst, src);
+}
+
+static uacpi_status push_op(struct execution_context *ctx)
+{
+    struct call_frame *frame = ctx->cur_frame;
+    struct op_context *op_ctx;
+
+    op_ctx = op_context_array_calloc(&frame->pending_ops);
+    if (op_ctx == UACPI_NULL)
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    op_ctx->op = ctx->cur_op;
+    refresh_ctx_pointers(ctx);
+    return UACPI_STATUS_OK;
+}
+
+static void pop_op(struct execution_context *ctx)
+{
+    struct call_frame *frame = ctx->cur_frame;
+    struct op_context *cur_op_ctx = ctx->cur_op_ctx;
+
+    for (;;) {
+        struct item *item;
+
+        item = item_array_last(&cur_op_ctx->items);
+
+        if (item == UACPI_NULL)
+            break;
+        if (item->type == ITEM_OBJECT)
+            uacpi_object_unref(item->obj);
+
+        item_array_pop(&cur_op_ctx->items);
+    }
+
+    item_array_clear(&cur_op_ctx->items);
+    op_context_array_pop(&frame->pending_ops);
+    refresh_ctx_pointers(ctx);
+}
+
+static uacpi_u8 parse_op_generates_item[0x100] = {
+    [UACPI_PARSE_OP_SIMPLE_NAME] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_SUPERNAME] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_SUPERNAME_NO_INVOKE] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_TERM_ARG] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_OPERAND] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_TARGET] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_PKGLEN] = ITEM_PACKAGE_LENGTH,
+    [UACPI_PARSE_OP_TRACKED_PKGLEN] = ITEM_PACKAGE_LENGTH,
+    [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE,
+    [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
+    [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
+    [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_OBJECT_ALLOC] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_OBJECT_ALLOC_TYPED] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_RECORD_AML_PC] = ITEM_IMMEDIATE,
+};
+
+static const uacpi_u8 *op_decode_cursor(const struct op_context *ctx)
+{
+    return &ctx->op->decode_ops[ctx->pc];
+}
+
+static uacpi_u8 op_decode_byte(struct op_context *ctx)
+{
+    uacpi_u8 byte;
+
+    byte = *op_decode_cursor(ctx);
+    ctx->pc++;
+
+    return byte;
+}
+
+// MSVC doesn't support __VA_OPT__ so we do this weirdness
+#define EXEC_OP_DO_WARN(reason, ...)                                 \
+    uacpi_kernel_log(UACPI_LOG_WARN, "Op 0x%04X ('%s'): "reason"\n", \
+                     op_ctx->op->code, op_ctx->op->name __VA_ARGS__)
+
+#define EXEC_OP_WARN_2(reason, arg0, arg1) EXEC_OP_DO_WARN(reason, ,arg0, arg1)
+#define EXEC_OP_WARN_1(reason, arg0) EXEC_OP_DO_WARN(reason, ,arg0)
+#define EXEC_OP_WARN(reason) EXEC_OP_DO_WARN(reason)
+
+#define SPEC_SIMPLE_NAME "SimpleName := NameString | ArgObj | LocalObj"
+#define SPEC_SUPER_NAME \
+    "SuperName := SimpleName | DebugObj | ReferenceTypeOpcode"
+#define SPEC_TERM_ARG \
+    "TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj"
+#define SPEC_OPERAND "Operand := TermArg => Integer"
+#define SPEC_TARGET "Target := SuperName | NullName"
+
+static uacpi_status op_typecheck(const struct op_context *op_ctx,
+                                 const struct op_context *cur_op_ctx)
+{
+    const char *expected_type_str;
+    uacpi_u8 ok_mask = 0;
+    uacpi_u8 props = cur_op_ctx->op->properties;
+
+    switch (*op_decode_cursor(op_ctx)) {
+    // SimpleName := NameString | ArgObj | LocalObj
+    case UACPI_PARSE_OP_SIMPLE_NAME:
+        expected_type_str = SPEC_SIMPLE_NAME;
+        ok_mask |= UACPI_OP_PROPERTY_SIMPLE_NAME;
+        break;
+
+    // Target := SuperName | NullName
+    case UACPI_PARSE_OP_TARGET:
+        expected_type_str = SPEC_TARGET;
+        ok_mask |= UACPI_OP_PROPERTY_TARGET | UACPI_OP_PROPERTY_SUPERNAME;
+        break;
+
+    // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
+    case UACPI_PARSE_OP_SUPERNAME:
+    case UACPI_PARSE_OP_SUPERNAME_NO_INVOKE:
+    case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+        expected_type_str = SPEC_SUPER_NAME;
+        ok_mask |= UACPI_OP_PROPERTY_SUPERNAME;
+        break;
+
+    // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
+    case UACPI_PARSE_OP_TERM_ARG:
+    case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
+    case UACPI_PARSE_OP_OPERAND:
+        expected_type_str = SPEC_TERM_ARG;
+        ok_mask |= UACPI_OP_PROPERTY_TERM_ARG;
+        break;
+    }
+
+    if (!(props & ok_mask)) {
+        EXEC_OP_WARN_2("invalid argument: '%s', expected a %s",
+                       cur_op_ctx->op->name, expected_type_str);
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status typecheck_operand(
+    const struct op_context *op_ctx,
+    const uacpi_object *obj
+)
+{
+    if (uacpi_likely(obj->type == UACPI_OBJECT_INTEGER))
+        return UACPI_STATUS_OK;
+
+    EXEC_OP_WARN_2("invalid argument type: %s, expected a %s",
+                   uacpi_object_type_to_string(obj->type), SPEC_OPERAND);
+    return UACPI_STATUS_BAD_BYTECODE;
+}
+
+static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+
+    EXEC_OP_WARN("no dedicated handler installed");
+    return UACPI_STATUS_UNIMPLEMENTED;
+}
+
+#define LOCAL_HANDLER_IDX 1
+#define ARG_HANDLER_IDX 2
+#define STRING_HANDLER_IDX 3
+#define BINARY_MATH_HANDLER_IDX 4
+#define CONTROL_FLOW_HANDLER_IDX 5
+#define CODE_BLOCK_HANDLER_IDX 6
+#define RETURN_HANDLER_IDX 7
+#define CREATE_METHOD_HANDLER_IDX 8
+#define COPY_OBJECT_OR_STORE_HANDLER_IDX 9
+#define INC_DEC_HANDLER_IDX 10
+#define REF_OR_DEREF_OF_HANDLER_IDX 11
+#define LOGICAL_NOT_HANDLER_IDX 12
+#define LOGICAL_EQUALITY_HANDLER_IDX 13
+#define NAMED_OBJECT_HANDLER_IDX 14
+
+uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
+    /*
+     * All OPs that don't have a handler dispatch to here if
+     * UACPI_PARSE_OP_INVOKE_HANDLER is reached.
+     */
+    [0] = uninstalled_op_handler,
+    [LOCAL_HANDLER_IDX] = handle_local,
+    [ARG_HANDLER_IDX] = handle_arg,
+    [NAMED_OBJECT_HANDLER_IDX] = handle_named_object,
+    [STRING_HANDLER_IDX] = handle_string,
+    [BINARY_MATH_HANDLER_IDX] = handle_binary_math,
+    [CONTROL_FLOW_HANDLER_IDX] = handle_control_flow,
+    [CODE_BLOCK_HANDLER_IDX] = handle_code_block,
+    [RETURN_HANDLER_IDX] = handle_return,
+    [CREATE_METHOD_HANDLER_IDX] = handle_create_method,
+    [COPY_OBJECT_OR_STORE_HANDLER_IDX] = handle_copy_object_or_store,
+    [INC_DEC_HANDLER_IDX] = handle_inc_dec,
+    [REF_OR_DEREF_OF_HANDLER_IDX] = handle_ref_or_deref_of,
+    [LOGICAL_NOT_HANDLER_IDX] = handle_logical_not,
+    [LOGICAL_EQUALITY_HANDLER_IDX] = handle_logical_equality,
+};
+
+static uacpi_u8 handler_idx_of_op[0x100] = {
+    [UACPI_AML_OP_Local0Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local1Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local2Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local3Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local4Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local5Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local6Op] = LOCAL_HANDLER_IDX,
+    [UACPI_AML_OP_Local7Op] = LOCAL_HANDLER_IDX,
+
+    [UACPI_AML_OP_Arg0Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg1Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg2Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg3Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg4Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg5Op] = ARG_HANDLER_IDX,
+    [UACPI_AML_OP_Arg6Op] = ARG_HANDLER_IDX,
+
+    [UACPI_AML_OP_StringPrefix] = STRING_HANDLER_IDX,
+
+    [UACPI_AML_OP_AddOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_SubtractOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_MultiplyOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_DivideOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_ShiftLeftOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_ShiftRightOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_AndOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_NandOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_OrOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_NorOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_XorOp] = BINARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_ModOp] = BINARY_MATH_HANDLER_IDX,
+
+    [UACPI_AML_OP_IfOp] = CODE_BLOCK_HANDLER_IDX,
+    [UACPI_AML_OP_ElseOp] = CODE_BLOCK_HANDLER_IDX,
+    [UACPI_AML_OP_WhileOp] = CODE_BLOCK_HANDLER_IDX,
+    [UACPI_AML_OP_ScopeOp] = CODE_BLOCK_HANDLER_IDX,
+
+    [UACPI_AML_OP_ContinueOp] = CONTROL_FLOW_HANDLER_IDX,
+    [UACPI_AML_OP_BreakOp] = CONTROL_FLOW_HANDLER_IDX,
+
+    [UACPI_AML_OP_ReturnOp] = RETURN_HANDLER_IDX,
+
+    [UACPI_AML_OP_MethodOp] = CREATE_METHOD_HANDLER_IDX,
+
+    [UACPI_AML_OP_StoreOp] = COPY_OBJECT_OR_STORE_HANDLER_IDX,
+    [UACPI_AML_OP_CopyObjectOp] = COPY_OBJECT_OR_STORE_HANDLER_IDX,
+
+    [UACPI_AML_OP_IncrementOp] = INC_DEC_HANDLER_IDX,
+    [UACPI_AML_OP_DecrementOp] = INC_DEC_HANDLER_IDX,
+
+    [UACPI_AML_OP_RefOfOp] = REF_OR_DEREF_OF_HANDLER_IDX,
+    [UACPI_AML_OP_DerefOfOp] = REF_OR_DEREF_OF_HANDLER_IDX,
+
+    [UACPI_AML_OP_LnotOp] = LOGICAL_NOT_HANDLER_IDX,
+
+    [UACPI_AML_OP_LEqualOp] = LOGICAL_EQUALITY_HANDLER_IDX,
+
+    [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
+};
+
+static uacpi_status exec_op(struct execution_context *ctx)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    struct call_frame *frame = ctx->cur_frame;
+    struct op_context *op_ctx;
+    struct item *item = UACPI_NULL;
+    enum uacpi_parse_op prev_op = 0, op;
+
+    /*
+     * Allocate a new op context if previous is preempted (looking for a
+     * dynamic argument), or doesn't exist at all.
+     */
+    if (!ctx_has_non_preempted_op(ctx)) {
+        ret = push_op(ctx);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    if (ctx->prev_op_ctx)
+        prev_op = *op_decode_cursor(ctx->prev_op_ctx);
+
+    for (;;) {
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        op_ctx = ctx->cur_op_ctx;
+
+        if (op_ctx->pc == 0 && ctx->prev_op_ctx) {
+            /*
+             * Type check the current arg type against what is expected by the
+             * preempted op. This check is able to catch most type violations
+             * with the only exception being Operand as we only know whether
+             * that evaluates to an integer after the fact.
+             */
+            ret = op_typecheck(ctx->prev_op_ctx, ctx->cur_op_ctx);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+        }
+
+        op = op_decode_byte(op_ctx);
+
+        if (parse_op_generates_item[op] != ITEM_NONE) {
+            item = item_array_alloc(&op_ctx->items);
+            if (uacpi_unlikely(item == UACPI_NULL))
+                return UACPI_STATUS_OUT_OF_MEMORY;
+
+            item->type = parse_op_generates_item[op];
+            if (item->type == ITEM_OBJECT) {
+                item->obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+                if (uacpi_unlikely(item->obj == UACPI_NULL))
+                    return UACPI_STATUS_OUT_OF_MEMORY;
+            }
+        } else if (item == UACPI_NULL) {
+            item = item_array_last(&op_ctx->items);
+        }
+
+        switch (op) {
+        case UACPI_PARSE_OP_END: {
+            if (op_ctx->tracked_pkg_idx) {
+                item = item_array_at(&op_ctx->items, op_ctx->tracked_pkg_idx - 1);
+                frame->code_offset = item->pkg.end;
+            }
+
+            pop_op(ctx);
+            if (ctx->cur_op_ctx) {
+                ctx->cur_op_ctx->preempted = UACPI_FALSE;
+                ctx->cur_op_ctx->pc++;
+            }
+
+            return UACPI_STATUS_OK;
+        }
+
+        case UACPI_PARSE_OP_SIMPLE_NAME:
+        case UACPI_PARSE_OP_SUPERNAME:
+        case UACPI_PARSE_OP_SUPERNAME_NO_INVOKE:
+        case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+        case UACPI_PARSE_OP_TERM_ARG:
+        case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
+        case UACPI_PARSE_OP_OPERAND:
+        case UACPI_PARSE_OP_TARGET:
+            /*
+             * Preempt this op parsing for now as we wait for the dynamic arg
+             * to be parsed.
+             */
+            op_ctx->preempted = UACPI_TRUE;
+            op_ctx->pc--;
+            return UACPI_STATUS_OK;
+
+        case UACPI_PARSE_OP_TRACKED_PKGLEN:
+            op_ctx->tracked_pkg_idx = item_array_size(&op_ctx->items);
+        case UACPI_PARSE_OP_PKGLEN:
+            ret = parse_package_length(frame, &item->pkg);
+            break;
+
+        case UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT:
+            item->obj->type = UACPI_OBJECT_INTEGER;
+            uacpi_memcpy(
+                &item->obj->as_integer.value,
+                op_decode_cursor(op_ctx),
+                8
+            );
+            op_ctx->pc += 8;
+            break;
+
+        case UACPI_PARSE_OP_LOAD_IMM:
+        case UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT: {
+            uacpi_u8 width;
+            void *dst;
+
+            width = op_decode_byte(op_ctx);
+            if (uacpi_unlikely(call_frame_code_bytes_left(frame) < width))
+                return UACPI_STATUS_BAD_BYTECODE;
+
+            if (op == UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT) {
+                item->obj->type = UACPI_OBJECT_INTEGER;
+                item->obj->as_integer.value = 0;
+                dst = &item->obj->as_integer.value;
+            } else {
+                item->immediate = 0;
+                dst = item->immediate_bytes;
+            }
+
+            uacpi_memcpy(dst, call_frame_cursor(frame), width);
+            frame->code_offset += width;
+            break;
+        }
+
+        case UACPI_PARSE_OP_RECORD_AML_PC:
+            item->immediate = frame->code_offset;
+            break;
+
+        case UACPI_PARSE_OP_TRUNCATE_NUMBER:
+            truncate_number_if_needed(item->obj);
+            break;
+
+        case UACPI_PARSE_OP_OBJECT_ALLOC_TYPED:
+        case UACPI_PARSE_OP_SET_OBJECT_TYPE:
+            item->obj->type = op_decode_byte(op_ctx);
+            break;
+
+        case UACPI_PARSE_OP_TYPECHECK: {
+            enum uacpi_object_type expected_type;
+
+            expected_type = op_decode_byte(op_ctx);
+
+            if (uacpi_unlikely(item->obj->type != expected_type)) {
+                EXEC_OP_WARN_2("bad object type: expected %d, got %d!",
+                               expected_type, item->obj->type);
+                ret = UACPI_STATUS_BAD_BYTECODE;
+            }
+
+            break;
+        }
+
+        case UACPI_PARSE_OP_TODO:
+            EXEC_OP_WARN("not yet implemented");
+            ret = UACPI_STATUS_UNIMPLEMENTED;
+            break;
+
+        case UACPI_PARSE_OP_BAD_OPCODE:
+        case UACPI_PARSE_OP_UNREACHABLE:
+            EXEC_OP_WARN("invalid/unexpected opcode");
+            ret = UACPI_STATUS_BAD_BYTECODE;
+            break;
+
+        case UACPI_PARSE_OP_AML_PC_DECREMENT:
+            frame->code_offset--;
+            break;
+
+        case UACPI_PARSE_OP_CREATE_NAMESTRING:
+        case UACPI_PARSE_OP_EXISTING_NAMESTRING: {
+            enum resolve_behavior behavior;
+
+            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
+                behavior = RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS;
+            else
+                behavior = RESOLVE_FAIL_IF_DOESNT_EXIST;
+
+            ret = resolve_name_string(frame, behavior, &item->node);
+            break;
+        }
+
+        case UACPI_PARSE_OP_INVOKE_HANDLER:
+            ret = op_handlers[handler_idx_of_op[op_ctx->op->code]](ctx);
+            break;
+
+        case UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE:
+            item = item_array_at(&op_ctx->items, op_decode_byte(op_ctx));
+            ret = uacpi_node_install(item->node->parent, item->node);
+            break;
+
+        case UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV:
+        case UACPI_PARSE_OP_OBJECT_COPY_TO_PREV: {
+            uacpi_object *src;
+            struct item *dst;
+
+            if (!ctx->prev_op_ctx)
+                break;
+
+            switch (prev_op) {
+            case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
+            case UACPI_PARSE_OP_OPERAND:
+            case UACPI_PARSE_OP_TARGET:
+                src = object_deref_if_internal(item->obj);
+
+                if (prev_op == UACPI_PARSE_OP_OPERAND)
+                    ret = typecheck_operand(ctx->prev_op_ctx, src);
+
+                break;
+            case UACPI_PARSE_OP_SUPERNAME:
+            case UACPI_PARSE_OP_SUPERNAME_NO_INVOKE:
+            case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+                if (prev_op == UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF)
+                    src = object_deref_implicit(item->obj);
+                else
+                    src = item->obj;
+                break;
+
+            case UACPI_PARSE_OP_SIMPLE_NAME:
+            case UACPI_PARSE_OP_TERM_ARG:
+                src = item->obj;
+                break;
+
+            default:
+                EXEC_OP_WARN_1("don't know how to copy/transfer object to %d",
+                               prev_op);
+                ret = UACPI_STATUS_INVALID_ARGUMENT;
+                break;
+            }
+
+            if (uacpi_likely_success(ret)) {
+                dst = item_array_last(&ctx->prev_op_ctx->items);
+                dst->type = ITEM_OBJECT;
+
+                if (op == UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV) {
+                    dst->obj = src;
+                    uacpi_object_ref(dst->obj);
+                } else {
+                    dst->obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+                    if (uacpi_unlikely(dst->obj == UACPI_NULL)) {
+                        ret = UACPI_STATUS_OUT_OF_MEMORY;
+                        break;
+                    }
+
+                    ret = object_assign(dst->obj, src, ASSIGN_BY_COPY);
+                }
+            }
+            break;
+        }
+
+        case UACPI_PARSE_OP_STORE_TO_TARGET:
+        case UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT: {
+            uacpi_object *dst, *src;
+
+            dst = item_array_at(&op_ctx->items, op_decode_byte(op_ctx))->obj;
+
+            if (op == UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT) {
+                src = item_array_at(&op_ctx->items,
+                                    op_decode_byte(op_ctx))->obj;
+            } else {
+                src = item->obj;
+            }
+
+            ret = store_to_target(dst, src);
+            break;
+        }
+
+        // Nothing to do here, object is allocated automatically
+        case UACPI_PARSE_OP_OBJECT_ALLOC:
+            break;
+
+        case UACPI_PARSE_OP_DEREF_IF_INTERNAL: {
+            uacpi_object *temp;
+
+            temp = object_deref_if_internal(item->obj);
+            uacpi_object_ref(temp);
+            uacpi_object_unref(item->obj);
+            item->obj = temp;
+            break;
+        }
+
+        case UACPI_PARSE_OP_DISPATCH_METHOD_CALL: {
+            struct uacpi_control_method *method;
+
+            method = item_array_at(&op_ctx->items, 0)->node->object->as_method.method;
+
+            ret = push_new_frame(ctx, &frame);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
+            frame_push_args(frame, ctx->cur_op_ctx);
+            frame_setup_base_scope(frame, method);
+
+            ctx->cur_frame = frame;
+            ctx->cur_frame->method = method;
+            ctx->cur_op_ctx = UACPI_NULL;
+            ctx->prev_op_ctx = UACPI_NULL;
+            ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
+            return UACPI_STATUS_OK;
+        }
+
+        case UACPI_PARSE_OP_CONVERT_NAMESTRING: {
+            uacpi_aml_op new_op;
+
+            if (prev_op && prev_op == UACPI_PARSE_OP_SUPERNAME_NO_INVOKE) {
+                new_op = UACPI_AML_OP_InternalOpNamedObject;
+            } else {
+                uacpi_object *obj = item->node->object;
+
+                if (obj->type == UACPI_OBJECT_METHOD) {
+                    new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
+                    new_op += obj->as_method.method->args;
+                } else {
+                    new_op = UACPI_AML_OP_InternalOpNamedObject;
+                }
+            }
+
+            op_ctx->pc = 0;
+            op_ctx->op = uacpi_get_op_spec(new_op);
+            break;
+        }
+
+        default:
+            EXEC_OP_WARN_1("unhandled parser op '%d'", op);
+            ret = UACPI_STATUS_UNIMPLEMENTED;
+            break;
+        }
+    }
 }
 
 uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
@@ -1926,57 +2150,33 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
         goto out;
     }
 
+    frame_setup_base_scope(ctx->cur_frame, method);
+    ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
+
     for (;;) {
-        if (uacpi_unlikely_error(st))
-            break;
-        if (ctx->cur_frame == UACPI_NULL)
-            break;
+        if (!ctx_has_non_preempted_op(ctx)) {
+            if (ctx->cur_frame == UACPI_NULL)
+                break;
 
-        st = maybe_dispatch_op(ctx);
-        if (uacpi_unlikely_error(st))
-            break;
+            if (maybe_end_block(ctx))
+                continue;
 
-        if (maybe_end_flow(ctx))
-            continue;
+            if (!call_frame_has_code(ctx->cur_frame)) {
+                ctx_reload_post_ret(ctx);
+                continue;
+            }
 
-        cur_frame = ctx->cur_frame;
-        if (!call_frame_has_code(cur_frame)) {
-            ctx_reload_post_ret(ctx);
-            continue;
+            st = get_op(ctx);
+            if (uacpi_unlikely_error(st))
+                goto out;
+
+            trace_op(ctx->cur_op);
         }
 
-        cur_op = &cur_frame->cur_op;
-
-        st = peek_op(cur_frame);
+        st = exec_op(ctx);
         if (uacpi_unlikely_error(st))
             goto out;
 
-        trace_op(cur_op);
-
-        switch (cur_op->info.type)
-        {
-        case UACPI_OPCODE_TYPE_EXEC:
-            st = exec_init(ctx);
-            break;
-        case UACPI_OPCODE_TYPE_METHOD_CALL:
-            st = method_call_init(ctx);
-            break;
-        case UACPI_OPCODE_TYPE_FLOW:
-            st = flow_init(ctx);
-            break;
-        case UACPI_OPCODE_TYPE_ARG:
-            call_frame_advance_pc(cur_frame);
-            st = get_arg(cur_frame);
-            break;
-        case UACPI_OPCODE_TYPE_CREATE:
-            st = create_dispatch(cur_frame);
-            break;
-        default:
-            uacpi_kernel_log(UACPI_LOG_WARN, "Unimplemented opcode type %u\n",
-                             cur_op->info.type);
-            st = UACPI_STATUS_UNIMPLEMENTED;
-            goto out;
-        }
         ctx->skip_else = UACPI_FALSE;
     }
 
