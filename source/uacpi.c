@@ -177,9 +177,9 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
 
     if (node == UACPI_NULL)
         return UACPI_STATUS_NOT_FOUND;
-    if (node->object.type != UACPI_OBJECT_METHOD)
+    if (node->object->type != UACPI_OBJECT_METHOD)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return uacpi_execute_control_method(node->object.as_method.method,
+    return uacpi_execute_control_method(node->object->as_method.method,
                                         args, ret);
 }

@@ -3,7 +3,8 @@
 
 static struct uacpi_namespace_node g_root;
 
-struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
+struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
+                                                        uacpi_object_type type)
 {
     struct uacpi_namespace_node *ret;
 
@@ -12,7 +13,13 @@ struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
         return ret;
 
     ret->name = name;
-    ret->object.common.refcount = 1;
+
+    ret->object = uacpi_create_object(type);
+    if (uacpi_unlikely(ret->object == UACPI_NULL)) {
+        uacpi_kernel_free(ret);
+        ret = UACPI_NULL;
+    }
+
     return ret;
 }
 
