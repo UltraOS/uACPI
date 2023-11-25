@@ -3,6 +3,30 @@
 
 #define BUGGED_REFCOUNT 0xFFFFFFFF
 
+const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
+{
+    switch (type) {
+    case UACPI_OBJECT_UNINITIALIZED:
+        return "Uninitialized";
+    case UACPI_OBJECT_INTEGER:
+        return "Integer";
+    case UACPI_OBJECT_STRING:
+        return "String";
+    case UACPI_OBJECT_BUFFER:
+        return "Buffer";
+    case UACPI_OBJECT_PACKAGE:
+        return "Package";
+    case UACPI_OBJECT_REFERENCE:
+        return "Reference";
+    case UACPI_OBJECT_METHOD:
+        return "Method";
+    case UACPI_OBJECT_DEBUG:
+        return "Debug";
+    default:
+        return "<Invalid type>";
+    }
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;

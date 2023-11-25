@@ -17,26 +17,6 @@ uacpi_object_type string_to_object_type(std::string_view str)
     );
 }
 
-std::string_view type_to_string(uacpi_object_type type)
-{
-    switch (type) {
-    case UACPI_OBJECT_UNINITIALIZED:
-        return "uninitialized";
-    case UACPI_OBJECT_INTEGER:
-        return "integer";
-    case UACPI_OBJECT_STRING:
-        return "string";
-    case UACPI_OBJECT_BUFFER:
-        return "buffer";
-    case UACPI_OBJECT_PACKAGE:
-        return "package";
-    case UACPI_OBJECT_REFERENCE:
-        return "reference";
-    default:
-        return "<bug>";
-    }
-}
-
 void validate_ret_against_expected(uacpi_object& obj,
                                    uacpi_object_type expected_type,
                                    std::string_view expected_val)
@@ -57,9 +37,9 @@ void validate_ret_against_expected(uacpi_object& obj,
     if (obj.type != expected_type) {
         std::string err;
         err += "returned type '";
-        err += type_to_string((uacpi_object_type)obj.type);
+        err += uacpi_object_type_to_string((uacpi_object_type)obj.type);
         err += "' doesn't match expected '";
-        err += type_to_string(expected_type);
+        err += uacpi_object_type_to_string(expected_type);
         err += "'";
 
         throw std::runtime_error(err);
