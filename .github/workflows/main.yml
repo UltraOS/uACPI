@@ -37,11 +37,11 @@ jobs:
         name: Install tools & libraries (Ubuntu)
         run: |
           sudo apt update
-          sudo apt install python3 python3-pytest acpica-tools cmake clang
+          sudo apt install python3 python3-pytest acpica-tools cmake
       - if: ${{ matrix.os == 'macos-latest' }}
         name: Install tools & libraries (MacOS)
         run: |
-          brew install python3 acpica cmake llvm
+          brew install python3 acpica cmake
           python3 -m pip install pytest
       - if: ${{ matrix.os == 'windows-latest' }}
         name: Install tools & libraries (Windows)
