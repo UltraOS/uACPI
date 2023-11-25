@@ -904,7 +904,9 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
+    UACPI_OP_PROPERTY_SIMPLE_NAME |                              \
     UACPI_OP_PROPERTY_SUPERNAME |                                \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
     UACPI_OP_PROPERTY_RESERVED                                   \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(0)                                      \
