@@ -1986,7 +1986,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             switch (prev_op) {
             case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
             case UACPI_PARSE_OP_OPERAND:
-            case UACPI_PARSE_OP_TARGET:
                 src = object_deref_if_internal(item->obj);
 
                 if (prev_op == UACPI_PARSE_OP_OPERAND)
@@ -2003,6 +2002,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             case UACPI_PARSE_OP_SIMPLE_NAME:
             case UACPI_PARSE_OP_TERM_ARG:
+            case UACPI_PARSE_OP_TARGET:
                 src = item->obj;
                 break;
 
