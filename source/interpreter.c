@@ -1230,13 +1230,6 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     method->code += method_begin_offset;
     method->size = pkg->end - method_begin_offset;
 
-    if (uacpi_unlikely(method->size == 0)) {
-        uacpi_kernel_log(UACPI_LOG_WARN, "Tried to create an empty method\n");
-        uacpi_kernel_free(method);
-        return UACPI_STATUS_BAD_BYTECODE;
-    }
-
-
     node->object->type = UACPI_OBJECT_METHOD;
     node->object->as_method.method = method;
     method->node = node;
