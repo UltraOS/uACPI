@@ -29,6 +29,8 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_REFERENCE = 20,
 } uacpi_object_type;
 
+const uacpi_char *uacpi_object_type_to_string(uacpi_object_type);
+
 #define UACPI_OBJECT_COMMON_HDR \
     uacpi_u8 type;              \
     uacpi_u8 flags;             \
