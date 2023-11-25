@@ -474,7 +474,7 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     case UACPI_OBJECT_REFERENCE:
         return UACPI_STATUS_INVALID_ARGUMENT;
     default:
-        return UACPI_STATUS_UNIMPLEMENTED;
+        return UACPI_STATUS_BAD_BYTECODE;
     }
 
     return UACPI_STATUS_OK;
