@@ -23,7 +23,6 @@ enum uacpi_parse_op {
 
     // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
     UACPI_PARSE_OP_SUPERNAME,
-    UACPI_PARSE_OP_SUPERNAME_NO_INVOKE,
     UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF,
 
     // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
@@ -493,7 +492,7 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     RefOfOp, 0x71,                                               \
     {                                                            \
-        UACPI_PARSE_OP_SUPERNAME_NO_INVOKE,                      \
+        UACPI_PARSE_OP_SUPERNAME,                                \
         UACPI_PARSE_OP_DEREF_IF_INTERNAL,                        \
         UACPI_PARSE_OP_OBJECT_ALLOC,                             \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
