@@ -949,11 +949,7 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     }
 
     src_obj = object_deref_if_internal(src);
-
-    if (!overwrite) {
-        overwrite = (*dst_slot)->type == src_obj->type ||
-                    (*dst_slot)->type == UACPI_OBJECT_UNINITIALIZED;
-    }
+    overwrite |= (*dst_slot)->type == UACPI_OBJECT_UNINITIALIZED;
 
     if (overwrite)
         return object_assign(*dst_slot, src_obj, ASSIGN_BY_MOVE);
