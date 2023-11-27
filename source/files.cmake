@@ -6,4 +6,5 @@ uacpi_add_sources(
     interpreter.c
     opcodes.c
     namespace.c
+    stdlib.c
 )
