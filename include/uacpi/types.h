@@ -32,6 +32,10 @@ typedef enum uacpi_object_type {
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type);
 typedef struct uacpi_object uacpi_object;
 
+struct uacpi_shareable {
+    uacpi_u32 reference_count;
+};
+
 typedef struct uacpi_buffer {
     union {
         void *data;
@@ -46,9 +50,9 @@ typedef struct uacpi_object_package {
 } uacpi_object_package;
 
 typedef struct uacpi_object {
+    struct uacpi_shareable shareable;
     uacpi_u8 type;
     uacpi_u8 flags;
-    uacpi_u32 refcount;
 
     union {
         uacpi_u64 integer;
