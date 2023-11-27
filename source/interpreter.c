@@ -433,7 +433,8 @@ static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
     uacpi_buffer *dst_buf = &dst->buffer;
 
     if (behavior == ASSIGN_BY_MOVE ||
-       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE && src->refcount == 1)) {
+       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE &&
+        src->shareable.reference_count == 1)) {
         dst_buf->data = src_buf->data;
         dst_buf->size = src_buf->size;
         src_buf->data = UACPI_NULL;
@@ -514,7 +515,7 @@ static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
     uacpi_status ret = UACPI_STATUS_OK;
 
     if (dst->type == UACPI_OBJECT_REFERENCE) {
-        uacpi_u32 refs_to_remove = dst->refcount;
+        uacpi_u32 refs_to_remove = dst->shareable.reference_count;
         while (refs_to_remove--)
             uacpi_object_unref(dst->inner_object);
     } else if (dst->type == UACPI_OBJECT_STRING ||
@@ -524,10 +525,12 @@ static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
         dst->buffer.size = 0;
     }
 
-    if (behavior == ASSIGN_BY_MOVE && uacpi_unlikely(src->refcount != 1)) {
+    if (behavior == ASSIGN_BY_MOVE &&
+        uacpi_unlikely(src->shareable.reference_count != 1)) {
         uacpi_kernel_log(UACPI_LOG_WARN,
                          "Tried to move an object (%p) with %u references, "
-                         "converting to copy\n", src, src->refcount);
+                         "converting to copy\n", src,
+                         src->shareable.reference_count);
         behavior = ASSIGN_BY_COPY;
     }
 
@@ -546,7 +549,7 @@ static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
         dst->method = src->method;
         break;
     case UACPI_OBJECT_REFERENCE: {
-        uacpi_u32 refs_to_add = dst->refcount;
+        uacpi_u32 refs_to_add = dst->shareable.reference_count;
 
         dst->flags = src->flags;
         dst->inner_object = src->inner_object;
