@@ -63,6 +63,9 @@ enum uacpi_parse_op {
     // Allocate an object an put it at the front of the item list
     UACPI_PARSE_OP_OBJECT_ALLOC,
 
+    // Convert last item into a shallow copy of itself
+    UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY,
+
     /*
      * Same as UACPI_PARSE_OP_OBJECT_ALLOC except the type of the allocated
      * object is specified at decode_ops[pc + 1]
@@ -178,6 +181,10 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
 
 #define UACPI_BAD_OPCODE(code) \
     UACPI_OP(Reserved_##code, code, { UACPI_PARSE_OP_BAD_OPCODE })
+
+#define UACPI_PARSE_OP_METHOD_ARGUMENT            \
+    UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,      \
+    UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY
 
 #define UACPI_METHOD_CALL_OPCODE(nargs, ...)             \
     UACPI_OP(                                            \
@@ -326,7 +333,7 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     StringPrefix, 0x0D,                                          \
     {                                                            \
-        UACPI_PARSE_OP_OBJECT_ALLOC,                             \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_STRING,  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
@@ -911,52 +918,52 @@ UACPI_OP(                                                        \
 UACPI_METHOD_CALL_OPCODE(0)                                      \
 UACPI_METHOD_CALL_OPCODE(                                        \
     1,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     2,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     3,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     4,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     5,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     6,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(                                        \
     7,                                                           \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
-    UACPI_PARSE_OP_TERM_ARG,                                     \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
+    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
 )                                                                \
 UACPI_OP(                                                        \
     OnesOp, 0xFF,                                                \

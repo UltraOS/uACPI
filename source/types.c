@@ -63,10 +63,45 @@ static uacpi_u32 shareable_unref(void *hdr)
     return shareable->reference_count--;
 }
 
+static void shareable_unref_and_delete_if_last(
+    void *hdr, void (*do_free)(void*)
+)
+{
+    if (uacpi_unlikely(bugged_shareable(hdr)))
+        return;
+
+    if (shareable_unref(hdr) == 1)
+        do_free(hdr);
+}
+
 static uacpi_u32 shareable_refcount(void *hdr)
 {
     struct uacpi_shareable *shareable = hdr;
     return shareable->reference_count;
+}
+
+static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
+{
+    uacpi_buffer *buf;
+
+    buf = uacpi_kernel_calloc(1, sizeof(uacpi_buffer));
+    if (uacpi_unlikely(buf == UACPI_NULL))
+        return UACPI_FALSE;
+
+    shareable_init(buf);
+
+    if (initial_size) {
+        buf->data = uacpi_kernel_alloc(initial_size);
+        if (uacpi_unlikely(buf->data == UACPI_NULL)) {
+            uacpi_kernel_free(buf);
+            return UACPI_FALSE;
+        }
+
+        buf->size = initial_size;
+    }
+
+    obj->buffer = buf;
+    return UACPI_TRUE;
 }
 
 uacpi_object *uacpi_create_object(uacpi_object_type type)
@@ -79,14 +114,30 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
 
     shareable_init(ret);
     ret->type = type;
+
+    if (type == UACPI_OBJECT_STRING || type == UACPI_OBJECT_BUFFER) {
+        if (uacpi_unlikely(!buffer_alloc(ret, 0))) {
+            uacpi_kernel_free(ret);
+            ret = UACPI_NULL;
+        }
+    }
+
     return ret;
+}
+
+static void free_buffer(void *hdr)
+{
+    uacpi_buffer *buf = hdr;
+
+    uacpi_kernel_free(buf->data);
+    uacpi_kernel_free(buf);
 }
 
 static void free_object(uacpi_object *obj)
 {
     if (obj->type == UACPI_OBJECT_STRING ||
         obj->type == UACPI_OBJECT_BUFFER)
-        uacpi_kernel_free(obj->buffer.data);
+        shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
     if (obj->type == UACPI_OBJECT_METHOD)
         uacpi_kernel_free(obj->method);
 
@@ -178,29 +229,29 @@ void uacpi_object_unref(uacpi_object *obj)
         free_chain(this_obj);
 }
 
+static uacpi_status buffer_alloc_and_store(
+    uacpi_object *obj, uacpi_size buf_size,
+    const void *src, uacpi_size src_size
+)
+{
+    if (uacpi_unlikely(!buffer_alloc(obj, buf_size)))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    uacpi_memcpy_zerout(obj->buffer->data, src, buf_size, src_size);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
                                   enum uacpi_assign_behavior behavior)
 {
-    uacpi_buffer *src_buf = &src->buffer;
-    uacpi_buffer *dst_buf = &dst->buffer;
-
-    if (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE ||
-       (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE_IF_POSSIBLE &&
-        src->shareable.reference_count == 1)) {
-        dst_buf->data = src_buf->data;
-        dst_buf->size = src_buf->size;
-        src_buf->data = UACPI_NULL;
-        src_buf->size = 0;
-    } else {
-        dst_buf->data = uacpi_kernel_alloc(src_buf->size);
-        if (uacpi_unlikely(dst_buf->data == UACPI_NULL))
-            return UACPI_STATUS_OUT_OF_MEMORY;
-
-        dst_buf->size = src_buf->size;
-        uacpi_memcpy(dst_buf->data, src_buf->data, src_buf->size);
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY) {
+        dst->buffer = src->buffer;
+        shareable_ref(dst->buffer);
+        return UACPI_STATUS_OK;
     }
 
-    return UACPI_STATUS_OK;
+    return buffer_alloc_and_store(dst, src->buffer->size,
+                                  src->buffer->data, src->buffer->size);
 }
 
 uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
@@ -214,18 +265,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
             uacpi_object_unref(dst->inner_object);
     } else if (dst->type == UACPI_OBJECT_STRING ||
                dst->type == UACPI_OBJECT_BUFFER) {
-        uacpi_kernel_free(dst->buffer.data);
-        dst->buffer.data = NULL;
-        dst->buffer.size = 0;
-    }
-
-    if (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE &&
-        uacpi_unlikely(shareable_refcount(src) != 1)) {
-        uacpi_kernel_log(UACPI_LOG_WARN,
-                         "Tried to move an object (%p) with %u references, "
-                         "converting to copy\n", src,
-                         src->shareable.reference_count);
-        behavior = UACPI_ASSIGN_BEHAVIOR_COPY;
+        shareable_unref_and_delete_if_last(dst->buffer, free_buffer);
     }
 
     switch (src->type) {

@@ -54,8 +54,8 @@ void validate_ret_against_expected(uacpi_object& obj,
             ret_is_wrong(expected_val, std::to_string(actual_int));
     } break;
     case UACPI_OBJECT_STRING: {
-        auto actual_str = std::string_view(obj.buffer.text,
-                                           obj.buffer.size - 1);
+        auto actual_str = std::string_view(obj.buffer->text,
+                                           obj.buffer->size - 1);
 
         if (expected_val != actual_str)
             ret_is_wrong(expected_val, actual_str);
