@@ -735,20 +735,13 @@ static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
     return UACPI_STATUS_OK;
 }
 
-/*
- * NOTE: this function returns the slot in the parent object at which the
- *       child object is stored.
- */
-uacpi_object **reference_unwind(uacpi_object *obj)
+uacpi_object *reference_unwind(uacpi_object *obj)
 {
-    uacpi_object *parent = obj;
-
     while (obj) {
         if (obj->type != UACPI_OBJECT_REFERENCE)
-            return &parent->inner_object;
+            return obj;
 
-        parent = obj;
-        obj = parent->inner_object;
+        obj = obj->inner_object;
     }
 
     // This should be unreachable
@@ -772,7 +765,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
         obj = obj->inner_object;
     }
 
-    return *reference_unwind(obj);
+    return reference_unwind(obj);
 }
 
 /*
@@ -788,7 +781,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
  static uacpi_status copy_object_to_reference(uacpi_object *dst,
                                               uacpi_object *src)
 {
-    uacpi_object **dst_slot;
+    uacpi_object *dst_obj;
     uacpi_object *src_obj;
 
     switch (dst->flags) {
@@ -798,7 +791,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
             referenced_obj->flags == REFERENCE_KIND_REFOF) {
-            dst_slot = reference_unwind(referenced_obj);
+            dst_obj = reference_unwind(referenced_obj);
             break;
         }
 
@@ -806,14 +799,14 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     }
     case REFERENCE_KIND_LOCAL:
     case REFERENCE_KIND_NAMED:
-        dst_slot = &dst->inner_object;
+        dst_obj = dst->inner_object;
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     src_obj = object_deref_if_internal(src);
-    return uacpi_object_assign(*dst_slot, src_obj,
+    return uacpi_object_assign(dst_obj, src_obj,
                                UACPI_ASSIGN_BEHAVIOR_MOVE);
 }
 
@@ -830,7 +823,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
 static uacpi_status store_to_reference(uacpi_object *dst,
                                        uacpi_object *src)
 {
-    uacpi_object **dst_slot;
+    uacpi_object *dst_obj;
     uacpi_object *src_obj;
     uacpi_bool overwrite = UACPI_FALSE;
 
@@ -842,31 +835,31 @@ static uacpi_status store_to_reference(uacpi_object *dst,
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
             referenced_obj->flags == REFERENCE_KIND_REFOF) {
-            dst_slot = reference_unwind(referenced_obj);
+            dst_obj = reference_unwind(referenced_obj);
             overwrite = dst->flags == REFERENCE_KIND_ARG;
             break;
         }
 
         overwrite = UACPI_TRUE;
-        dst_slot = &dst->inner_object;
+        dst_obj = dst->inner_object;
         break;
     }
     case REFERENCE_KIND_NAMED:
-        dst_slot = reference_unwind(dst);
+        dst_obj = reference_unwind(dst);
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     src_obj = object_deref_if_internal(src);
-    overwrite |= (*dst_slot)->type == UACPI_OBJECT_UNINITIALIZED;
+    overwrite |= dst_obj->type == UACPI_OBJECT_UNINITIALIZED;
 
     if (overwrite) {
-        return uacpi_object_assign(*dst_slot, src_obj,
+        return uacpi_object_assign(dst_obj, src_obj,
                                    UACPI_ASSIGN_BEHAVIOR_MOVE);
     }
 
-    return object_assign_with_implicit_cast(*dst_slot, src_obj);
+    return object_assign_with_implicit_cast(dst_obj, src_obj);
 }
 
 static uacpi_status handle_inc_dec(struct execution_context *ctx)
@@ -900,7 +893,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
          * the bottom-most reference. Note that this is different from
          * ACPICA where DerefOf dereferences one level.
          */
-        src = *reference_unwind(src);
+        src = reference_unwind(src);
         return uacpi_object_assign(dst, src, UACPI_ASSIGN_BEHAVIOR_COPY);
     }
 
