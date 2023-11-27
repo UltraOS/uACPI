@@ -1,3 +1,4 @@
+#include <uacpi/internal/types.h>
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/opcodes.h>
@@ -415,42 +416,6 @@ uacpi_status handle_string(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-enum assign_by {
-    // Deep copy
-    ASSIGN_BY_COPY,
-
-    // Shallow copy
-    ASSIGN_BY_MOVE,
-
-    // Attempt to shallow copy with fallback
-    ASSIGN_BY_MOVE_IF_POSSIBLE,
-};
-
-static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
-                                  enum assign_by behavior)
-{
-    uacpi_buffer *src_buf = &src->buffer;
-    uacpi_buffer *dst_buf = &dst->buffer;
-
-    if (behavior == ASSIGN_BY_MOVE ||
-       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE &&
-        src->shareable.reference_count == 1)) {
-        dst_buf->data = src_buf->data;
-        dst_buf->size = src_buf->size;
-        src_buf->data = UACPI_NULL;
-        src_buf->size = 0;
-    } else {
-        dst_buf->data = uacpi_kernel_alloc(src_buf->size);
-        if (uacpi_unlikely(dst_buf->data == UACPI_NULL))
-            return UACPI_STATUS_OUT_OF_MEMORY;
-
-        dst_buf->size = src_buf->size;
-        uacpi_memcpy(dst_buf->data, src_buf->data, src_buf->size);
-    }
-
-    return UACPI_STATUS_OK;
-}
-
 struct object_storage_as_buffer {
     void *ptr;
     uacpi_size len;
@@ -505,64 +470,6 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     uacpi_memcpy(dst_buf.ptr, src_buf.ptr, bytes_to_copy);
     uacpi_memzero((uacpi_u8*)dst_buf.ptr + bytes_to_copy,
                   dst_buf.len - bytes_to_copy);
-
-    return ret;
-}
-
-static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
-                                  enum assign_by behavior)
-{
-    uacpi_status ret = UACPI_STATUS_OK;
-
-    if (dst->type == UACPI_OBJECT_REFERENCE) {
-        uacpi_u32 refs_to_remove = dst->shareable.reference_count;
-        while (refs_to_remove--)
-            uacpi_object_unref(dst->inner_object);
-    } else if (dst->type == UACPI_OBJECT_STRING ||
-               dst->type == UACPI_OBJECT_BUFFER) {
-        uacpi_kernel_free(dst->buffer.data);
-        dst->buffer.data = NULL;
-        dst->buffer.size = 0;
-    }
-
-    if (behavior == ASSIGN_BY_MOVE &&
-        uacpi_unlikely(src->shareable.reference_count != 1)) {
-        uacpi_kernel_log(UACPI_LOG_WARN,
-                         "Tried to move an object (%p) with %u references, "
-                         "converting to copy\n", src,
-                         src->shareable.reference_count);
-        behavior = ASSIGN_BY_COPY;
-    }
-
-    switch (src->type) {
-    case UACPI_OBJECT_UNINITIALIZED:
-    case UACPI_OBJECT_DEBUG:
-        break;
-    case UACPI_OBJECT_BUFFER:
-    case UACPI_OBJECT_STRING:
-        ret = assign_buffer(dst, src, behavior);
-        break;
-    case UACPI_OBJECT_INTEGER:
-        dst->integer = src->integer;
-        break;
-    case UACPI_OBJECT_METHOD:
-        dst->method = src->method;
-        break;
-    case UACPI_OBJECT_REFERENCE: {
-        uacpi_u32 refs_to_add = dst->shareable.reference_count;
-
-        dst->flags = src->flags;
-        dst->inner_object = src->inner_object;
-
-        while (refs_to_add-- > 0)
-            uacpi_object_ref(dst->inner_object);
-        break;
-    } default:
-        ret = UACPI_STATUS_UNIMPLEMENTED;
-    }
-
-    if (ret == UACPI_STATUS_OK)
-        dst->type = src->type;
 
     return ret;
 }
@@ -906,7 +813,8 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     }
 
     src_obj = object_deref_if_internal(src);
-    return object_assign(*dst_slot, src_obj, ASSIGN_BY_MOVE);
+    return uacpi_object_assign(*dst_slot, src_obj,
+                               UACPI_ASSIGN_BEHAVIOR_MOVE);
 }
 
 /*
@@ -953,8 +861,10 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     src_obj = object_deref_if_internal(src);
     overwrite |= (*dst_slot)->type == UACPI_OBJECT_UNINITIALIZED;
 
-    if (overwrite)
-        return object_assign(*dst_slot, src_obj, ASSIGN_BY_MOVE);
+    if (overwrite) {
+        return uacpi_object_assign(*dst_slot, src_obj,
+                                   UACPI_ASSIGN_BEHAVIOR_MOVE);
+    }
 
     return object_assign_with_implicit_cast(*dst_slot, src_obj);
 }
@@ -991,7 +901,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
          * ACPICA where DerefOf dereferences one level.
          */
         src = *reference_unwind(src);
-        return object_assign(dst, src, ASSIGN_BY_COPY);
+        return uacpi_object_assign(dst, src, UACPI_ASSIGN_BEHAVIOR_COPY);
     }
 
     dst->type = UACPI_OBJECT_REFERENCE;
@@ -1310,10 +1220,10 @@ static uacpi_status handle_return(struct execution_context *ctx)
      * like Return(Buffer { ... }), otherwise we have to copy just to
      * be safe.
      */
-    return object_assign(
+    return uacpi_object_assign(
         dst,
         item_array_at(&ctx->cur_op_ctx->items, 0)->obj,
-        ASSIGN_BY_MOVE_IF_POSSIBLE
+        UACPI_ASSIGN_BEHAVIOR_MOVE_IF_POSSIBLE
     );
 }
 
@@ -1401,7 +1311,8 @@ static void frame_push_args(struct call_frame *frame,
         if (obj->type != UACPI_OBJECT_INTEGER)
             goto next;
 
-        object_assign(frame->args[i - 1], obj, ASSIGN_BY_COPY);
+        uacpi_object_assign(frame->args[i - 1], obj,
+                            UACPI_ASSIGN_BEHAVIOR_COPY);
 
     next:
         uacpi_object_ref(frame->args[i - 1]);
@@ -2018,7 +1929,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
                         break;
                     }
 
-                    ret = object_assign(dst->obj, src, ASSIGN_BY_COPY);
+                    ret = uacpi_object_assign(dst->obj, src,
+                                              UACPI_ASSIGN_BEHAVIOR_COPY);
                 }
             }
             break;
