@@ -1,4 +1,6 @@
 #include <uacpi/types.h>
+#include <uacpi/internal/types.h>
+#include <uacpi/internal/stdlib.h>
 #include <uacpi/kernel_api.h>
 
 #define BUGGED_REFCOUNT 0xFFFFFFFF
@@ -174,4 +176,87 @@ void uacpi_object_unref(uacpi_object *obj)
 
     if (shareable_refcount(this_obj) == 0)
         free_chain(this_obj);
+}
+
+static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
+                                  enum uacpi_assign_behavior behavior)
+{
+    uacpi_buffer *src_buf = &src->buffer;
+    uacpi_buffer *dst_buf = &dst->buffer;
+
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE ||
+       (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE_IF_POSSIBLE &&
+        src->shareable.reference_count == 1)) {
+        dst_buf->data = src_buf->data;
+        dst_buf->size = src_buf->size;
+        src_buf->data = UACPI_NULL;
+        src_buf->size = 0;
+    } else {
+        dst_buf->data = uacpi_kernel_alloc(src_buf->size);
+        if (uacpi_unlikely(dst_buf->data == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        dst_buf->size = src_buf->size;
+        uacpi_memcpy(dst_buf->data, src_buf->data, src_buf->size);
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
+                                 enum uacpi_assign_behavior behavior)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+
+    if (dst->type == UACPI_OBJECT_REFERENCE) {
+        uacpi_u32 refs_to_remove = shareable_refcount(dst);
+        while (refs_to_remove--)
+            uacpi_object_unref(dst->inner_object);
+    } else if (dst->type == UACPI_OBJECT_STRING ||
+               dst->type == UACPI_OBJECT_BUFFER) {
+        uacpi_kernel_free(dst->buffer.data);
+        dst->buffer.data = NULL;
+        dst->buffer.size = 0;
+    }
+
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_MOVE &&
+        uacpi_unlikely(shareable_refcount(src) != 1)) {
+        uacpi_kernel_log(UACPI_LOG_WARN,
+                         "Tried to move an object (%p) with %u references, "
+                         "converting to copy\n", src,
+                         src->shareable.reference_count);
+        behavior = UACPI_ASSIGN_BEHAVIOR_COPY;
+    }
+
+    switch (src->type) {
+    case UACPI_OBJECT_UNINITIALIZED:
+    case UACPI_OBJECT_DEBUG:
+        break;
+    case UACPI_OBJECT_BUFFER:
+    case UACPI_OBJECT_STRING:
+        ret = assign_buffer(dst, src, behavior);
+        break;
+    case UACPI_OBJECT_INTEGER:
+        dst->integer = src->integer;
+        break;
+    case UACPI_OBJECT_METHOD:
+        dst->method = src->method;
+        break;
+    case UACPI_OBJECT_REFERENCE: {
+        uacpi_u32 refs_to_add = shareable_refcount(dst);
+
+        dst->flags = src->flags;
+        dst->inner_object = src->inner_object;
+
+        while (refs_to_add-- > 0)
+            uacpi_object_ref(dst->inner_object);
+        break;
+    } default:
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    if (ret == UACPI_STATUS_OK)
+        dst->type = src->type;
+
+    return ret;
 }
