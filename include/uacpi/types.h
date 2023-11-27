@@ -37,6 +37,7 @@ struct uacpi_shareable {
 };
 
 typedef struct uacpi_buffer {
+    struct uacpi_shareable shareable;
     union {
         void *data;
         uacpi_char *text;
@@ -59,7 +60,7 @@ typedef struct uacpi_object {
         uacpi_object_package package;
         uacpi_object *inner_object;
         uacpi_control_method *method;
-        uacpi_buffer buffer;
+        uacpi_buffer *buffer;
     };
 } uacpi_object;
 

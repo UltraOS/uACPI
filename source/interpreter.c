@@ -405,13 +405,12 @@ uacpi_status handle_string(struct execution_context *ctx)
     if (string[length++] != 0x00)
         return UACPI_STATUS_BAD_BYTECODE;
 
-    obj->type = UACPI_OBJECT_STRING;
-    obj->buffer.text = uacpi_kernel_alloc(length);
-    if (uacpi_unlikely(obj->buffer.text == UACPI_NULL))
+    obj->buffer->text = uacpi_kernel_alloc(length);
+    if (uacpi_unlikely(obj->buffer->text == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    uacpi_memcpy(obj->buffer.text, string, length);
-    obj->buffer.size = length;
+    uacpi_memcpy(obj->buffer->text, string, length);
+    obj->buffer->size = length;
     frame->code_offset += length;
     return UACPI_STATUS_OK;
 }
@@ -430,12 +429,17 @@ static uacpi_status get_object_storage(uacpi_object *obj,
         out_buf->ptr = &obj->integer;
         break;
     case UACPI_OBJECT_STRING:
-        out_buf->len = obj->buffer.size ? obj->buffer.size - 1 : 0;
-        out_buf->ptr = obj->buffer.text;
+        out_buf->len = obj->buffer->size ? obj->buffer->size - 1 : 0;
+        out_buf->ptr = obj->buffer->text;
         break;
     case UACPI_OBJECT_BUFFER:
-        out_buf->ptr = obj->buffer.data;
-        out_buf->len = obj->buffer.size;
+        if (obj->buffer->size == 0) {
+            out_buf->len = 0;
+            break;
+        }
+
+        out_buf->len = obj->buffer->size - (obj->type == UACPI_OBJECT_STRING);
+        out_buf->ptr = obj->buffer->data;
         break;
     case UACPI_OBJECT_REFERENCE:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -713,7 +717,7 @@ static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
         break;
     case UACPI_OBJECT_STRING:
         uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, String] %s\n",
-                         src->buffer.text);
+                         src->buffer->text);
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
@@ -807,7 +811,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
 
     src_obj = object_deref_if_internal(src);
     return uacpi_object_assign(dst_obj, src_obj,
-                               UACPI_ASSIGN_BEHAVIOR_MOVE);
+                               UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
 }
 
 /*
@@ -856,7 +860,7 @@ static uacpi_status store_to_reference(uacpi_object *dst,
 
     if (overwrite) {
         return uacpi_object_assign(dst_obj, src_obj,
-                                   UACPI_ASSIGN_BEHAVIOR_MOVE);
+                                   UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
     }
 
     return object_assign_with_implicit_cast(dst_obj, src_obj);
@@ -894,7 +898,8 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
          * ACPICA where DerefOf dereferences one level.
          */
         src = reference_unwind(src);
-        return uacpi_object_assign(dst, src, UACPI_ASSIGN_BEHAVIOR_COPY);
+        return uacpi_object_assign(dst, src,
+                                   UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
     }
 
     dst->type = UACPI_OBJECT_REFERENCE;
@@ -1024,12 +1029,12 @@ static uacpi_status handle_logical_equality(struct execution_context *ctx)
         break;
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER:
-        res = lhs->buffer.size == rhs->buffer.size;
-        if (res) {
+        res = lhs->buffer->size == rhs->buffer->size;
+        if (res && lhs->buffer->size) {
             res = uacpi_memcmp(
-                lhs->buffer.data,
-                rhs->buffer.data,
-                lhs->buffer.size
+                lhs->buffer->data,
+                rhs->buffer->data,
+                lhs->buffer->size
             ) == 0;
         }
         break;
@@ -1216,7 +1221,7 @@ static uacpi_status handle_return(struct execution_context *ctx)
     return uacpi_object_assign(
         dst,
         item_array_at(&ctx->cur_op_ctx->items, 0)->obj,
-        UACPI_ASSIGN_BEHAVIOR_MOVE_IF_POSSIBLE
+        UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
     );
 }
 
@@ -1286,28 +1291,16 @@ static void frame_push_args(struct call_frame *frame,
 {
     uacpi_size i;
 
-    for (i = 1; i < item_array_size(&op_ctx->items); ++i) {
-        uacpi_object *obj = item_array_at(&op_ctx->items, i)->obj;
-        frame->args[i - 1] = obj;
-
-        /*
-         * If argument is a LocalX or ArgX and the referenced type is an
-         * integer then we just copy the object
-         */
-        if (obj->type != UACPI_OBJECT_REFERENCE)
-            goto next;
-        if (obj->flags != REFERENCE_KIND_LOCAL &&
-            obj->flags != REFERENCE_KIND_ARG)
-            goto next;
-
-        obj = object_deref_if_internal(obj);
-        if (obj->type != UACPI_OBJECT_INTEGER)
-            goto next;
-
-        uacpi_object_assign(frame->args[i - 1], obj,
-                            UACPI_ASSIGN_BEHAVIOR_COPY);
-
-    next:
+    /*
+     * MethodCall items:
+     * items[0] -> method namespace node
+     * items[1...nargs-1] -> method arguments
+     * items[-1] -> return value object
+     *
+     * Here we only care about the arguments though.
+     */
+    for (i = 1; i < item_array_size(&op_ctx->items) - 1; i++) {
+        frame->args[i - 1] = item_array_at(&op_ctx->items, i)->obj;
         uacpi_object_ref(frame->args[i - 1]);
     }
 }
@@ -1468,6 +1461,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC_TYPED] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY] = ITEM_OBJECT,
     [UACPI_PARSE_OP_RECORD_AML_PC] = ITEM_IMMEDIATE,
 };
 
@@ -1927,7 +1921,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                     }
 
                     ret = uacpi_object_assign(dst->obj, src,
-                                              UACPI_ASSIGN_BEHAVIOR_COPY);
+                                              UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
                 }
             }
             break;
@@ -1954,6 +1948,23 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_OBJECT_ALLOC:
         case UACPI_PARSE_OP_OBJECT_ALLOC_TYPED:
             break;
+
+
+        case UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY: {
+            uacpi_object *temp = item->obj;
+
+            item_array_pop(&op_ctx->items);
+            item = item_array_last(&op_ctx->items);
+
+            ret = uacpi_object_assign(temp, item->obj,
+                                      UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
+            if (uacpi_unlikely_error(ret))
+                break;
+
+            uacpi_object_unref(item->obj);
+            item->obj = temp;
+            break;
+        }
 
         case UACPI_PARSE_OP_DEREF_IF_INTERNAL: {
             uacpi_object *temp;
