@@ -48,14 +48,14 @@ void validate_ret_against_expected(uacpi_object& obj,
     switch (obj.type) {
     case UACPI_OBJECT_INTEGER: {
         auto expected_int = std::stoull(expected_val.data(), nullptr, 0);
-        auto& actual_int = obj.as_integer.value;
+        auto& actual_int = obj.integer;
 
         if (expected_int != actual_int)
             ret_is_wrong(expected_val, std::to_string(actual_int));
     } break;
     case UACPI_OBJECT_STRING: {
-        auto actual_str = std::string_view(obj.as_string.text,
-                                           obj.as_string.length - 1);
+        auto actual_str = std::string_view(obj.buffer.text,
+                                           obj.buffer.size - 1);
 
         if (expected_val != actual_str)
             ret_is_wrong(expected_val, actual_str);

@@ -30,65 +30,33 @@ typedef enum uacpi_object_type {
 } uacpi_object_type;
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type);
+typedef struct uacpi_object uacpi_object;
 
-#define UACPI_OBJECT_COMMON_HDR \
-    uacpi_u8 type;              \
-    uacpi_u8 flags;             \
-    uacpi_u32 refcount;         \
-
-typedef union uacpi_object uacpi_object;
-
-typedef struct uacpi_object_integer {
-    UACPI_OBJECT_COMMON_HDR
-    uacpi_u64 value;
-} uacpi_object_integer;
-
-typedef struct uacpi_object_string {
-    UACPI_OBJECT_COMMON_HDR
-    uacpi_char *text;
-    uacpi_size length;
-} uacpi_object_string;
-
-typedef struct uacpi_object_buffer {
-    UACPI_OBJECT_COMMON_HDR
-    void *data;
+typedef struct uacpi_buffer {
+    union {
+        void *data;
+        uacpi_char *text;
+    };
     uacpi_size size;
-} uacpi_object_buffer;
+} uacpi_buffer;
 
 typedef struct uacpi_object_package {
-    UACPI_OBJECT_COMMON_HDR
     uacpi_object *objects;
     uacpi_size count;
 } uacpi_object_package;
 
-typedef struct uacpi_object_reference {
-    UACPI_OBJECT_COMMON_HDR
-    uacpi_object *object;
-} uacpi_object_reference;
-
-typedef struct uacpi_object_control_method {
-    UACPI_OBJECT_COMMON_HDR
-    uacpi_control_method *method;
-} uacpi_object_control_method;
-
-typedef struct uacpi_object_debug {
-    UACPI_OBJECT_COMMON_HDR
-} uacpi_object_debug;
-
-typedef struct uacpi_object_common {
-    UACPI_OBJECT_COMMON_HDR
-} uacpi_object_common;
-
-typedef union uacpi_object {
+typedef struct uacpi_object {
     uacpi_u8 type;
-    uacpi_object_common common;
-    uacpi_object_integer as_integer;
-    uacpi_object_string as_string;
-    uacpi_object_buffer as_buffer;
-    uacpi_object_package as_package;
-    uacpi_object_reference as_reference;
-    uacpi_object_control_method as_method;
-    uacpi_object_debug as_debug;
+    uacpi_u8 flags;
+    uacpi_u32 refcount;
+
+    union {
+        uacpi_u64 integer;
+        uacpi_object_package package;
+        uacpi_object *inner_object;
+        uacpi_control_method *method;
+        uacpi_buffer buffer;
+    };
 } uacpi_object;
 
 typedef struct uacpi_args {
