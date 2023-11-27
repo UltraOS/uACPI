@@ -405,12 +405,12 @@ uacpi_status handle_string(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
 
     obj->type = UACPI_OBJECT_STRING;
-    obj->as_string.text = uacpi_kernel_alloc(length);
-    if (uacpi_unlikely(obj->as_string.text == UACPI_NULL))
+    obj->buffer.text = uacpi_kernel_alloc(length);
+    if (uacpi_unlikely(obj->buffer.text == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    uacpi_memcpy(obj->as_string.text, string, length);
-    obj->as_string.length = length;
+    uacpi_memcpy(obj->buffer.text, string, length);
+    obj->buffer.size = length;
     frame->code_offset += length;
     return UACPI_STATUS_OK;
 }
@@ -429,11 +429,11 @@ enum assign_by {
 static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
                                   enum assign_by behavior)
 {
-    struct uacpi_object_buffer *src_buf = &src->as_buffer;
-    struct uacpi_object_buffer *dst_buf = &dst->as_buffer;
+    uacpi_buffer *src_buf = &src->buffer;
+    uacpi_buffer *dst_buf = &dst->buffer;
 
     if (behavior == ASSIGN_BY_MOVE ||
-       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE && src->common.refcount == 1)) {
+       (behavior == ASSIGN_BY_MOVE_IF_POSSIBLE && src->refcount == 1)) {
         dst_buf->data = src_buf->data;
         dst_buf->size = src_buf->size;
         src_buf->data = UACPI_NULL;
@@ -461,15 +461,15 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     switch (obj->type) {
     case UACPI_OBJECT_INTEGER:
         out_buf->len = g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
-        out_buf->ptr = &obj->as_integer.value;
+        out_buf->ptr = &obj->integer;
         break;
     case UACPI_OBJECT_STRING:
-        out_buf->len = obj->as_string.length ? obj->as_string.length - 1 : 0;
-        out_buf->ptr = obj->as_string.text;
+        out_buf->len = obj->buffer.size ? obj->buffer.size - 1 : 0;
+        out_buf->ptr = obj->buffer.text;
         break;
     case UACPI_OBJECT_BUFFER:
-        out_buf->ptr = obj->as_buffer.data;
-        out_buf->len = obj->as_buffer.size;
+        out_buf->ptr = obj->buffer.data;
+        out_buf->len = obj->buffer.size;
         break;
     case UACPI_OBJECT_REFERENCE:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -514,20 +514,20 @@ static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
     uacpi_status ret = UACPI_STATUS_OK;
 
     if (dst->type == UACPI_OBJECT_REFERENCE) {
-        uacpi_u32 refs_to_remove = dst->common.refcount;
+        uacpi_u32 refs_to_remove = dst->refcount;
         while (refs_to_remove--)
-            uacpi_object_unref(dst->as_reference.object);
+            uacpi_object_unref(dst->inner_object);
     } else if (dst->type == UACPI_OBJECT_STRING ||
                dst->type == UACPI_OBJECT_BUFFER) {
-        uacpi_kernel_free(dst->as_buffer.data);
-        dst->as_buffer.data = NULL;
-        dst->as_buffer.size = 0;
+        uacpi_kernel_free(dst->buffer.data);
+        dst->buffer.data = NULL;
+        dst->buffer.size = 0;
     }
 
-    if (behavior == ASSIGN_BY_MOVE && uacpi_unlikely(src->common.refcount != 1)) {
+    if (behavior == ASSIGN_BY_MOVE && uacpi_unlikely(src->refcount != 1)) {
         uacpi_kernel_log(UACPI_LOG_WARN,
                          "Tried to move an object (%p) with %u references, "
-                         "converting to copy\n", src, src->common.refcount);
+                         "converting to copy\n", src, src->refcount);
         behavior = ASSIGN_BY_COPY;
     }
 
@@ -540,20 +540,19 @@ static uacpi_status object_assign(uacpi_object *dst, uacpi_object *src,
         ret = assign_buffer(dst, src, behavior);
         break;
     case UACPI_OBJECT_INTEGER:
-        dst->as_integer.value = src->as_integer.value;
+        dst->integer = src->integer;
         break;
     case UACPI_OBJECT_METHOD:
-        dst->as_method.method = src->as_method.method;
+        dst->method = src->method;
         break;
     case UACPI_OBJECT_REFERENCE: {
-        uacpi_u32 refs_to_add = dst->common.refcount;
-        uacpi_object_reference *ref = &dst->as_reference;
+        uacpi_u32 refs_to_add = dst->refcount;
 
-        dst->common.flags = src->common.flags;
-        ref->object = src->as_reference.object;
+        dst->flags = src->flags;
+        dst->inner_object = src->inner_object;
 
         while (refs_to_add-- > 0)
-            uacpi_object_ref(ref->object);
+            uacpi_object_ref(dst->inner_object);
         break;
     } default:
         ret = UACPI_STATUS_UNIMPLEMENTED;
@@ -569,10 +568,10 @@ static uacpi_object *object_deref_if_internal(uacpi_object *object)
 {
     for (;;) {
         if (object->type != UACPI_OBJECT_REFERENCE ||
-            object->common.flags == REFERENCE_KIND_REFOF)
+            object->flags == REFERENCE_KIND_REFOF)
             return object;
 
-        object = object->as_reference.object;
+        object = object->inner_object;
     }
 }
 
@@ -606,9 +605,9 @@ static uacpi_status handle_arg_or_local(
             return UACPI_STATUS_OUT_OF_MEMORY;
     }
 
-    dst->common.flags = kind;
+    dst->flags = kind;
     dst->type = UACPI_OBJECT_REFERENCE;
-    dst->as_reference.object = *src;
+    dst->inner_object = *src;
     uacpi_object_ref(*src);
 
     return UACPI_STATUS_OK;
@@ -642,8 +641,8 @@ static uacpi_status handle_named_object(struct execution_context *ctx)
     dst = item_array_at(&ctx->cur_op_ctx->items, 1)->obj;
 
     dst->type = UACPI_OBJECT_REFERENCE;
-    dst->common.flags = REFERENCE_KIND_NAMED;
-    dst->as_reference.object = src->object;
+    dst->flags = REFERENCE_KIND_NAMED;
+    dst->inner_object = src->object;
     uacpi_object_ref(src->object);
 
     return UACPI_STATUS_OK;
@@ -654,7 +653,7 @@ static void truncate_number_if_needed(uacpi_object *obj)
     if (!g_uacpi_rt_ctx.is_rev1)
         return;
 
-    obj->as_integer.value &= 0xFFFFFFFF;
+    obj->integer &= 0xFFFFFFFF;
 }
 
 static uacpi_u64 ones()
@@ -804,15 +803,15 @@ static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
         break;
     case UACPI_OBJECT_STRING:
         uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, String] %s\n",
-                         src->as_string.text);
+                         src->buffer.text);
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
             uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%08llX\n",
-                             src->as_integer.value);
+                             src->integer);
         } else {
             uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%016llX\n",
-                             src->as_integer.value);
+                             src->integer);
         }
         break;
     case UACPI_OBJECT_REFERENCE:
@@ -836,10 +835,10 @@ uacpi_object **reference_unwind(uacpi_object *obj)
 
     while (obj) {
         if (obj->type != UACPI_OBJECT_REFERENCE)
-            return &parent->as_reference.object;
+            return &parent->inner_object;
 
         parent = obj;
-        obj = parent->as_reference.object;
+        obj = parent->inner_object;
     }
 
     // This should be unreachable
@@ -855,12 +854,12 @@ uacpi_object **reference_unwind(uacpi_object *obj)
  */
 static uacpi_object *object_deref_implicit(uacpi_object *obj)
 {
-    if (obj->common.flags != REFERENCE_KIND_REFOF) {
-        if (obj->common.flags == REFERENCE_KIND_NAMED ||
-            obj->as_reference.object->type != UACPI_OBJECT_REFERENCE)
-            return obj->as_reference.object;
+    if (obj->flags != REFERENCE_KIND_REFOF) {
+        if (obj->flags == REFERENCE_KIND_NAMED ||
+            obj->inner_object->type != UACPI_OBJECT_REFERENCE)
+            return obj->inner_object;
 
-        obj = obj->as_reference.object;
+        obj = obj->inner_object;
     }
 
     return *reference_unwind(obj);
@@ -882,13 +881,13 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     uacpi_object **dst_slot;
     uacpi_object *src_obj;
 
-    switch (dst->common.flags) {
+    switch (dst->flags) {
     case REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->common.flags == REFERENCE_KIND_REFOF) {
+            referenced_obj->flags == REFERENCE_KIND_REFOF) {
             dst_slot = reference_unwind(referenced_obj);
             break;
         }
@@ -897,7 +896,7 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     }
     case REFERENCE_KIND_LOCAL:
     case REFERENCE_KIND_NAMED:
-        dst_slot = &dst->as_reference.object;
+        dst_slot = &dst->inner_object;
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -924,21 +923,21 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     uacpi_object *src_obj;
     uacpi_bool overwrite = UACPI_FALSE;
 
-    switch (dst->common.flags) {
+    switch (dst->flags) {
     case REFERENCE_KIND_LOCAL:
     case REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->common.flags == REFERENCE_KIND_REFOF) {
+            referenced_obj->flags == REFERENCE_KIND_REFOF) {
             dst_slot = reference_unwind(referenced_obj);
-            overwrite = dst->common.flags == REFERENCE_KIND_ARG;
+            overwrite = dst->flags == REFERENCE_KIND_ARG;
             break;
         }
 
         overwrite = UACPI_TRUE;
-        dst_slot = &dst->as_reference.object;
+        dst_slot = &dst->inner_object;
         break;
     }
     case REFERENCE_KIND_NAMED:
@@ -965,9 +964,9 @@ static uacpi_status handle_inc_dec(struct execution_context *ctx)
     obj = item_array_at(&op_ctx->items, 0)->obj;
 
     if (op_ctx->op->code == UACPI_AML_OP_IncrementOp)
-        obj->as_integer.value++;
+        obj->integer++;
     else
-        obj->as_integer.value--;
+        obj->integer--;
 
     return UACPI_STATUS_OK;
 }
@@ -993,7 +992,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
     }
 
     dst->type = UACPI_OBJECT_REFERENCE;
-    dst->as_reference.object = src;
+    dst->inner_object = src;
     uacpi_object_ref(src);
     return UACPI_STATUS_OK;
 }
@@ -1005,8 +1004,8 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
     uacpi_u64 lhs, rhs, res;
     uacpi_bool should_negate = UACPI_FALSE;
 
-    lhs = arg0->as_integer.value;
-    rhs = arg1->as_integer.value;
+    lhs = arg0->integer;
+    rhs = arg1->integer;
 
     switch (op)
     {
@@ -1045,10 +1044,10 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
         break;
     case UACPI_AML_OP_DivideOp:
         if (uacpi_likely(rhs > 0)) {
-            tgt1->as_integer.value = lhs / rhs;
+            tgt1->integer = lhs / rhs;
         } else {
             uacpi_kernel_log(UACPI_LOG_WARN, "Attempted division by zero!\n");
-            tgt1->as_integer.value = 0;
+            tgt1->integer = 0;
         }
         // FALLTHROUGH intended here
     case UACPI_AML_OP_ModOp:
@@ -1061,7 +1060,7 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
     if (should_negate)
         res = ~res;
 
-    tgt0->as_integer.value = res;
+    tgt0->integer = res;
 }
 
 static uacpi_status handle_binary_math(struct execution_context *ctx)
@@ -1094,7 +1093,7 @@ static uacpi_status handle_logical_not(struct execution_context *ctx)
     dst = item_array_at(&op_ctx->items, 1)->obj;
 
     dst->type = UACPI_OBJECT_INTEGER;
-    dst->as_integer.value = src->as_integer.value ? 0 : ones();
+    dst->integer = src->integer ? 0 : ones();
 
     return UACPI_STATUS_OK;
 }
@@ -1115,16 +1114,16 @@ static uacpi_status handle_logical_equality(struct execution_context *ctx)
 
     switch (lhs->type) {
     case UACPI_OBJECT_INTEGER:
-        res = lhs->as_integer.value == rhs->as_integer.value;
+        res = lhs->integer == rhs->integer;
         break;
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER:
-        res = lhs->as_buffer.size == rhs->as_buffer.size;
+        res = lhs->buffer.size == rhs->buffer.size;
         if (res) {
             res = uacpi_memcmp(
-                lhs->as_buffer.data,
-                rhs->as_buffer.data,
-                lhs->as_buffer.size
+                lhs->buffer.data,
+                rhs->buffer.data,
+                lhs->buffer.size
             ) == 0;
         }
         break;
@@ -1134,7 +1133,7 @@ static uacpi_status handle_logical_equality(struct execution_context *ctx)
     }
 
     dst->type = UACPI_OBJECT_INTEGER;
-    dst->as_integer.value = res ? ones() : 0;
+    dst->integer = res ? ones() : 0;
     return UACPI_STATUS_OK;
 }
 
@@ -1227,7 +1226,7 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     method->size = pkg->end - method_begin_offset;
 
     node->object->type = UACPI_OBJECT_METHOD;
-    node->object->as_method.method = method;
+    node->object->method = method;
     method->node = node;
 
     return UACPI_STATUS_OK;
@@ -1275,7 +1274,7 @@ static uacpi_status handle_code_block(struct execution_context *ctx)
         uacpi_object *operand;
 
         operand = item_array_at(&op_ctx->items, 1)->obj;
-        skip_block = operand->as_integer.value == 0;
+        skip_block = operand->integer == 0;
         break;
     }
     default:
@@ -1391,8 +1390,8 @@ static void frame_push_args(struct call_frame *frame,
          */
         if (obj->type != UACPI_OBJECT_REFERENCE)
             goto next;
-        if (obj->common.flags != REFERENCE_KIND_LOCAL &&
-            obj->common.flags != REFERENCE_KIND_ARG)
+        if (obj->flags != REFERENCE_KIND_LOCAL &&
+            obj->flags != REFERENCE_KIND_ARG)
             goto next;
 
         obj = object_deref_if_internal(obj);
@@ -1483,7 +1482,7 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
         break;
     case UACPI_OBJECT_INTEGER:
         // NULL target
-        if (dst->as_integer.value == 0) {
+        if (dst->integer == 0) {
             ret = UACPI_STATUS_OK;
             break;
         }
@@ -1870,7 +1869,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT:
             item->obj->type = UACPI_OBJECT_INTEGER;
             uacpi_memcpy(
-                &item->obj->as_integer.value,
+                &item->obj->integer,
                 op_decode_cursor(op_ctx),
                 8
             );
@@ -1888,8 +1887,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             if (op == UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT) {
                 item->obj->type = UACPI_OBJECT_INTEGER;
-                item->obj->as_integer.value = 0;
-                dst = &item->obj->as_integer.value;
+                item->obj->integer = 0;
+                dst = &item->obj->integer;
             } else {
                 item->immediate = 0;
                 dst = item->immediate_bytes;
@@ -2056,7 +2055,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_DISPATCH_METHOD_CALL: {
             struct uacpi_control_method *method;
 
-            method = item_array_at(&op_ctx->items, 0)->node->object->as_method.method;
+            method = item_array_at(&op_ctx->items, 0)->node->object->method;
 
             ret = push_new_frame(ctx, &frame);
             if (uacpi_unlikely_error(ret))
@@ -2083,7 +2082,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
                 if (obj->type == UACPI_OBJECT_METHOD) {
                     new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
-                    new_op += obj->as_method.method->args;
+                    new_op += obj->method->args;
                 } else {
                     new_op = UACPI_AML_OP_InternalOpNamedObject;
                 }

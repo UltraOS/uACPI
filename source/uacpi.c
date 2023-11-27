@@ -180,6 +180,6 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
     if (node->object->type != UACPI_OBJECT_METHOD)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return uacpi_execute_control_method(node->object->as_method.method,
+    return uacpi_execute_control_method(node->object->method,
                                         args, ret);
 }
