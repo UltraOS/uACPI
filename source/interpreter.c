@@ -1728,7 +1728,12 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             item->type = parse_op_generates_item[op];
             if (item->type == ITEM_OBJECT) {
-                item->obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+                enum uacpi_object_type type = UACPI_OBJECT_UNINITIALIZED;
+
+                if (op == UACPI_PARSE_OP_OBJECT_ALLOC_TYPED)
+                    type = op_decode_byte(op_ctx);
+
+                item->obj = uacpi_create_object(type);
                 if (uacpi_unlikely(item->obj == UACPI_NULL))
                     return UACPI_STATUS_OUT_OF_MEMORY;
             }
@@ -1814,7 +1819,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             truncate_number_if_needed(item->obj);
             break;
 
-        case UACPI_PARSE_OP_OBJECT_ALLOC_TYPED:
         case UACPI_PARSE_OP_SET_OBJECT_TYPE:
             item->obj->type = op_decode_byte(op_ctx);
             break;
@@ -1948,6 +1952,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         // Nothing to do here, object is allocated automatically
         case UACPI_PARSE_OP_OBJECT_ALLOC:
+        case UACPI_PARSE_OP_OBJECT_ALLOC_TYPED:
             break;
 
         case UACPI_PARSE_OP_DEREF_IF_INTERNAL: {
