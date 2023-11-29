@@ -362,7 +362,7 @@ out:
     return UACPI_STATUS_OK;
 }
 
-uacpi_status get_op(struct execution_context *ctx)
+static uacpi_status get_op(struct execution_context *ctx)
 {
     uacpi_aml_op op;
     struct call_frame *frame = ctx->cur_frame;
@@ -738,7 +738,7 @@ static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
     return UACPI_STATUS_OK;
 }
 
-uacpi_object *reference_unwind(uacpi_object *obj)
+static uacpi_object *reference_unwind(uacpi_object *obj)
 {
     while (obj) {
         if (obj->type != UACPI_OBJECT_REFERENCE)
@@ -1107,7 +1107,7 @@ static uacpi_status parse_package_length(struct call_frame *frame,
  * //   1 Serialized
  * // bit 4-7: SyncLevel (0x00-0x0f)
  */
-void init_method_flags(uacpi_control_method *method, uacpi_u8 flags_byte)
+static void init_method_flags(uacpi_control_method *method, uacpi_u8 flags_byte)
 {
     method->args = flags_byte & 0b111;
     method->is_serialized = (flags_byte >> 3) & 1;
@@ -1590,7 +1590,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define LOGICAL_EQUALITY_HANDLER_IDX 13
 #define NAMED_OBJECT_HANDLER_IDX 14
 
-uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
+static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
      * All OPs that don't have a handler dispatch to here if
      * UACPI_PARSE_OP_INVOKE_HANDLER is reached.
