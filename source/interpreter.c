@@ -547,7 +547,6 @@ static uacpi_status handle_arg(struct execution_context *ctx)
 
 static uacpi_status handle_named_object(struct execution_context *ctx)
 {
-    struct op_context *op_ctx = ctx->cur_op_ctx;
     struct uacpi_namespace_node *src;
     uacpi_object *dst;
 
