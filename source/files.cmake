@@ -7,4 +7,5 @@ uacpi_add_sources(
     opcodes.c
     namespace.c
     stdlib.c
+    shareable.c
 )

@@ -1,9 +1,8 @@
 #include <uacpi/types.h>
 #include <uacpi/internal/types.h>
 #include <uacpi/internal/stdlib.h>
+#include <uacpi/internal/shareable.h>
 #include <uacpi/kernel_api.h>
-
-#define BUGGED_REFCOUNT 0xFFFFFFFF
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
 {
@@ -29,57 +28,6 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
     }
 }
 
-static void shareable_init(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-    shareable->reference_count = 1;
-}
-
-static uacpi_bool bugged_shareable(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-
-    if (uacpi_unlikely(shareable->reference_count == 0))
-        shareable->reference_count = BUGGED_REFCOUNT;
-
-    return shareable->reference_count == BUGGED_REFCOUNT;
-}
-
-static void make_shareable_bugged(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-    shareable->reference_count = BUGGED_REFCOUNT;
-}
-
-static uacpi_u32 shareable_ref(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-    return shareable->reference_count++;
-}
-
-static uacpi_u32 shareable_unref(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-    return shareable->reference_count--;
-}
-
-static void shareable_unref_and_delete_if_last(
-    void *hdr, void (*do_free)(void*)
-)
-{
-    if (uacpi_unlikely(bugged_shareable(hdr)))
-        return;
-
-    if (shareable_unref(hdr) == 1)
-        do_free(hdr);
-}
-
-static uacpi_u32 shareable_refcount(void *hdr)
-{
-    struct uacpi_shareable *shareable = hdr;
-    return shareable->reference_count;
-}
-
 static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
 {
     uacpi_buffer *buf;
@@ -88,7 +36,7 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
     if (uacpi_unlikely(buf == UACPI_NULL))
         return UACPI_FALSE;
 
-    shareable_init(buf);
+    uacpi_shareable_init(buf);
 
     if (initial_size) {
         buf->data = uacpi_kernel_alloc(initial_size);
@@ -112,7 +60,7 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     if (uacpi_unlikely(ret == UACPI_NULL))
         return ret;
 
-    shareable_init(ret);
+    uacpi_shareable_init(ret);
     ret->type = type;
 
     if (type == UACPI_OBJECT_STRING || type == UACPI_OBJECT_BUFFER) {
@@ -125,9 +73,9 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     return ret;
 }
 
-static void free_buffer(void *hdr)
+static void free_buffer(uacpi_handle handle)
 {
-    uacpi_buffer *buf = hdr;
+    uacpi_buffer *buf = handle;
 
     uacpi_kernel_free(buf->data);
     uacpi_kernel_free(buf);
@@ -137,7 +85,7 @@ static void free_object(uacpi_object *obj)
 {
     if (obj->type == UACPI_OBJECT_STRING ||
         obj->type == UACPI_OBJECT_BUFFER)
-        shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
+        uacpi_shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
     if (obj->type == UACPI_OBJECT_METHOD)
         uacpi_kernel_free(obj->method);
 
@@ -151,7 +99,7 @@ void make_chain_bugged(uacpi_object *obj)
                      obj);
 
     while (obj) {
-        make_shareable_bugged(obj);
+        uacpi_make_shareable_bugged(obj);
 
         if (obj->type == UACPI_OBJECT_REFERENCE)
             obj = obj->inner_object;
@@ -165,12 +113,12 @@ void uacpi_object_ref(uacpi_object *obj)
     uacpi_object *this_obj = obj;
 
     while (obj) {
-        if (uacpi_unlikely(bugged_shareable(obj))) {
+        if (uacpi_unlikely(uacpi_bugged_shareable(obj))) {
             make_chain_bugged(this_obj);
             return;
         }
 
-        shareable_ref(obj);
+        uacpi_shareable_ref(obj);
 
         if (obj->type == UACPI_OBJECT_REFERENCE)
             obj = obj->inner_object;
@@ -187,7 +135,7 @@ static void free_chain(uacpi_object *obj)
         if (obj->type == UACPI_OBJECT_REFERENCE)
             next_obj = obj->inner_object;
 
-        if (shareable_refcount(obj) == 0)
+        if (uacpi_shareable_refcount(obj) == 0)
             free_object(obj);
 
         obj = next_obj;
@@ -206,17 +154,17 @@ void uacpi_object_unref(uacpi_object *obj)
     parent_refcount = obj->shareable.reference_count;
 
     while (obj) {
-        if (uacpi_unlikely(bugged_shareable(obj))) {
+        if (uacpi_unlikely(uacpi_bugged_shareable(obj))) {
             make_chain_bugged(this_obj);
             return;
         }
 
-        if (uacpi_unlikely(shareable_refcount(obj) < parent_refcount)) {
+        if (uacpi_unlikely(uacpi_shareable_refcount(obj) < parent_refcount)) {
             make_chain_bugged(this_obj);
             return;
         }
 
-        parent_refcount = shareable_unref(obj);
+        parent_refcount = uacpi_shareable_unref(obj);
 
         if (obj->type == UACPI_OBJECT_REFERENCE) {
             obj = obj->inner_object;
@@ -225,7 +173,7 @@ void uacpi_object_unref(uacpi_object *obj)
         }
     }
 
-    if (shareable_refcount(this_obj) == 0)
+    if (uacpi_shareable_refcount(this_obj) == 0)
         free_chain(this_obj);
 }
 
@@ -246,7 +194,7 @@ static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
 {
     if (behavior == UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY) {
         dst->buffer = src->buffer;
-        shareable_ref(dst->buffer);
+        uacpi_shareable_ref(dst->buffer);
         return UACPI_STATUS_OK;
     }
 
@@ -260,12 +208,12 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     uacpi_status ret = UACPI_STATUS_OK;
 
     if (dst->type == UACPI_OBJECT_REFERENCE) {
-        uacpi_u32 refs_to_remove = shareable_refcount(dst);
+        uacpi_u32 refs_to_remove = uacpi_shareable_refcount(dst);
         while (refs_to_remove--)
             uacpi_object_unref(dst->inner_object);
     } else if (dst->type == UACPI_OBJECT_STRING ||
                dst->type == UACPI_OBJECT_BUFFER) {
-        shareable_unref_and_delete_if_last(dst->buffer, free_buffer);
+        uacpi_shareable_unref_and_delete_if_last(dst->buffer, free_buffer);
     }
 
     switch (src->type) {
@@ -283,7 +231,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         dst->method = src->method;
         break;
     case UACPI_OBJECT_REFERENCE: {
-        uacpi_u32 refs_to_add = shareable_refcount(dst);
+        uacpi_u32 refs_to_add = uacpi_shareable_refcount(dst);
 
         dst->flags = src->flags;
         dst->inner_object = src->inner_object;
