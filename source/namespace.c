@@ -1,12 +1,12 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/kernel_api.h>
 
-static struct uacpi_namespace_node g_root;
+static uacpi_namespace_node g_root;
 
-struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
-                                                        uacpi_object_type type)
+uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
+                                                 uacpi_object_type type)
 {
-    struct uacpi_namespace_node *ret;
+    uacpi_namespace_node *ret;
 
     ret = uacpi_kernel_calloc(1, sizeof(*ret));
     if (uacpi_unlikely(ret == UACPI_NULL))
@@ -23,17 +23,17 @@ struct uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
     return ret;
 }
 
-void uacpi_namespace_node_free(struct uacpi_namespace_node *node)
+void uacpi_namespace_node_free(uacpi_namespace_node *node)
 {
     uacpi_kernel_free(node);
 }
 
 uacpi_status uacpi_node_install(
-    struct uacpi_namespace_node *parent,
-    struct uacpi_namespace_node *node
+    uacpi_namespace_node *parent,
+    uacpi_namespace_node *node
 )
 {
-    struct uacpi_namespace_node *prev;
+    uacpi_namespace_node *prev;
 
     if (parent == UACPI_NULL)
         parent = &g_root;
@@ -46,15 +46,15 @@ uacpi_status uacpi_node_install(
     return UACPI_STATUS_OK;
 }
 
-struct uacpi_namespace_node *uacpi_namespace_node_find(
-    struct uacpi_namespace_node *parent,
+uacpi_namespace_node *uacpi_namespace_node_find(
+    uacpi_namespace_node *parent,
     uacpi_object_name name
 )
 {
     if (parent == UACPI_NULL)
         parent = &g_root;
 
-    struct uacpi_namespace_node *node = parent->child;
+    uacpi_namespace_node *node = parent->child;
 
     while (node) {
         if (node->name.id == name.id)
