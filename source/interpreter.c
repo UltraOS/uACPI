@@ -7,39 +7,6 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/context.h>
 
-enum reference_kind {
-    /*
-     * Stores to this reference type change the referenced object.
-     * The reference is created with this kind when a RefOf result is stored
-     * in an object. Detailed explanation below.
-     */
-    REFERENCE_KIND_REFOF = 0,
-
-    /*
-     * Reference to a local variable, stores go into the referenced object
-     * _unless_ the referenced object is a REFERENCE_KIND_REFOF. In that case,
-     * the reference is unwound one more level as if the expression was
-     * Store(..., DerefOf(ArgX))
-     */
-    REFERENCE_KIND_LOCAL = 1,
-
-    /*
-     * Reference to an argument. Same semantics for stores as
-     * REFERENCE_KIND_LOCAL.
-     */
-    REFERENCE_KIND_ARG = 2,
-
-    /*
-     * Reference to a named object. Same semantics as REFERENCE_KIND_LOCAL.
-     */
-    REFERENCE_KIND_NAMED = 3,
-};
-
-/*
- * TODO: Write a note here explaining how references are currently implemented
- *       and how some of the edge cases are handled.
- */
-
 enum item_type {
     ITEM_NONE = 0,
     ITEM_NAMESPACE_NODE,
@@ -482,7 +449,7 @@ static uacpi_object *object_deref_if_internal(uacpi_object *object)
 {
     for (;;) {
         if (object->type != UACPI_OBJECT_REFERENCE ||
-            object->flags == REFERENCE_KIND_REFOF)
+            object->flags == UACPI_REFERENCE_KIND_REFOF)
             return object;
 
         object = object->inner_object;
@@ -500,16 +467,16 @@ static uacpi_status handle_arg_or_local(
 )
 {
     uacpi_object **src, *dst;
-    enum reference_kind kind;
+    enum uacpi_reference_kind kind;
 
     dst = item_array_last(&ctx->cur_op_ctx->items)->obj;
 
     if (type == ARGX) {
         src = &ctx->cur_frame->args[idx];
-        kind = REFERENCE_KIND_ARG;
+        kind = UACPI_REFERENCE_KIND_ARG;
     } else {
         src = &ctx->cur_frame->locals[idx];
-        kind = REFERENCE_KIND_LOCAL;
+        kind = UACPI_REFERENCE_KIND_LOCAL;
     }
 
     // Access to an uninitialized local or arg, hopefully a store incoming
@@ -554,7 +521,7 @@ static uacpi_status handle_named_object(struct execution_context *ctx)
     dst = item_array_at(&ctx->cur_op_ctx->items, 1)->obj;
 
     dst->type = UACPI_OBJECT_REFERENCE;
-    dst->flags = REFERENCE_KIND_NAMED;
+    dst->flags = UACPI_REFERENCE_KIND_NAMED;
     dst->inner_object = src->object;
     uacpi_object_ref(src->object);
 
@@ -760,8 +727,8 @@ static uacpi_object *reference_unwind(uacpi_object *obj)
  */
 static uacpi_object *object_deref_implicit(uacpi_object *obj)
 {
-    if (obj->flags != REFERENCE_KIND_REFOF) {
-        if (obj->flags == REFERENCE_KIND_NAMED ||
+    if (obj->flags != UACPI_REFERENCE_KIND_REFOF) {
+        if (obj->flags == UACPI_REFERENCE_KIND_NAMED ||
             obj->inner_object->type != UACPI_OBJECT_REFERENCE)
             return obj->inner_object;
 
@@ -788,20 +755,20 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     uacpi_object *src_obj;
 
     switch (dst->flags) {
-    case REFERENCE_KIND_ARG: {
+    case UACPI_REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->flags == REFERENCE_KIND_REFOF) {
+            referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
             dst_obj = reference_unwind(referenced_obj);
             break;
         }
 
         // FALLTHROUGH intended here
     }
-    case REFERENCE_KIND_LOCAL:
-    case REFERENCE_KIND_NAMED:
+    case UACPI_REFERENCE_KIND_LOCAL:
+    case UACPI_REFERENCE_KIND_NAMED:
         dst_obj = dst->inner_object;
         break;
     default:
@@ -831,15 +798,15 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     uacpi_bool overwrite = UACPI_FALSE;
 
     switch (dst->flags) {
-    case REFERENCE_KIND_LOCAL:
-    case REFERENCE_KIND_ARG: {
+    case UACPI_REFERENCE_KIND_LOCAL:
+    case UACPI_REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
         referenced_obj = object_deref_if_internal(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->flags == REFERENCE_KIND_REFOF) {
+            referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
             dst_obj = reference_unwind(referenced_obj);
-            overwrite = dst->flags == REFERENCE_KIND_ARG;
+            overwrite = dst->flags == UACPI_REFERENCE_KIND_ARG;
             break;
         }
 
@@ -847,7 +814,7 @@ static uacpi_status store_to_reference(uacpi_object *dst,
         dst_obj = dst->inner_object;
         break;
     }
-    case REFERENCE_KIND_NAMED:
+    case UACPI_REFERENCE_KIND_NAMED:
         dst_obj = reference_unwind(dst);
         break;
     default:
