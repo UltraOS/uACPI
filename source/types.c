@@ -202,15 +202,29 @@ static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
                                   src->buffer->data, src->buffer->size);
 }
 
+void uacpi_object_detach_child(uacpi_object *parent)
+{
+    uacpi_u32 refs_to_remove;
+    uacpi_object *child;
+
+    child = parent->inner_object;
+    parent->inner_object = UACPI_NULL;
+
+    if (uacpi_unlikely(uacpi_bugged_shareable(parent)))
+        return;
+
+    refs_to_remove = uacpi_shareable_refcount(parent);
+    while (refs_to_remove--)
+        uacpi_object_unref(child);
+}
+
 uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
                                  enum uacpi_assign_behavior behavior)
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
     if (dst->type == UACPI_OBJECT_REFERENCE) {
-        uacpi_u32 refs_to_remove = uacpi_shareable_refcount(dst);
-        while (refs_to_remove--)
-            uacpi_object_unref(dst->inner_object);
+        uacpi_object_detach_child(dst);
     } else if (dst->type == UACPI_OBJECT_STRING ||
                dst->type == UACPI_OBJECT_BUFFER) {
         uacpi_shareable_unref_and_delete_if_last(dst->buffer, free_buffer);
