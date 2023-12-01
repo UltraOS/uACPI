@@ -47,3 +47,8 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
 
 void uacpi_object_attach_child(uacpi_object *parent, uacpi_object *child);
 void uacpi_object_detach_child(uacpi_object *parent);
+
+struct uacpi_object *uacpi_create_internal_reference(
+    enum uacpi_reference_kind kind, uacpi_object *child
+);
+uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object);

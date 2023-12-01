@@ -92,7 +92,7 @@ static void free_object(uacpi_object *obj)
     uacpi_kernel_free(obj);
 }
 
-void make_chain_bugged(uacpi_object *obj)
+static void make_chain_bugged(uacpi_object *obj)
 {
     uacpi_kernel_log(UACPI_LOG_WARN,
                      "Object refcount bug, marking chain @%p as bugged\n",
@@ -271,4 +271,30 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         dst->type = src->type;
 
     return ret;
+}
+
+struct uacpi_object *uacpi_create_internal_reference(
+    enum uacpi_reference_kind kind, uacpi_object *child
+)
+{
+    uacpi_object *ret;
+
+    ret = uacpi_create_object(UACPI_OBJECT_REFERENCE);
+    if (uacpi_unlikely(ret == UACPI_NULL))
+        return ret;
+
+    ret->flags = kind;
+    uacpi_object_attach_child(ret, child);
+    return ret;
+}
+
+uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object)
+{
+    for (;;) {
+        if (object->type != UACPI_OBJECT_REFERENCE ||
+            object->flags == UACPI_REFERENCE_KIND_REFOF)
+            return object;
+
+        object = object->inner_object;
+    }
 }

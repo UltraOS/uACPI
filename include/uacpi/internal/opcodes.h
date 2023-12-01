@@ -236,7 +236,7 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
 UACPI_OP(                                                 \
     prefix##offset##Op, base + offset,                    \
     {                                                     \
-        UACPI_PARSE_OP_OBJECT_ALLOC,                      \
+        UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,                \
         UACPI_PARSE_OP_INVOKE_HANDLER,                    \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,           \
     },                                                    \
@@ -388,6 +388,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
         UACPI_PARSE_OP_LOAD_IMM, 1,                              \
         UACPI_PARSE_OP_RECORD_AML_PC,                            \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_METHOD,  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
     }                                                            \
@@ -502,7 +503,6 @@ UACPI_OP(                                                        \
     RefOfOp, 0x71,                                               \
     {                                                            \
         UACPI_PARSE_OP_SUPERNAME,                                \
-        UACPI_PARSE_OP_DEREF_IF_INTERNAL,                        \
         UACPI_PARSE_OP_OBJECT_ALLOC,                             \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
