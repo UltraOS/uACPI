@@ -202,6 +202,22 @@ static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
                                   src->buffer->data, src->buffer->size);
 }
 
+void uacpi_object_attach_child(uacpi_object *parent, uacpi_object *child)
+{
+    uacpi_u32 refs_to_add;
+
+    parent->inner_object = child;
+
+    if (uacpi_unlikely(uacpi_bugged_shareable(parent))) {
+        make_chain_bugged(child);
+        return;
+    }
+
+    refs_to_add = uacpi_shareable_refcount(parent);
+    while (refs_to_add--)
+        uacpi_object_ref(child);
+}
+
 void uacpi_object_detach_child(uacpi_object *parent)
 {
     uacpi_u32 refs_to_remove;
@@ -245,13 +261,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         dst->method = src->method;
         break;
     case UACPI_OBJECT_REFERENCE: {
-        uacpi_u32 refs_to_add = uacpi_shareable_refcount(dst);
-
-        dst->flags = src->flags;
-        dst->inner_object = src->inner_object;
-
-        while (refs_to_add-- > 0)
-            uacpi_object_ref(dst->inner_object);
+        uacpi_object_attach_child(dst, src->inner_object);
         break;
     } default:
         ret = UACPI_STATUS_UNIMPLEMENTED;
