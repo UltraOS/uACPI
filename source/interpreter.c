@@ -298,10 +298,7 @@ static uacpi_status resolve_name_string(
                     return UACPI_STATUS_BAD_BYTECODE;
 
                 // Create the node and link to parent but don't install YET
-                cur_node = uacpi_namespace_node_alloc(
-                    name,
-                    UACPI_OBJECT_UNINITIALIZED
-                );
+                cur_node = uacpi_namespace_node_alloc(name);
                 cur_node->parent = parent;
             }
             break;
@@ -445,17 +442,6 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     return ret;
 }
 
-static uacpi_object *object_deref_if_internal(uacpi_object *object)
-{
-    for (;;) {
-        if (object->type != UACPI_OBJECT_REFERENCE ||
-            object->flags == UACPI_REFERENCE_KIND_REFOF)
-            return object;
-
-        object = object->inner_object;
-    }
-}
-
 enum argx_or_localx {
     ARGX,
     LOCALX,
@@ -466,10 +452,9 @@ static uacpi_status handle_arg_or_local(
     uacpi_size idx, enum argx_or_localx type
 )
 {
-    uacpi_object **src, *dst;
+    uacpi_object **src;
+    struct item *dst;
     enum uacpi_reference_kind kind;
-
-    dst = item_array_last(&ctx->cur_op_ctx->items)->obj;
 
     if (type == ARGX) {
         src = &ctx->cur_frame->args[idx];
@@ -479,17 +464,24 @@ static uacpi_status handle_arg_or_local(
         kind = UACPI_REFERENCE_KIND_LOCAL;
     }
 
-    // Access to an uninitialized local or arg, hopefully a store incoming
     if (*src == UACPI_NULL) {
-        *src = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+        uacpi_object *default_value;
+
+        default_value = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+        if (uacpi_unlikely(default_value == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        *src = uacpi_create_internal_reference(kind, default_value);
         if (uacpi_unlikely(*src == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
+
+        uacpi_object_unref(default_value);
     }
 
-    dst->flags = kind;
-    dst->type = UACPI_OBJECT_REFERENCE;
-    dst->inner_object = *src;
-    uacpi_object_ref(*src);
+    dst = item_array_last(&ctx->cur_op_ctx->items);
+    dst->obj = *src;
+    dst->type = ITEM_OBJECT;
+    uacpi_object_ref(dst->obj);
 
     return UACPI_STATUS_OK;
 }
@@ -515,15 +507,14 @@ static uacpi_status handle_arg(struct execution_context *ctx)
 static uacpi_status handle_named_object(struct execution_context *ctx)
 {
     struct uacpi_namespace_node *src;
-    uacpi_object *dst;
+    struct item *dst;
 
     src = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
-    dst = item_array_at(&ctx->cur_op_ctx->items, 1)->obj;
+    dst = item_array_at(&ctx->cur_op_ctx->items, 1);
 
-    dst->type = UACPI_OBJECT_REFERENCE;
-    dst->flags = UACPI_REFERENCE_KIND_NAMED;
-    dst->inner_object = src->object;
-    uacpi_object_ref(src->object);
+    dst->obj = src->object;
+    dst->type = ITEM_OBJECT;
+    uacpi_object_ref(dst->obj);
 
     return UACPI_STATUS_OK;
 }
@@ -582,7 +573,7 @@ static uacpi_status method_get_ret_object(struct execution_context *ctx,
     if (ret != UACPI_STATUS_OK || *out_obj == UACPI_NULL)
         return ret;
 
-    *out_obj = object_deref_if_internal(*out_obj);
+    *out_obj = uacpi_unwrap_internal_reference(*out_obj);
     return UACPI_STATUS_OK;
 }
 
@@ -675,7 +666,7 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
 
 static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
 {
-    src = object_deref_if_internal(src);
+    src = uacpi_unwrap_internal_reference(src);
 
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
@@ -705,13 +696,19 @@ static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_object *reference_unwind(uacpi_object *obj)
+/*
+ * NOTE: this function returns the parent object
+ */
+uacpi_object *reference_unwind(uacpi_object *obj)
 {
+    uacpi_object *parent = obj;
+
     while (obj) {
         if (obj->type != UACPI_OBJECT_REFERENCE)
-            return obj;
+            return parent;
 
-        obj = obj->inner_object;
+        parent = obj;
+        obj = parent->inner_object;
     }
 
     // This should be unreachable
@@ -735,7 +732,13 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
         obj = obj->inner_object;
     }
 
-    return reference_unwind(obj);
+    return reference_unwind(obj)->inner_object;
+}
+
+static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
+{
+    uacpi_object_detach_child(parent);
+    uacpi_object_attach_child(parent, new_child);
 }
 
 /*
@@ -751,17 +754,18 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
  static uacpi_status copy_object_to_reference(uacpi_object *dst,
                                               uacpi_object *src)
 {
-    uacpi_object *dst_obj;
-    uacpi_object *src_obj;
+    uacpi_status ret;
+    uacpi_object *src_obj, *new_obj;
+    uacpi_u32 refs;
 
     switch (dst->flags) {
     case UACPI_REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
-        referenced_obj = object_deref_if_internal(dst);
+        referenced_obj = uacpi_unwrap_internal_reference(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
             referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
-            dst_obj = reference_unwind(referenced_obj);
+            dst = reference_unwind(referenced_obj);
             break;
         }
 
@@ -769,15 +773,26 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
     }
     case UACPI_REFERENCE_KIND_LOCAL:
     case UACPI_REFERENCE_KIND_NAMED:
-        dst_obj = dst->inner_object;
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    src_obj = object_deref_if_internal(src);
-    return uacpi_object_assign(dst_obj, src_obj,
-                               UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+    src_obj = uacpi_unwrap_internal_reference(src);
+
+    new_obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+    if (uacpi_unlikely(new_obj == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    ret = uacpi_object_assign(new_obj, src_obj,
+                              UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    object_replace_child(dst, new_obj);
+    uacpi_object_unref(new_obj);
+
+    return UACPI_STATUS_OK;
 }
 
 /*
@@ -793,7 +808,6 @@ static uacpi_object *object_deref_implicit(uacpi_object *obj)
 static uacpi_status store_to_reference(uacpi_object *dst,
                                        uacpi_object *src)
 {
-    uacpi_object *dst_obj;
     uacpi_object *src_obj;
     uacpi_bool overwrite = UACPI_FALSE;
 
@@ -802,34 +816,48 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     case UACPI_REFERENCE_KIND_ARG: {
         uacpi_object *referenced_obj;
 
-        referenced_obj = object_deref_if_internal(dst);
+        referenced_obj = uacpi_unwrap_internal_reference(dst);
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
             referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
-            dst_obj = reference_unwind(referenced_obj);
             overwrite = dst->flags == UACPI_REFERENCE_KIND_ARG;
+            dst = reference_unwind(referenced_obj);
             break;
         }
 
         overwrite = UACPI_TRUE;
-        dst_obj = dst->inner_object;
         break;
     }
     case UACPI_REFERENCE_KIND_NAMED:
-        dst_obj = reference_unwind(dst);
+        dst = reference_unwind(dst);
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    src_obj = object_deref_if_internal(src);
-    overwrite |= dst_obj->type == UACPI_OBJECT_UNINITIALIZED;
+    src_obj = uacpi_unwrap_internal_reference(src);
+    overwrite |= dst->inner_object->type == UACPI_OBJECT_UNINITIALIZED;
 
     if (overwrite) {
-        return uacpi_object_assign(dst_obj, src_obj,
-                                   UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+        uacpi_status ret;
+        uacpi_object *new_obj;
+
+        new_obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+        if (uacpi_unlikely(new_obj == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        ret = uacpi_object_assign(new_obj, src_obj,
+                                  UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+        if (uacpi_unlikely_error(ret)) {
+            uacpi_object_unref(new_obj);
+            return ret;
+        }
+
+        object_replace_child(dst, new_obj);
+        uacpi_object_unref(new_obj);
+        return UACPI_STATUS_OK;
     }
 
-    return object_assign_with_implicit_cast(dst_obj, src_obj);
+    return object_assign_with_implicit_cast(dst->inner_object, src_obj);
 }
 
 static uacpi_status handle_inc_dec(struct execution_context *ctx)
@@ -863,7 +891,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
          * the bottom-most reference. Note that this is different from
          * ACPICA where DerefOf dereferences one level.
          */
-        src = reference_unwind(src);
+        src = reference_unwind(src)->inner_object;
         return uacpi_object_assign(dst, src,
                                    UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
     }
@@ -1087,6 +1115,7 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     struct uacpi_control_method *method;
     struct package_length *pkg;
     struct uacpi_namespace_node *node;
+    struct uacpi_object *dst;
     uacpi_u32 method_begin_offset;
 
     method = uacpi_kernel_alloc(sizeof(*method));
@@ -1102,10 +1131,16 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     method->code += method_begin_offset;
     method->size = pkg->end - method_begin_offset;
 
-    node->object->type = UACPI_OBJECT_METHOD;
-    node->object->method = method;
-    method->node = node;
+    dst = item_array_at(&op_ctx->items, 4)->obj;
+    dst->method = method;
 
+    node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
+                                                   dst);
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    // TODO: make node ref-counted
+    method->node = node;
     return UACPI_STATUS_OK;
 }
 
@@ -1252,8 +1287,8 @@ static void trace_op(const struct uacpi_op_spec *op)
 #endif
 }
 
-static void frame_push_args(struct call_frame *frame,
-                            struct op_context *op_ctx)
+static uacpi_status frame_push_args(struct call_frame *frame,
+                                    struct op_context *op_ctx)
 {
     uacpi_size i;
 
@@ -1266,9 +1301,18 @@ static void frame_push_args(struct call_frame *frame,
      * Here we only care about the arguments though.
      */
     for (i = 1; i < item_array_size(&op_ctx->items) - 1; i++) {
-        frame->args[i - 1] = item_array_at(&op_ctx->items, i)->obj;
-        uacpi_object_ref(frame->args[i - 1]);
+        uacpi_object *src, *dst;
+
+        src = item_array_at(&op_ctx->items, i)->obj;
+
+        dst = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_ARG, src);
+        if (uacpi_unlikely(dst == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        frame->args[i - 1] = dst;
     }
+
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status frame_setup_base_scope(struct call_frame *frame,
@@ -1846,7 +1890,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
             switch (prev_op) {
             case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
             case UACPI_PARSE_OP_OPERAND:
-                src = object_deref_if_internal(item->obj);
+                src = uacpi_unwrap_internal_reference(item->obj);
 
                 if (prev_op == UACPI_PARSE_OP_OPERAND)
                     ret = typecheck_operand(ctx->prev_op_ctx, src);
@@ -1945,16 +1989,23 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         case UACPI_PARSE_OP_DISPATCH_METHOD_CALL: {
+            struct uacpi_namespace_node *node;
             struct uacpi_control_method *method;
 
-            method = item_array_at(&op_ctx->items, 0)->node->object->method;
+            node = item_array_at(&op_ctx->items, 0)->node;
+            method = uacpi_namespace_node_get_object(node)->method;
 
             ret = push_new_frame(ctx, &frame);
             if (uacpi_unlikely_error(ret))
                 return ret;
 
-            frame_push_args(frame, ctx->cur_op_ctx);
-            frame_setup_base_scope(frame, method);
+            ret = frame_push_args(frame, ctx->cur_op_ctx);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
+            ret = frame_setup_base_scope(frame, method);
+            if (uacpi_unlikely_error(ret))
+                return ret;
 
             ctx->cur_frame = frame;
             ctx->cur_frame->method = method;
@@ -1970,7 +2021,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
             if (prev_op && op_wants_supername(prev_op)) {
                 new_op = UACPI_AML_OP_InternalOpNamedObject;
             } else {
-                uacpi_object *obj = item->node->object;
+                uacpi_object *obj;
+
+                obj = uacpi_namespace_node_get_object(item->node);
 
                 if (obj->type == UACPI_OBJECT_METHOD) {
                     new_op = UACPI_AML_OP_InternalOpMethodCall0Args;

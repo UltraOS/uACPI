@@ -11,8 +11,7 @@ typedef struct uacpi_namespace_node {
     struct uacpi_namespace_node *next;
 } uacpi_namespace_node;
 
-uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
-                                                 uacpi_object_type type);
+uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name);
 void uacpi_namespace_node_free(uacpi_namespace_node *node);
 
 uacpi_status uacpi_node_install(uacpi_namespace_node *parent, uacpi_namespace_node *node);
@@ -21,3 +20,5 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     uacpi_namespace_node *parent,
     uacpi_object_name name
 );
+
+uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node);

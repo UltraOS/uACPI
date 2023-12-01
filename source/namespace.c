@@ -1,10 +1,10 @@
 #include <uacpi/internal/namespace.h>
+#include <uacpi/internal/types.h>
 #include <uacpi/kernel_api.h>
 
 static uacpi_namespace_node g_root;
 
-uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
-                                                 uacpi_object_type type)
+uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
 {
     uacpi_namespace_node *ret;
 
@@ -13,13 +13,6 @@ uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name,
         return ret;
 
     ret->name = name;
-
-    ret->object = uacpi_create_object(type);
-    if (uacpi_unlikely(ret->object == UACPI_NULL)) {
-        uacpi_kernel_free(ret);
-        ret = UACPI_NULL;
-    }
-
     return ret;
 }
 
@@ -64,4 +57,9 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     }
 
     return UACPI_NULL;
+}
+
+uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
+{
+    return uacpi_unwrap_internal_reference(node->object);
 }

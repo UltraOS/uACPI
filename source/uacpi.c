@@ -156,6 +156,7 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
            uacpi_object **ret)
 {
     struct uacpi_namespace_node *node;
+    uacpi_object *obj;
     uacpi_object_name name;
     uacpi_size len;
 
@@ -177,9 +178,10 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
 
     if (node == UACPI_NULL)
         return UACPI_STATUS_NOT_FOUND;
-    if (node->object->type != UACPI_OBJECT_METHOD)
+    obj = uacpi_namespace_node_get_object(node);
+
+    if (obj->type != UACPI_OBJECT_METHOD)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return uacpi_execute_control_method(node->object->method,
-                                        args, ret);
+    return uacpi_execute_control_method(obj->method, args, ret);
 }
