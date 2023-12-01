@@ -10,3 +10,5 @@ enum uacpi_assign_behavior {
 
 uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
                                  enum uacpi_assign_behavior);
+
+void uacpi_object_detach_child(uacpi_object *parent);
