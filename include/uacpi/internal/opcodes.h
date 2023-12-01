@@ -118,11 +118,6 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT,
 
-    UACPI_PARSE_OP_DEREF_IF_INTERNAL,
-
-    // Basically UACPI_PARSE_OP_TERM_ARG times items[0]->args
-    UACPI_PARSE_OP_METHOD_ARGS,
-
     // Error out saying the op is not yet implemented
     UACPI_PARSE_OP_TODO,
 

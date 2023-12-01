@@ -1978,16 +1978,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
-        case UACPI_PARSE_OP_DEREF_IF_INTERNAL: {
-            uacpi_object *temp;
-
-            temp = object_deref_if_internal(item->obj);
-            uacpi_object_ref(temp);
-            uacpi_object_unref(item->obj);
-            item->obj = temp;
-            break;
-        }
-
         case UACPI_PARSE_OP_DISPATCH_METHOD_CALL: {
             struct uacpi_namespace_node *node;
             struct uacpi_control_method *method;
