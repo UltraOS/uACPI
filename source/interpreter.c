@@ -1460,6 +1460,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC_TYPED] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY] = ITEM_OBJECT,
     [UACPI_PARSE_OP_RECORD_AML_PC] = ITEM_IMMEDIATE,
 };
@@ -1946,6 +1947,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         // Nothing to do here, object is allocated automatically
         case UACPI_PARSE_OP_OBJECT_ALLOC:
         case UACPI_PARSE_OP_OBJECT_ALLOC_TYPED:
+        case UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC:
             break;
 
 
