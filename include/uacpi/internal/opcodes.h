@@ -63,6 +63,8 @@ enum uacpi_parse_op {
     // Allocate an object an put it at the front of the item list
     UACPI_PARSE_OP_OBJECT_ALLOC,
 
+    UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,
+
     // Convert last item into a shallow copy of itself
     UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY,
 
