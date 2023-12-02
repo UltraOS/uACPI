@@ -1926,6 +1926,11 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
+        case UACPI_PARSE_OP_JMP: {
+            op_ctx->pc = op_decode_byte(op_ctx);
+            break;
+        }
+
         case UACPI_PARSE_OP_CREATE_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING: {
             enum resolve_behavior behavior;
