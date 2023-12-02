@@ -142,6 +142,12 @@ enum uacpi_parse_op {
      * or a named object reference.
      */
     UACPI_PARSE_OP_CONVERT_NAMESTRING,
+
+    /*
+     * Execute the next instruction only if currently tracked package still
+     * has data left, otherwise skip decode_ops[pc + 1] bytes.
+     */
+    UACPI_PARSE_OP_IF_HAS_DATA,
 };
 
 /*
