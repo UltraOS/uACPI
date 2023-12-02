@@ -3,9 +3,9 @@
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/opcodes.h>
 #include <uacpi/internal/namespace.h>
-#include <uacpi/platform/stdlib.h>
-#include <uacpi/kernel_api.h>
+#include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/context.h>
+#include <uacpi/kernel_api.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -349,6 +349,56 @@ static uacpi_status get_op(struct execution_context *ctx)
     if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED))
         return UACPI_STATUS_BAD_BYTECODE;
 
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_buffer(struct execution_context *ctx)
+{
+    struct package_length *pkg;
+    uacpi_u8 *src;
+    uacpi_object *dst, *declared_size;
+    uacpi_u32 buffer_size, init_size, aml_offset;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+
+    aml_offset = item_array_at(&op_ctx->items, 2)->immediate;
+    src = ctx->cur_frame->method->code;
+    src += aml_offset;
+
+    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
+    init_size = pkg->end - aml_offset;
+
+    // TODO: do package bounds checking at parse time
+    if (uacpi_unlikely(pkg->end > ctx->cur_frame->method->size))
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    declared_size = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (uacpi_unlikely(declared_size->integer > 0xE0000000)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "buffer is too large (%llu), assuming corrupted bytestream\n",
+            declared_size->integer
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    buffer_size = declared_size->integer;
+    if (uacpi_unlikely(init_size > buffer_size)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "too many buffer initializers: %u (size is %u)\n",
+            init_size, buffer_size
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    dst = item_array_at(&op_ctx->items, 3)->obj;
+    dst->buffer->data = uacpi_kernel_alloc(buffer_size);
+    if (uacpi_unlikely(dst->buffer->data == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    dst->buffer->size = buffer_size;
+
+    uacpi_memcpy_zerout(dst->buffer->data, src, buffer_size, init_size);
     return UACPI_STATUS_OK;
 }
 
@@ -1601,6 +1651,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define LOGICAL_NOT_HANDLER_IDX 12
 #define LOGICAL_EQUALITY_HANDLER_IDX 13
 #define NAMED_OBJECT_HANDLER_IDX 14
+#define BUFFER_HANDLER_IDX 15
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -1622,6 +1673,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [REF_OR_DEREF_OF_HANDLER_IDX] = handle_ref_or_deref_of,
     [LOGICAL_NOT_HANDLER_IDX] = handle_logical_not,
     [LOGICAL_EQUALITY_HANDLER_IDX] = handle_logical_equality,
+    [BUFFER_HANDLER_IDX] = handle_buffer,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -1683,6 +1735,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_LEqualOp] = LOGICAL_EQUALITY_HANDLER_IDX,
 
     [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
+
+    [UACPI_AML_OP_BufferOp] = BUFFER_HANDLER_IDX,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
