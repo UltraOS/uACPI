@@ -81,14 +81,19 @@ static void free_buffer(uacpi_handle handle)
     uacpi_kernel_free(buf);
 }
 
-static void free_object(uacpi_object *obj)
+static void free_object_storage(uacpi_object *obj)
 {
     if (obj->type == UACPI_OBJECT_STRING ||
-        obj->type == UACPI_OBJECT_BUFFER)
+        obj->type == UACPI_OBJECT_BUFFER) {
         uacpi_shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
-    if (obj->type == UACPI_OBJECT_METHOD)
+    } else if (obj->type == UACPI_OBJECT_METHOD) {
         uacpi_kernel_free(obj->method);
+    }
+}
 
+static void free_object(uacpi_object *obj)
+{
+    free_object_storage(obj);
     uacpi_kernel_free(obj);
 }
 
@@ -243,7 +248,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         uacpi_object_detach_child(dst);
     } else if (dst->type == UACPI_OBJECT_STRING ||
                dst->type == UACPI_OBJECT_BUFFER) {
-        uacpi_shareable_unref_and_delete_if_last(dst->buffer, free_buffer);
+        free_object_storage(dst);
     }
 
     switch (src->type) {
