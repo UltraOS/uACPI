@@ -1765,6 +1765,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
             return ret;
 
         op_ctx = ctx->cur_op_ctx;
+        frame = ctx->cur_frame;
 
         if (op_ctx->pc == 0 && ctx->prev_op_ctx) {
             /*
@@ -1910,6 +1911,20 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_AML_PC_DECREMENT:
             frame->code_offset--;
             break;
+
+        case UACPI_PARSE_OP_IF_HAS_DATA: {
+            uacpi_size pkg_idx = op_ctx->tracked_pkg_idx - 1;
+            struct package_length *pkg;
+            uacpi_u8 bytes_skip;
+
+            bytes_skip = op_decode_byte(op_ctx);
+            pkg = &item_array_at(&op_ctx->items, pkg_idx)->pkg;
+
+            if (frame->code_offset >= pkg->end)
+                op_ctx->pc += bytes_skip;
+
+            break;
+        }
 
         case UACPI_PARSE_OP_CREATE_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING: {
