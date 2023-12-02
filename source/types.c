@@ -244,10 +244,13 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
-    if (dst->type == UACPI_OBJECT_REFERENCE) {
+    switch (dst->type) {
+    case UACPI_OBJECT_REFERENCE:
         uacpi_object_detach_child(dst);
-    } else if (dst->type == UACPI_OBJECT_STRING ||
-               dst->type == UACPI_OBJECT_BUFFER) {
+        break;
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER:
+    case UACPI_OBJECT_METHOD:
         free_object_storage(dst);
     }
 
