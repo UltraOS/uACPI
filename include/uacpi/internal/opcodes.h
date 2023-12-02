@@ -358,7 +358,12 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     BufferOp, 0x11,                                              \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_RECORD_AML_PC,                            \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER,  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
