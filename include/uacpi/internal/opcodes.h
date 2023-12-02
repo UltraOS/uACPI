@@ -148,6 +148,11 @@ enum uacpi_parse_op {
      * has data left, otherwise skip decode_ops[pc + 1] bytes.
      */
     UACPI_PARSE_OP_IF_HAS_DATA,
+
+    /*
+     * pc = decode_ops[pc + 1]
+     */
+    UACPI_PARSE_OP_JMP,
 };
 
 /*
