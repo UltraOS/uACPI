@@ -2,6 +2,7 @@
 #include <uacpi/internal/types.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/shareable.h>
+#include <uacpi/internal/dynamic_array.h>
 #include <uacpi/kernel_api.h>
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
@@ -126,13 +127,145 @@ static void free_buffer(uacpi_handle handle)
     uacpi_kernel_free(buf);
 }
 
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(free_queue, uacpi_package*, 4)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(free_queue, uacpi_package*, static)
+
+static uacpi_bool free_queue_push(struct free_queue *queue, uacpi_package *pkg)
+{
+    uacpi_package **slot;
+
+    slot = free_queue_alloc(queue);
+    if (uacpi_unlikely(slot == UACPI_NULL))
+        return UACPI_FALSE;
+
+    *slot = pkg;
+    return UACPI_TRUE;
+}
+
+static void free_object(uacpi_object *obj);
+
+// No references allowed here, only plain objects
+static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
+{
+    switch (obj->type) {
+    case UACPI_OBJECT_PACKAGE:
+        if (uacpi_unlikely(uacpi_bugged_shareable(obj->package)))
+            break;
+        if (uacpi_shareable_unref(obj->package) > 1)
+            break;
+
+        if (uacpi_unlikely(!free_queue_push(queue,
+                                            obj->package))) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "Unable to free nested package @p: not enough memory\n",
+                obj->package
+            );
+        }
+
+        // Don't call free_object here as that will recurse
+        uacpi_kernel_free(obj);
+        break;
+    default:
+        /*
+         * This call is guaranteed to not recurse further as we handle
+         * recursive cases elsewhere explicitly.
+         */
+        free_object(obj);
+    }
+}
+
+static void unref_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
+{
+    if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
+        return;
+    if (uacpi_shareable_unref(obj) > 1)
+        return;
+
+    free_plain_no_recurse(obj, queue);
+}
+
+static void unref_chain_no_recurse(uacpi_object *obj, struct free_queue *queue)
+{
+    uacpi_object *next_obj = UACPI_NULL;
+
+    while (obj) {
+        if (obj->type == UACPI_OBJECT_REFERENCE)
+            next_obj = obj->inner_object;
+
+        if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
+            continue;
+        if (uacpi_shareable_unref(obj) > 1)
+            continue;
+
+        if (obj->type == UACPI_OBJECT_REFERENCE) {
+            uacpi_kernel_free(obj);
+        } else {
+            free_plain_no_recurse(obj, queue);
+        }
+
+        obj = next_obj;
+        next_obj = UACPI_NULL;
+    }
+}
+
+static void unref_object_no_recurse(uacpi_object *obj, struct free_queue *queue)
+{
+    if (obj->type == UACPI_OBJECT_REFERENCE) {
+        unref_chain_no_recurse(obj, queue);
+        return;
+    }
+
+    unref_plain_no_recurse(obj, queue);
+}
+
+static void free_package(uacpi_object *obj)
+{
+    struct free_queue queue = { 0 };
+    uacpi_size i;
+
+    free_queue_push(&queue, obj->package);
+
+    while (free_queue_size(&queue) != 0) {
+        uacpi_package *pkg;
+
+        pkg = *free_queue_last(&queue);
+        free_queue_pop(&queue);
+
+        /*
+         * 1. Unref/free every object in the package. Note that this might add
+         *    even more packages into the free queue.
+         */
+        for (i = 0; i < pkg->count; ++i) {
+            obj = pkg->objects[i];
+            unref_object_no_recurse(obj, &queue);
+        }
+
+        // 2. Release the object array
+        uacpi_kernel_free(pkg->objects);
+
+        // 3. Release the package itself
+        uacpi_kernel_free(pkg);
+    }
+
+    free_queue_clear(&queue);
+}
+
 static void free_object_storage(uacpi_object *obj)
 {
-    if (obj->type == UACPI_OBJECT_STRING ||
-        obj->type == UACPI_OBJECT_BUFFER) {
+    switch (obj->type) {
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER:
         uacpi_shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
-    } else if (obj->type == UACPI_OBJECT_METHOD) {
+        break;
+    case UACPI_OBJECT_METHOD:
         uacpi_kernel_free(obj->method);
+        break;
+    case UACPI_OBJECT_PACKAGE:
+        free_package(obj);
+        break;
+    default:
+        break;
     }
 }
 
