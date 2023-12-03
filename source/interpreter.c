@@ -581,7 +581,6 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 {
     uacpi_status ret;
     struct object_storage_as_buffer src_buf, dst_buf;
-    uacpi_size bytes_to_copy;
 
     ret = get_object_storage(src, &src_buf);
     if (uacpi_unlikely_error(ret))
@@ -591,11 +590,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    bytes_to_copy = UACPI_MIN(src_buf.len, dst_buf.len);
-    uacpi_memcpy(dst_buf.ptr, src_buf.ptr, bytes_to_copy);
-    uacpi_memzero((uacpi_u8*)dst_buf.ptr + bytes_to_copy,
-                  dst_buf.len - bytes_to_copy);
-
+    uacpi_memcpy_zerout(dst_buf.ptr, src_buf.ptr, dst_buf.len, src_buf.len);
     return ret;
 }
 
