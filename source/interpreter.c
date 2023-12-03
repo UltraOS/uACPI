@@ -429,6 +429,113 @@ uacpi_status handle_string(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_package(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_package *package;
+    uacpi_u32 num_elements, num_defined_elements, i;
+
+    /*
+     * Layout of items here:
+     * [0] -> Package length, not interesting
+     * [1] -> Immediate or integer object, depending on PackageOp/VarPackageOp
+     * [2..N-2] -> Package elements
+     * [N-1] -> The resulting package object that we're constructing
+     */
+    package = item_array_last(&op_ctx->items)->obj->package;
+
+    // 1. Detect how many elements we have, do sanity checking
+    if (op_ctx->op->code == UACPI_AML_OP_VarPackageOp) {
+        uacpi_object *var_num_elements;
+
+        var_num_elements = item_array_at(&op_ctx->items, 1)->obj;
+        if (uacpi_unlikely(var_num_elements->integer > 0xE0000000)) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "package is too large (%llu), assuming corrupted bytestream\n",
+                var_num_elements->integer
+            );
+            return UACPI_STATUS_BAD_BYTECODE;
+        }
+        num_elements = var_num_elements->integer;
+    } else {
+        num_elements = item_array_at(&op_ctx->items, 1)->immediate;
+    }
+
+    num_defined_elements = item_array_size(&op_ctx->items) - 3;
+    if (uacpi_unlikely(num_defined_elements > num_elements)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "too many package initializers: %u (size is %u)\n",
+            num_defined_elements, num_elements
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    // 2. Create every object in the package, start as uninitialized
+    if (uacpi_unlikely(!uacpi_package_fill(package, num_elements)))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    // 3. Go through every defined object and copy it into the package
+    for (i = 0; i < num_defined_elements; ++i) {
+        uacpi_status ret;
+        uacpi_object *obj;
+
+        obj = item_array_at(&op_ctx->items, i + 2)->obj;
+
+        /*
+         * These Named References to Data Objects are resolved to actual
+         * data by the AML Interpreter at runtime:
+         * - Integer reference
+         * - String reference
+         * - Buffer reference
+         * - Buffer Field reference
+         * - Field Unit reference
+         * - Package reference
+         */
+        if (obj->type == UACPI_OBJECT_REFERENCE) {
+            uacpi_object *unwrapped_obj;
+
+            unwrapped_obj = uacpi_unwrap_internal_reference(obj);
+
+            if (obj->flags == UACPI_REFERENCE_KIND_NAMED) {
+                switch (unwrapped_obj->type) {
+                case UACPI_OBJECT_INTEGER:
+                case UACPI_OBJECT_STRING:
+                case UACPI_OBJECT_BUFFER:
+                case UACPI_OBJECT_PACKAGE:
+                    obj = unwrapped_obj;
+                    break;
+
+                /*
+                 * These Named References to non-Data Objects cannot be resolved to
+                 * values. They are instead returned in the package as references:
+                 * - Device reference
+                 * - Event reference
+                 * - Method reference
+                 * - Mutex reference
+                 * - Operation Region reference
+                 * - Power Resource reference
+                 * - Processor reference
+                 * - Thermal Zone reference
+                 */
+                default:
+                    break;
+                }
+            } else {
+                obj = unwrapped_obj;
+            }
+        }
+
+        ret = uacpi_object_assign(package->objects[i], obj,
+                                  UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 struct object_storage_as_buffer {
     void *ptr;
     uacpi_size len;
@@ -1684,6 +1791,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define LOGICAL_EQUALITY_HANDLER_IDX 13
 #define NAMED_OBJECT_HANDLER_IDX 14
 #define BUFFER_HANDLER_IDX 15
+#define PACKAGE_HANDLER_IDX 16
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -1706,6 +1814,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [LOGICAL_NOT_HANDLER_IDX] = handle_logical_not,
     [LOGICAL_EQUALITY_HANDLER_IDX] = handle_logical_equality,
     [BUFFER_HANDLER_IDX] = handle_buffer,
+    [PACKAGE_HANDLER_IDX] = handle_package,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -1769,6 +1878,9 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
 
     [UACPI_AML_OP_BufferOp] = BUFFER_HANDLER_IDX,
+
+    [UACPI_AML_OP_PackageOp] = PACKAGE_HANDLER_IDX,
+    [UACPI_AML_OP_VarPackageOp] = PACKAGE_HANDLER_IDX,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
