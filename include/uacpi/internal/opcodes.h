@@ -382,14 +382,28 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     PackageOp, 0x12,                                             \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                              \
+        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
+            UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,                   \
+            UACPI_PARSE_OP_JMP, 3,                               \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_OP(                                                        \
     VarPackageOp, 0x13,                                          \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
+            UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,                   \
+            UACPI_PARSE_OP_JMP, 2,                               \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
