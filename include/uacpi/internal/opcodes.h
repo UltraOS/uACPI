@@ -66,8 +66,9 @@ enum uacpi_parse_op {
 
     UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,
 
-    // Convert last item into a shallow copy of itself
+    // Convert last item into a shallow/deep copy of itself
     UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY,
+    UACPI_PARSE_OP_OBJECT_CONVERT_TO_DEEP_COPY,
 
     /*
      * Same as UACPI_PARSE_OP_OBJECT_ALLOC except the type of the allocated
