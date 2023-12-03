@@ -385,6 +385,105 @@ static uacpi_status assign_buffer(uacpi_object *dst, uacpi_object *src,
                                   src->buffer->data, src->buffer->size);
 }
 
+struct pkg_copy_req {
+    uacpi_object *dst;
+    uacpi_package *src;
+};
+
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(pkg_copy_reqs, struct pkg_copy_req, 2)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
+    pkg_copy_reqs, struct pkg_copy_req, static
+)
+
+static uacpi_bool pkg_copy_reqs_push(
+    struct pkg_copy_reqs *reqs,
+    uacpi_object *dst, uacpi_package *pkg
+)
+{
+    struct pkg_copy_req *req;
+
+    req = pkg_copy_reqs_alloc(reqs);
+    if (uacpi_unlikely(req == UACPI_NULL))
+        return UACPI_FALSE;
+
+    req->dst = dst;
+    req->src = pkg;
+
+    return UACPI_TRUE;
+}
+
+static uacpi_status deep_copy_package_no_recurse(
+    uacpi_object *dst, uacpi_package *src,
+    struct pkg_copy_reqs *reqs
+)
+{
+    uacpi_size i;
+    uacpi_package *dst_package;
+
+    if (uacpi_unlikely(!package_alloc(dst, src->count)))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    dst->type = UACPI_OBJECT_PACKAGE;
+    dst_package = dst->package;
+
+    for (i = 0; i < src->count; ++i) {
+        uacpi_status st;
+        uacpi_object *src_obj = src->objects[i];
+        uacpi_object *dst_obj = dst_package->objects[i];
+
+        if (src_obj->type == UACPI_OBJECT_PACKAGE) {
+            uacpi_bool ret;
+
+            ret = pkg_copy_reqs_push(reqs, dst_obj, src_obj->package);
+            if (uacpi_unlikely(!ret))
+                return UACPI_STATUS_OUT_OF_MEMORY;
+
+            continue;
+        }
+
+        st = uacpi_object_assign(dst_obj, src_obj,
+                                 UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+        if (uacpi_unlikely_error(st))
+            return st;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status deep_copy_package(uacpi_object *dst, uacpi_object *src)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    struct pkg_copy_reqs reqs = { 0 };
+
+    pkg_copy_reqs_push(&reqs, dst, src->package);
+
+    while (pkg_copy_reqs_size(&reqs) != 0) {
+        struct pkg_copy_req req;
+
+        req = *pkg_copy_reqs_last(&reqs);
+        pkg_copy_reqs_pop(&reqs);
+
+        ret = deep_copy_package_no_recurse(req.dst, req.src, &reqs);
+        if (uacpi_unlikely_error(ret))
+            break;
+    }
+
+    pkg_copy_reqs_clear(&reqs);
+    return ret;
+}
+
+static uacpi_status assign_package(uacpi_object *dst, uacpi_object *src,
+                                   enum uacpi_assign_behavior behavior)
+{
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY) {
+        dst->package = src->package;
+        uacpi_shareable_ref(dst->package);
+        return UACPI_STATUS_OK;
+    }
+
+    return deep_copy_package(dst, src);
+}
+
 void uacpi_object_attach_child(uacpi_object *parent, uacpi_object *child)
 {
     uacpi_u32 refs_to_add;
@@ -429,6 +528,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_METHOD:
+    case UACPI_OBJECT_PACKAGE:
         free_object_storage(dst);
     }
 
@@ -446,10 +546,13 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_METHOD:
         dst->method = src->method;
         break;
-    case UACPI_OBJECT_REFERENCE: {
+    case UACPI_OBJECT_PACKAGE:
+        ret = assign_package(dst, src, behavior);
+        break;
+    case UACPI_OBJECT_REFERENCE:
         uacpi_object_attach_child(dst, src->inner_object);
         break;
-    } default:
+    default:
         ret = UACPI_STATUS_UNIMPLEMENTED;
     }
 
