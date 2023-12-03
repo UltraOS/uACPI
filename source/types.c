@@ -52,6 +52,46 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
+uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements)
+{
+    uacpi_size i;
+
+    pkg->objects = uacpi_kernel_calloc(num_elements, sizeof(uacpi_handle));
+    if (uacpi_unlikely(pkg->objects == UACPI_NULL))
+        return UACPI_FALSE;
+
+    pkg->count = num_elements;
+    for (i = 0; i < num_elements; ++i) {
+        pkg->objects[i] = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+
+        if (uacpi_unlikely(pkg->objects[i] == UACPI_NULL))
+            return UACPI_FALSE;
+    }
+
+    return UACPI_TRUE;
+}
+
+static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
+{
+    uacpi_package *pkg;
+
+    pkg = uacpi_kernel_calloc(1, sizeof(uacpi_package));
+    if (uacpi_unlikely(pkg == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(pkg);
+
+    if (initial_size) {
+        if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size))) {
+            uacpi_kernel_free(pkg);
+            return UACPI_FALSE;
+        }
+    }
+
+    obj->package = pkg;
+    return UACPI_TRUE;
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -65,6 +105,11 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
 
     if (type == UACPI_OBJECT_STRING || type == UACPI_OBJECT_BUFFER) {
         if (uacpi_unlikely(!buffer_alloc(ret, 0))) {
+            uacpi_kernel_free(ret);
+            ret = UACPI_NULL;
+        }
+    } else if (type == UACPI_OBJECT_PACKAGE) {
+        if (uacpi_unlikely_error(!package_alloc(ret, 0))) {
             uacpi_kernel_free(ret);
             ret = UACPI_NULL;
         }

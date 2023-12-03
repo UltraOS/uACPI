@@ -46,6 +46,7 @@ typedef struct uacpi_buffer {
 } uacpi_buffer;
 
 typedef struct uacpi_package {
+    struct uacpi_shareable shareable;
     uacpi_object **objects;
     uacpi_size count;
 } uacpi_package;
@@ -57,7 +58,7 @@ typedef struct uacpi_object {
 
     union {
         uacpi_u64 integer;
-        uacpi_package package;
+        uacpi_package *package;
         uacpi_object *inner_object;
         uacpi_control_method *method;
         uacpi_buffer *buffer;
