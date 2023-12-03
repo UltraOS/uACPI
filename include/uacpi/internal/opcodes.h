@@ -28,6 +28,7 @@ enum uacpi_parse_op {
     // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
     UACPI_PARSE_OP_TERM_ARG,
     UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
+    UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,
 
     // Operand := TermArg => Integer
     UACPI_PARSE_OP_OPERAND,
