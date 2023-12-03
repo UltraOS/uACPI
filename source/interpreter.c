@@ -1656,6 +1656,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_OBJECT_ALLOC_TYPED] = ITEM_OBJECT,
     [UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_OBJECT_CONVERT_TO_DEEP_COPY] = ITEM_OBJECT,
     [UACPI_PARSE_OP_RECORD_AML_PC] = ITEM_IMMEDIATE,
 };
 
@@ -2176,15 +2177,20 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC:
             break;
 
-
-        case UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY: {
+        case UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY:
+        case UACPI_PARSE_OP_OBJECT_CONVERT_TO_DEEP_COPY: {
             uacpi_object *temp = item->obj;
+            enum uacpi_assign_behavior behavior;
 
             item_array_pop(&op_ctx->items);
             item = item_array_last(&op_ctx->items);
 
-            ret = uacpi_object_assign(temp, item->obj,
-                                      UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
+            if (op == UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY)
+                behavior = UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY;
+            else
+                behavior = UACPI_ASSIGN_BEHAVIOR_DEEP_COPY;
+
+            ret = uacpi_object_assign(temp, item->obj, behavior);
             if (uacpi_unlikely_error(ret))
                 break;
 
