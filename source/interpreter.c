@@ -1326,6 +1326,23 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_create_named(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_namespace_node *node;
+    uacpi_object *src;
+
+    node = item_array_at(&op_ctx->items, 0)->node;
+    src = item_array_at(&op_ctx->items, 1)->obj;
+
+    node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
+                                                   src);
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_control_flow(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
@@ -1788,6 +1805,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define NAMED_OBJECT_HANDLER_IDX 14
 #define BUFFER_HANDLER_IDX 15
 #define PACKAGE_HANDLER_IDX 16
+#define CREATE_NAMED_HANDLER_IDX 17
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -1811,6 +1829,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [LOGICAL_EQUALITY_HANDLER_IDX] = handle_logical_equality,
     [BUFFER_HANDLER_IDX] = handle_buffer,
     [PACKAGE_HANDLER_IDX] = handle_package,
+    [CREATE_NAMED_HANDLER_IDX] = handle_create_named,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -1877,6 +1896,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 
     [UACPI_AML_OP_PackageOp] = PACKAGE_HANDLER_IDX,
     [UACPI_AML_OP_VarPackageOp] = PACKAGE_HANDLER_IDX,
+
+    [UACPI_AML_OP_NameOp] = CREATE_NAMED_HANDLER_IDX,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)

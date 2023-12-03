@@ -309,7 +309,11 @@ UACPI_BAD_OPCODE(0x07)                                           \
 UACPI_OP(                                                        \
     NameOp, 0x08,                                                \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_OBJECT_CONVERT_TO_DEEP_COPY,              \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,                \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0x09)                                           \
