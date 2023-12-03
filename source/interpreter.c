@@ -714,7 +714,7 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
     }
 }
 
-static uacpi_status debug_store(uacpi_object *dst, uacpi_object *src)
+static uacpi_status debug_store(uacpi_object *src)
 {
     src = uacpi_unwrap_internal_reference(src);
 
@@ -1435,7 +1435,7 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
 
     switch (dst->type) {
     case UACPI_OBJECT_DEBUG:
-        ret = debug_store(dst, src);
+        ret = debug_store(src);
         break;
     case UACPI_OBJECT_REFERENCE:
         ret = store_to_reference(dst, src);
