@@ -714,33 +714,63 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
     }
 }
 
+static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
+{
+    switch (src->type) {
+    case UACPI_OBJECT_UNINITIALIZED:
+        uacpi_kernel_log(UACPI_LOG_INFO, "%s Uninitialized\n", prefix);
+        break;
+    case UACPI_OBJECT_STRING:
+        uacpi_kernel_log(UACPI_LOG_INFO, "%s String => \"%s\"\n",
+                         prefix, src->buffer->text);
+        break;
+    case UACPI_OBJECT_INTEGER:
+        if (g_uacpi_rt_ctx.is_rev1) {
+            uacpi_kernel_log(UACPI_LOG_INFO, "%s Integer => 0x%08llX\n",
+                             prefix, src->integer);
+        } else {
+            uacpi_kernel_log(UACPI_LOG_INFO, "%s Integer => 0x%016llX\n",
+                             prefix, src->integer);
+        }
+        break;
+    case UACPI_OBJECT_REFERENCE:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Reference @%p => %p\n",
+            prefix, src, src->inner_object
+        );
+        break;
+    case UACPI_OBJECT_PACKAGE:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Package @%p (%p) (%zu elements)\n",
+            prefix, src, src->package, src->package->count
+        );
+        break;
+    case UACPI_OBJECT_BUFFER:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Buffer @%p (%p) (%zu bytes)\n",
+            prefix, src, src->buffer, src->buffer->size
+        );
+        break;
+    default:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s %s @%p\n",
+            prefix, uacpi_object_type_to_string(src->type), src
+        );
+    }
+}
+
 static uacpi_status debug_store(uacpi_object *src)
 {
     src = uacpi_unwrap_internal_reference(src);
 
-    switch (src->type) {
-    case UACPI_OBJECT_UNINITIALIZED:
-        uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Uninitialized]\n");
-        break;
-    case UACPI_OBJECT_STRING:
-        uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, String] %s\n",
-                         src->buffer->text);
-        break;
-    case UACPI_OBJECT_INTEGER:
-        if (g_uacpi_rt_ctx.is_rev1) {
-            uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%08llX\n",
-                             src->integer);
-        } else {
-            uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Integer] 0x%016llX\n",
-                             src->integer);
-        }
-        break;
-    case UACPI_OBJECT_REFERENCE:
-        uacpi_kernel_log(UACPI_LOG_INFO, "[AML DEBUG, Reference] Object @%p\n",
-                         src);
-        break;
-    default:
-        return UACPI_STATUS_UNIMPLEMENTED;
+    debug_store_no_recurse("[AML DEBUG]", src);
+
+    if (src->type == UACPI_OBJECT_PACKAGE) {
+        uacpi_package *pkg = src->package;
+        uacpi_size i;
+
+        for (i = 0; i < pkg->count; ++i)
+            debug_store_no_recurse("Element:", pkg->objects[i]);
     }
 
     return UACPI_STATUS_OK;
