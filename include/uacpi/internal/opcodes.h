@@ -934,7 +934,7 @@ UACPI_BAD_OPCODE(0xF5)                                           \
 UACPI_OP(                                                        \
     InternalOpNamedObject, 0xF6,                                 \
     {                                                            \
-        UACPI_PARSE_OP_OBJECT_ALLOC,                             \
+        UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,                       \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
