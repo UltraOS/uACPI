@@ -104,19 +104,27 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     uacpi_shareable_init(ret);
     ret->type = type;
 
-    if (type == UACPI_OBJECT_STRING || type == UACPI_OBJECT_BUFFER) {
-        if (uacpi_unlikely(!buffer_alloc(ret, 0))) {
-            uacpi_kernel_free(ret);
-            ret = UACPI_NULL;
-        }
-    } else if (type == UACPI_OBJECT_PACKAGE) {
-        if (uacpi_unlikely_error(!package_alloc(ret, 0))) {
-            uacpi_kernel_free(ret);
-            ret = UACPI_NULL;
-        }
+    switch (type) {
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER:
+        if (uacpi_likely(buffer_alloc(ret, 0)))
+            break;
+
+        goto out_free_ret;
+    case UACPI_OBJECT_PACKAGE:
+        if (uacpi_likely(package_alloc(ret, 0)))
+            break;
+
+        goto out_free_ret;
+    default:
+        break;
     }
 
     return ret;
+
+out_free_ret:
+    uacpi_kernel_free(ret);
+    return UACPI_NULL;
 }
 
 static void free_buffer(uacpi_handle handle)
