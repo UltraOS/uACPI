@@ -1659,7 +1659,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
-    [UACPI_PARSE_OP_TERM_ARG_NO_INVOKE] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_OPERAND] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TARGET] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_PKGLEN] = ITEM_PACKAGE_LENGTH,
@@ -1752,7 +1752,7 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
     case UACPI_PARSE_OP_TERM_ARG:
     case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
-    case UACPI_PARSE_OP_TERM_ARG_NO_INVOKE:
+    case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
     case UACPI_PARSE_OP_OPERAND:
         expected_type_str = SPEC_TERM_ARG;
         ok_mask |= UACPI_OP_PROPERTY_TERM_ARG;
@@ -1983,7 +1983,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
         case UACPI_PARSE_OP_TERM_ARG:
         case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
-        case UACPI_PARSE_OP_TERM_ARG_NO_INVOKE:
+        case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
         case UACPI_PARSE_OP_OPERAND:
         case UACPI_PARSE_OP_TARGET:
             /*
@@ -2142,7 +2142,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             case UACPI_PARSE_OP_SIMPLE_NAME:
             case UACPI_PARSE_OP_TERM_ARG:
-            case UACPI_PARSE_OP_TERM_ARG_NO_INVOKE:
+            case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
             case UACPI_PARSE_OP_TARGET:
                 src = item->obj;
                 break;
@@ -2255,7 +2255,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             switch (obj->type) {
             case UACPI_OBJECT_METHOD:
-                if (prev_op == UACPI_PARSE_OP_TERM_ARG_NO_INVOKE)
+                if (prev_op == UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT)
                     break;
                 if (op_wants_supername(prev_op))
                     break;
