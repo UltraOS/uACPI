@@ -2248,22 +2248,23 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         case UACPI_PARSE_OP_CONVERT_NAMESTRING: {
-            uacpi_aml_op new_op;
+            uacpi_aml_op new_op = UACPI_AML_OP_InternalOpNamedObject;
+            uacpi_object *obj;
 
-            if (prev_op && (op_wants_supername(prev_op) ||
-                prev_op == UACPI_PARSE_OP_TERM_ARG_NO_INVOKE)) {
-                new_op = UACPI_AML_OP_InternalOpNamedObject;
-            } else {
-                uacpi_object *obj;
+            obj = uacpi_namespace_node_get_object(item->node);
 
-                obj = uacpi_namespace_node_get_object(item->node);
+            switch (obj->type) {
+            case UACPI_OBJECT_METHOD:
+                if (prev_op == UACPI_PARSE_OP_TERM_ARG_NO_INVOKE)
+                    break;
+                if (op_wants_supername(prev_op))
+                    break;
 
-                if (obj->type == UACPI_OBJECT_METHOD) {
-                    new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
-                    new_op += obj->method->args;
-                } else {
-                    new_op = UACPI_AML_OP_InternalOpNamedObject;
-                }
+                new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
+                new_op += obj->method->args;
+                break;
+            default:
+                break;
             }
 
             op_ctx->pc = 0;
