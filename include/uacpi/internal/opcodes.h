@@ -28,7 +28,12 @@ enum uacpi_parse_op {
     // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
     UACPI_PARSE_OP_TERM_ARG,
     UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
-    UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,
+
+    /*
+     * Same as TERM_ARG, but named references are passed as-is.
+     * This means methods are not invoked, fields are not read, etc.
+     */
+    UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,
 
     // Operand := TermArg => Integer
     UACPI_PARSE_OP_OPERAND,
@@ -390,7 +395,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
         UACPI_PARSE_OP_LOAD_IMM, 1,                              \
         UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
-            UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,                   \
+            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
             UACPI_PARSE_OP_JMP, 3,                               \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
@@ -404,7 +409,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
         UACPI_PARSE_OP_OPERAND,                                  \
         UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
-            UACPI_PARSE_OP_TERM_ARG_NO_INVOKE,                   \
+            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
             UACPI_PARSE_OP_JMP, 2,                               \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
