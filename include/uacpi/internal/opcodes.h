@@ -277,6 +277,23 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
+#define UACPI_DO_BUILD_BUFFER_FIELD_OP(type, code, node_idx, ...)     \
+UACPI_OP(                                                             \
+    type##FieldOp, code,                                              \
+    {                                                                 \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                      \
+        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,                \
+        UACPI_PARSE_OP_OPERAND,                                       \
+        __VA_ARGS__                                                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                             \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER_FIELD, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                                \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, node_idx,              \
+    }                                                                 \
+)
+
+#define UACPI_BUILD_BUFFER_FIELD_OP(type, code) \
+    UACPI_DO_BUILD_BUFFER_FIELD_OP(Create##type, code, 2)
 
 #define UACPI_ENUMERATE_OPCODES                                  \
 UACPI_OP(                                                        \
@@ -668,30 +685,10 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    CreateDWordFieldOp, 0x8A,                                    \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    }                                                            \
-)                                                                \
-UACPI_OP(                                                        \
-    CreateWordFieldOp, 0x8B,                                     \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    }                                                            \
-)                                                                \
-UACPI_OP(                                                        \
-    CreateByteFieldOp, 0x8C,                                     \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    }                                                            \
-)                                                                \
-UACPI_OP(                                                        \
-    CreateBitFieldOp, 0x8D,                                      \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    }                                                            \
-)                                                                \
+UACPI_BUILD_BUFFER_FIELD_OP(DWord, 0x8A)                         \
+UACPI_BUILD_BUFFER_FIELD_OP(Word, 0x8B)                          \
+UACPI_BUILD_BUFFER_FIELD_OP(Byte, 0x8C)                          \
+UACPI_BUILD_BUFFER_FIELD_OP(Bit, 0x8D)                           \
 UACPI_OP(                                                        \
     ObjectTypeOp, 0x8E,                                          \
     {                                                            \
@@ -699,12 +696,7 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    CreateQWordFieldOp, 0x8F,                                    \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    }                                                            \
-)                                                                \
+UACPI_BUILD_BUFFER_FIELD_OP(QWord, 0x8F)                         \
 UACPI_OP(                                                        \
     LandOp, 0x90,                                                \
     {                                                            \
@@ -1040,11 +1032,9 @@ UACPI_OP(                                                   \
         UACPI_PARSE_OP_TODO,                                \
     }                                                       \
 )                                                           \
-UACPI_OP(                                                   \
-    CreateFieldOp, UACPI_EXT_OP(0x13),                      \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
+    Create, UACPI_EXT_OP(0x13), 3,                          \
+    UACPI_PARSE_OP_OPERAND,                                 \
 )                                                           \
 UACPI_OP(                                                   \
     LoadTableOp, UACPI_EXT_OP(0x1F),                        \
