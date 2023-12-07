@@ -178,6 +178,12 @@ enum uacpi_op_property {
     UACPI_OP_PROPERTY_OPERAND = 8,
     UACPI_OP_PROPERTY_TARGET = 16,
 
+    /*
+     * Op wants named fields to be read even if the desired argument is a
+     * supername or term_arg_or_named_object.
+     */
+    UACPI_OP_PROPERTY_READS_NAMED_FIELDS = 64,
+
     // Error if encountered in the AML byte strem
     UACPI_OP_PROPERTY_RESERVED = 128,
 };
@@ -418,7 +424,8 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
 )                                                                \
 UACPI_OP(                                                        \
     VarPackageOp, 0x13,                                          \
@@ -432,7 +439,8 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
 )                                                                \
 UACPI_OP(                                                        \
     MethodOp, 0x14,                                              \
