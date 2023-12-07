@@ -9,5 +9,14 @@
 #define UACPI_MIN(x, y) UACPI_COMPARE(x, y, <)
 #define UACPI_MAX(x, y) UACPI_COMPARE(x, y, >)
 
+#define UACPI_ALIGN_UP_MASK(x, mask) (((x) + (mask)) & ~(mask))
+#define UACPI_ALIGN_UP(x, val, type) UACPI_ALIGN_UP_MASK(x, (type)(val) - 1)
+
+#define UACPI_ALIGN_DOWN_MASK(x, mask) ((x) & ~(mask))
+#define UACPI_ALIGN_DOWN(x, val, type) UACPI_ALIGN_DOWN_MASK(x, (type)(val) - 1)
+
+#define UACPI_IS_ALIGNED_MASK(x, mask) (((x) & (mask)) == 0)
+#define UACPI_IS_ALIGNED(x, val, type) UACPI_IS_ALIGNED_MASK(x, (type)(val) - 1)
+
 void uacpi_memcpy_zerout(void *dst, const void *src,
                          uacpi_size dst_size, uacpi_size src_size);
