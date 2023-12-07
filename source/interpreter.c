@@ -5,6 +5,7 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/context.h>
+#include <uacpi/internal/shareable.h>
 #include <uacpi/kernel_api.h>
 
 enum item_type {
@@ -1343,6 +1344,98 @@ static uacpi_status handle_create_named(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_namespace_node *node;
+    uacpi_buffer *src_buf;
+    uacpi_object *field_obj;
+    uacpi_buffer_field *field;
+
+    /*
+     * Layout of items here:
+     * [0] -> Type checked source buffer object
+     * [1] -> Byte/bit index integer object
+     * [2] (  if     CreateField) -> bit length integer object
+     * [3] (2 if not CreateField) -> the new namespace node
+     * [4] (3 if not CreateField) -> the buffer field object we're creating here
+     */
+    src_buf = item_array_at(&op_ctx->items, 0)->obj->buffer;
+
+    if (op_ctx->op->code == UACPI_AML_OP_CreateFieldOp) {
+        uacpi_object *idx_obj, *len_obj;
+
+        idx_obj = item_array_at(&op_ctx->items, 1)->obj;
+        len_obj = item_array_at(&op_ctx->items, 2)->obj;
+        node = item_array_at(&op_ctx->items, 3)->node;
+        field_obj = item_array_at(&op_ctx->items, 4)->obj;
+        field = field_obj->buffer_field;
+
+        field->bit_index = idx_obj->integer;
+
+        if (uacpi_unlikely(!len_obj->integer ||
+                            len_obj->integer > 0xFFFFFFFF)) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN, "invalid bit field length (%llu)\n",
+                field->bit_length
+            );
+            return UACPI_STATUS_BAD_BYTECODE;
+        }
+
+        field->bit_length = len_obj->integer;
+        field->force_buffer = UACPI_TRUE;
+    } else {
+        uacpi_object *idx_obj;
+
+        idx_obj = item_array_at(&op_ctx->items, 1)->obj;
+        node = item_array_at(&op_ctx->items, 2)->node;
+        field_obj = item_array_at(&op_ctx->items, 3)->obj;
+        field = field_obj->buffer_field;
+
+        field->bit_index = idx_obj->integer * 8;
+        switch (op_ctx->op->code) {
+        case UACPI_AML_OP_CreateBitFieldOp:
+            field->bit_length = 1;
+            break;
+        case UACPI_AML_OP_CreateByteFieldOp:
+            field->bit_length = 8;
+            break;
+        case UACPI_AML_OP_CreateWordFieldOp:
+            field->bit_length = 16;
+            break;
+        case UACPI_AML_OP_CreateDWordFieldOp:
+            field->bit_length = 32;
+            break;
+        case UACPI_AML_OP_CreateQWordFieldOp:
+            field->bit_length = 64;
+            break;
+        default:
+            return UACPI_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    if (uacpi_unlikely((field->bit_index + field->bit_length) >
+                       src_buf->size * 8)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid buffer field: bits [%zu..%zu], buffer size is %zu bytes\n",
+            field->bit_length, field->bit_index + field->bit_length,
+            src_buf->size
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    field->backing = src_buf;
+    if (uacpi_likely(!uacpi_bugged_shareable(field->backing)))
+        uacpi_shareable_ref(field->backing);
+    node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
+                                                   field_obj);
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_control_flow(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
@@ -1806,6 +1899,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define BUFFER_HANDLER_IDX 15
 #define PACKAGE_HANDLER_IDX 16
 #define CREATE_NAMED_HANDLER_IDX 17
+#define CREATE_BUFFER_FIELD_HANDLER_IDX 18
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -1830,6 +1924,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [BUFFER_HANDLER_IDX] = handle_buffer,
     [PACKAGE_HANDLER_IDX] = handle_package,
     [CREATE_NAMED_HANDLER_IDX] = handle_create_named,
+    [CREATE_BUFFER_FIELD_HANDLER_IDX] = handle_create_buffer_field,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -1898,6 +1993,19 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_VarPackageOp] = PACKAGE_HANDLER_IDX,
 
     [UACPI_AML_OP_NameOp] = CREATE_NAMED_HANDLER_IDX,
+
+    [UACPI_AML_OP_CreateBitFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+    [UACPI_AML_OP_CreateByteFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+    [UACPI_AML_OP_CreateWordFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+    [UACPI_AML_OP_CreateDWordFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+    [UACPI_AML_OP_CreateQWordFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+
+};
+
+#define EXT_OP_IDX(op) (op & 0xFF)
+
+static uacpi_u8 handler_idx_of_ext_op[0x100] = {
+    [EXT_OP_IDX(UACPI_AML_OP_CreateFieldOp)] = CREATE_BUFFER_FIELD_HANDLER_IDX,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
@@ -2106,9 +2214,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
-        case UACPI_PARSE_OP_INVOKE_HANDLER:
-            ret = op_handlers[handler_idx_of_op[op_ctx->op->code]](ctx);
+        case UACPI_PARSE_OP_INVOKE_HANDLER: {
+            uacpi_aml_op code = op_ctx->op->code;
+            uacpi_u8 idx;
+
+            if (code <= 0xFF)
+                idx = handler_idx_of_op[code];
+            else
+                idx = handler_idx_of_ext_op[EXT_OP_IDX(code)];
+
+            ret = op_handlers[idx](ctx);
             break;
+        }
 
         case UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE:
             item = item_array_at(&op_ctx->items, op_decode_byte(op_ctx));
