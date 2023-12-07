@@ -24,6 +24,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
     UACPI_OBJECT_METHOD = 8,
+    UACPI_OBJECT_BUFFER_FIELD = 14,
     UACPI_OBJECT_DEBUG = 16,
 
     UACPI_OBJECT_REFERENCE = 20,
@@ -51,6 +52,14 @@ typedef struct uacpi_package {
     uacpi_size count;
 } uacpi_package;
 
+typedef struct uacpi_buffer_field {
+    struct uacpi_shareable shareable;
+    uacpi_buffer *backing;
+    uacpi_size bit_index;
+    uacpi_u32 bit_length;
+    uacpi_bool force_buffer;
+} uacpi_buffer_field;
+
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
     uacpi_u8 type;
@@ -59,6 +68,7 @@ typedef struct uacpi_object {
     union {
         uacpi_u64 integer;
         uacpi_package *package;
+        uacpi_buffer_field *buffer_field;
         uacpi_object *inner_object;
         uacpi_control_method *method;
         uacpi_buffer *buffer;
