@@ -537,6 +537,11 @@ static uacpi_status handle_package(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_size buffer_field_byte_size(struct uacpi_buffer_field *field)
+{
+    return UACPI_ALIGN_UP(field->bit_length, 8, uacpi_u32) / 8;
+}
+
 struct object_storage_as_buffer {
     void *ptr;
     uacpi_size len;
@@ -1344,6 +1349,80 @@ static uacpi_status handle_create_named(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_object_type buffer_field_get_read_type(
+    struct uacpi_buffer_field *field
+)
+{
+    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32 : 64) ||
+        field->force_buffer)
+        return UACPI_OBJECT_BUFFER;
+
+    return UACPI_OBJECT_INTEGER;
+}
+
+static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
+{
+    uacpi_u8 *src = field->backing->data;
+    uacpi_u64 i, start, end;
+    uacpi_size count;
+    uacpi_u8 head_shift = field->bit_index & 7;
+
+    start = field->bit_index / 8;
+    count = buffer_field_byte_size(field);
+    end = start + count - 1;
+
+    if (head_shift) {
+        for (i = start; i < end; i++) {
+            dst[i - start] = (src[i] >> head_shift) |
+                             (src[i + 1] << (8 - head_shift));
+        }
+
+        dst[count - 1] = src[end] >> head_shift;
+        if ((field->bit_index + field->bit_length - 1) / 8 > end)
+            dst[count - 1] |= (src[end + 1] << (8 - head_shift));
+
+    } else {
+        uacpi_memcpy(dst, src + start, count);
+    }
+
+    if (field->bit_length & 7)
+        dst[count - 1] &= (1ul << (field->bit_length & 7)) - 1;
+}
+
+static uacpi_status handle_field_read(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_namespace_node *node;
+    uacpi_buffer_field *field;
+    uacpi_object *dst_obj;
+    void *dst;
+
+    node = item_array_at(&op_ctx->items, 0)->node;
+    field = uacpi_namespace_node_get_object(node)->buffer_field;
+
+    dst_obj = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (buffer_field_get_read_type(field) == UACPI_OBJECT_BUFFER) {
+        uacpi_buffer *buf;
+        uacpi_size buf_size;
+
+        buf = dst_obj->buffer;
+        buf_size = buffer_field_byte_size(field);
+
+        dst = uacpi_kernel_calloc(buf_size, 1);
+        if (dst == UACPI_NULL)
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        buf->data = dst;
+        buf->size = buf_size;
+    } else {
+        dst = &dst_obj->integer;
+    }
+
+    do_read_buffer_field(field, dst);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -1815,6 +1894,18 @@ static uacpi_bool op_wants_supername(enum uacpi_parse_op op)
     }
 }
 
+static uacpi_bool op_wants_term_arg_or_operand(enum uacpi_parse_op op)
+{
+    switch (op) {
+    case UACPI_PARSE_OP_TERM_ARG:
+    case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
+    case UACPI_PARSE_OP_OPERAND:
+        return UACPI_TRUE;
+    default:
+        return UACPI_FALSE;
+    }
+}
+
 static uacpi_status op_typecheck(const struct op_context *op_ctx,
                                  const struct op_context *cur_op_ctx)
 {
@@ -1900,6 +1991,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define PACKAGE_HANDLER_IDX 16
 #define CREATE_NAMED_HANDLER_IDX 17
 #define CREATE_BUFFER_FIELD_HANDLER_IDX 18
+#define READ_FIELD_HANDLER_IDX 19
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -1925,6 +2017,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [PACKAGE_HANDLER_IDX] = handle_package,
     [CREATE_NAMED_HANDLER_IDX] = handle_create_named,
     [CREATE_BUFFER_FIELD_HANDLER_IDX] = handle_create_buffer_field,
+    [READ_FIELD_HANDLER_IDX] = handle_field_read,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2000,6 +2093,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_CreateDWordFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
     [UACPI_AML_OP_CreateQWordFieldOp] = CREATE_BUFFER_FIELD_HANDLER_IDX,
 
+    [UACPI_AML_OP_InternalOpReadFieldAsBuffer] = READ_FIELD_HANDLER_IDX,
+    [UACPI_AML_OP_InternalOpReadFieldAsInteger] = READ_FIELD_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
@@ -2379,6 +2474,22 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
                 new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
                 new_op += obj->method->args;
+                break;
+            case UACPI_OBJECT_BUFFER_FIELD:
+                if (!op_wants_term_arg_or_operand(prev_op))
+                     break;
+
+                switch (buffer_field_get_read_type(obj->buffer_field)) {
+                case UACPI_OBJECT_BUFFER:
+                    new_op = UACPI_AML_OP_InternalOpReadFieldAsBuffer;
+                    break;
+                case UACPI_OBJECT_INTEGER:
+                    new_op = UACPI_AML_OP_InternalOpReadFieldAsInteger;
+                    break;
+                default:
+                    ret = UACPI_STATUS_INVALID_ARGUMENT;
+                    continue;
+                }
                 break;
             default:
                 break;

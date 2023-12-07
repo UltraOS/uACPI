@@ -931,8 +931,27 @@ UACPI_BAD_OPCODE(0xF0)                                           \
 UACPI_BAD_OPCODE(0xF1)                                           \
 UACPI_BAD_OPCODE(0xF2)                                           \
 UACPI_BAD_OPCODE(0xF3)                                           \
-UACPI_BAD_OPCODE(0xF4)                                           \
-UACPI_BAD_OPCODE(0xF5)                                           \
+UACPI_OP(                                                        \
+    InternalOpReadFieldAsBuffer, 0xF4,                           \
+    {                                                            \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER,  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_RESERVED                                   \
+)                                                                \
+UACPI_OP(                                                        \
+    InternalOpReadFieldAsInteger, 0xF5,                          \
+    {                                                            \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_OPERAND |                                  \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_RESERVED                                   \
+)                                                                \
 UACPI_OP(                                                        \
     InternalOpNamedObject, 0xF6,                                 \
     {                                                            \
