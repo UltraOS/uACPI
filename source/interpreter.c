@@ -565,7 +565,7 @@ static uacpi_status get_object_storage(uacpi_object *obj,
             break;
         }
 
-        out_buf->len = obj->buffer->size - (obj->type == UACPI_OBJECT_STRING);
+        out_buf->len = obj->buffer->size;
         out_buf->ptr = obj->buffer->data;
         break;
     case UACPI_OBJECT_REFERENCE:
