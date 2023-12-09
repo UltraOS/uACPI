@@ -6,6 +6,8 @@ import sys
 import platform
 from typing import List, Tuple, Optional
 
+from utilities.asl import ASLSource
+
 
 def abs_path_to_current_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
@@ -23,31 +25,6 @@ def get_case_name_and_expected_result(case: str) -> Tuple[str, str, str]:
         return name, expected[0], expected[1]
 
 
-def compile_case(compiler: str, case: str, bin_dir: str) -> str:
-    case_aml_name = os.path.basename(case).rsplit(".", 1)[0] + ".aml"
-    out_case = os.path.join(bin_dir, case_aml_name)
-
-    ignored_warnings = [
-        # Warning 3144 Method Local is set but never used
-        "-vw", "3144",
-        # Remark 2098 Recursive method call
-        "-vw", "2098",
-    ]
-
-    args = [compiler, *ignored_warnings, "-p", out_case, case]
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE,
-                            universal_newlines=True)
-
-    proc.wait(10)
-    stdout = proc.stdout
-    assert stdout
-
-    if proc.returncode != 0:
-        raise RuntimeError(f"Compiler error: {stdout.read()}")
-
-    return out_case
-
-
 def run_tests(
     cases: List[str], runner: str, compiler: str,
     bin_dir: str
@@ -56,7 +33,7 @@ def run_tests(
 
     for case in cases:
         name, rtype, value = get_case_name_and_expected_result(case)
-        compiled_case = compile_case(compiler, case, bin_dir)
+        compiled_case = ASLSource.compile(case, compiler, bin_dir)
 
         print(f"{os.path.basename(case)}:{name}...", end=" ", flush=True)
         proc = subprocess.Popen([runner, compiled_case, rtype, value],
