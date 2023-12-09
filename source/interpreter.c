@@ -579,6 +579,62 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     return UACPI_STATUS_OK;
 }
 
+struct bit_span
+{
+    uacpi_u8 *data;
+    uacpi_u64 index;
+    uacpi_u64 length;
+};
+
+static void do_rw_misaligned_buffer_field(struct bit_span *dst, struct bit_span *src)
+{
+    uacpi_u8 src_shift, dst_shift, bits = 0;
+    uacpi_u16 dst_mask;
+    uacpi_u8 *dst_ptr, *src_ptr;
+    uacpi_u64 dst_count, src_count;
+
+    dst_ptr = dst->data + (dst->index / 8);
+    src_ptr = src->data + (src->index / 8);
+
+    dst_count = dst->length;
+    dst_shift = dst->index & 7;
+
+    src_count = src->length;
+    src_shift = src->index & 7;
+
+    while (dst_count)
+    {
+        bits = 0;
+
+        if (src_count) {
+            bits = *src_ptr >> src_shift;
+
+            if (src_shift && src_count > 8 - src_shift)
+                bits |= *(src_ptr + 1) << (8 - src_shift);
+
+            if (src_count < 8) {
+                bits &= (1 << src_count) - 1;
+                src_count = 0;
+            } else {
+                src_count -= 8;
+                src_ptr++;
+            }
+        }
+
+        dst_mask = (dst_count < 8 ? (1 << dst_count) - 1 : 0xFF) << dst_shift;
+        *dst_ptr = (*dst_ptr & ~dst_mask) | ((bits << dst_shift) & dst_mask);
+
+        if (dst_shift && dst_count > (8 - dst_shift)) {
+            dst_mask >>= 8;
+            *(dst_ptr + 1) &= ~dst_mask;
+            *(dst_ptr + 1) |= (bits >> (8 - dst_shift)) & dst_mask;
+        }
+
+        dst_count = dst_count > 8 ? dst_count - 8 : 0;
+        ++dst_ptr;
+    }
+}
+
 /*
  * The word "implicit cast" here is only because it's called that in
  * the specification. In reality, we just copy one buffer to another
