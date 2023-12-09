@@ -4,6 +4,11 @@
 
 static uacpi_namespace_node g_root;
 
+uacpi_namespace_node *uacpi_namespace_root(void)
+{
+    return &g_root;
+}
+
 uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
 {
     uacpi_namespace_node *ret;
