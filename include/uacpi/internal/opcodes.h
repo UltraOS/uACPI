@@ -24,6 +24,8 @@ enum uacpi_parse_op {
     // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
     UACPI_PARSE_OP_SUPERNAME,
     UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF,
+    // The resulting item will be set to null if name couldn't be resolved
+    UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED,
 
     // TermArg := ExpressionOpcode | DataObject | ArgObj | LocalObj
     UACPI_PARSE_OP_TERM_ARG,
