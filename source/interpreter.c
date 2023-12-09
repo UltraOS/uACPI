@@ -635,6 +635,48 @@ static void do_rw_misaligned_buffer_field(struct bit_span *dst, struct bit_span 
     }
 }
 
+static void do_write_misaligned_buffer_field(
+    uacpi_buffer_field *field,
+    struct object_storage_as_buffer src_buf
+)
+{
+    struct bit_span src_span = {
+        .length = src_buf.len * 8,
+        .data = src_buf.ptr,
+    };
+    struct bit_span dst_span = {
+        .index = field->bit_index,
+        .length = field->bit_length,
+        .data = field->backing->data,
+    };
+
+    do_rw_misaligned_buffer_field(&dst_span, &src_span);
+}
+
+static void write_buffer_field(uacpi_buffer_field *field,
+                               struct object_storage_as_buffer src_buf)
+{
+    if (!(field->bit_index & 7)) {
+        uacpi_u8 *dst, last_byte, tail_shift;
+        uacpi_size count;
+
+        dst = field->backing->data;
+        dst += field->bit_index / 8;
+        count = buffer_field_byte_size(field);
+
+        last_byte = dst[count - 1];
+        tail_shift = field->bit_length & 7;
+
+        uacpi_memcpy_zerout(dst, src_buf.ptr, count, src_buf.len);
+        if (tail_shift)
+            dst[count - 1] |= (last_byte >> tail_shift) << tail_shift;
+
+        return;
+    }
+
+    do_write_misaligned_buffer_field(field, src_buf);
+}
+
 /*
  * The word "implicit cast" here is only because it's called that in
  * the specification. In reality, we just copy one buffer to another
@@ -644,17 +686,35 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
                                                      uacpi_object *src)
 {
     uacpi_status ret;
-    struct object_storage_as_buffer src_buf, dst_buf;
+    struct object_storage_as_buffer src_buf;
 
     ret = get_object_storage(src, &src_buf);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    ret = get_object_storage(dst, &dst_buf);
-    if (uacpi_unlikely_error(ret))
-        return ret;
+    switch (dst->type) {
+    case UACPI_OBJECT_INTEGER:
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER: {
+        struct object_storage_as_buffer dst_buf;
 
-    uacpi_memcpy_zerout(dst_buf.ptr, src_buf.ptr, dst_buf.len, src_buf.len);
+        ret = get_object_storage(dst, &dst_buf);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        uacpi_memcpy_zerout(dst_buf.ptr, src_buf.ptr, dst_buf.len, src_buf.len);
+        break;
+    }
+
+    case UACPI_OBJECT_BUFFER_FIELD:
+        write_buffer_field(dst->buffer_field, src_buf);
+        break;
+
+    default:
+        ret = UACPI_STATUS_BAD_BYTECODE;
+        break;
+    }
+
     return ret;
 }
 
