@@ -1075,8 +1075,20 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     CondRefOfOp, UACPI_EXT_OP(0x12),                        \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+        UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED,             \
+        UACPI_PARSE_OP_TARGET,                              \
+        UACPI_PARSE_OP_IF_NULL, 0, 3,                       \
+            UACPI_PARSE_OP_LOAD_FALSE_OBJECT,               \
+            UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,         \
+            UACPI_PARSE_OP_END,                             \
+        UACPI_PARSE_OP_OBJECT_ALLOC,                        \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                  \
+        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
+    },                                                      \
+    UACPI_OP_PROPERTY_OPERAND |                             \
+    UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
 UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
     Create, UACPI_EXT_OP(0x13), 3,                          \

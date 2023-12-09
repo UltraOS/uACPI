@@ -1071,7 +1071,11 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
     uacpi_object *dst, *src;
 
     src = item_array_at(&op_ctx->items, 0)->obj;
-    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (op_ctx->op->code == UACPI_AML_OP_CondRefOfOp)
+        dst = item_array_at(&op_ctx->items, 2)->obj;
+    else
+        dst = item_array_at(&op_ctx->items, 1)->obj;
 
     if (op_ctx->op->code == UACPI_AML_OP_DerefOfOp) {
         /*
@@ -2109,6 +2113,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 
 static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_CreateFieldOp)] = CREATE_BUFFER_FIELD_HANDLER_IDX,
+    [EXT_OP_IDX(UACPI_AML_OP_CondRefOfOp)] = REF_OR_DEREF_OF_HANDLER_IDX,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
