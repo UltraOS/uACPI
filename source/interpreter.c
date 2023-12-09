@@ -2298,6 +2298,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
+        case UACPI_PARSE_OP_IF_NULL: {
+            uacpi_u8 item_idx, bytes_skip;
+
+            item_idx = op_decode_byte(op_ctx);
+            bytes_skip = op_decode_byte(op_ctx);
+
+            if (item_array_at(&op_ctx->items, item_idx)->handle != UACPI_NULL)
+                op_ctx->pc += bytes_skip;
+
+            break;
+        }
+
         case UACPI_PARSE_OP_JMP: {
             op_ctx->pc = op_decode_byte(op_ctx);
             break;
