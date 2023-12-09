@@ -17,11 +17,22 @@ class ASL:
         return f"Name({name}, {term_arg})"
 
     @staticmethod
-    def buffer(initializers: List[int]) -> str:
-        buf = f"Buffer({len(initializers)})"
+    def buffer(
+        initializers: Optional[List[int]] = None,
+        count: Optional[int] = None
+    ) -> str:
+        if count is not None:
+            buf_len = count
+        elif initializers is not None:
+            buf_len = len(initializers)
+        else:
+            buf_len = 0
+
+        buf = f"Buffer({buf_len})"
 
         buf += " { "
-        buf += ", ".join([str(x) for x in initializers])
+        if initializers is not None:
+            buf += ", ".join([str(x) for x in initializers])
         buf += " }"
 
         return buf
