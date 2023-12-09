@@ -142,6 +142,7 @@ uacpi_status uacpi_namespace_load(void)
     dsdt = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
     method.code = dsdt->definition_block;
     method.size = tbl->length - sizeof(dsdt->hdr);
+    method.node = uacpi_namespace_root();
 
     return uacpi_execute_control_method(&method, NULL, NULL);
 }
