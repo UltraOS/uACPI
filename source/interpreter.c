@@ -194,9 +194,9 @@ static uacpi_status resolve_name_string(
     struct uacpi_namespace_node **out_node
 )
 {
-    uacpi_status ret;
+    uacpi_status ret = UACPI_STATUS_OK;
     uacpi_u8 *cursor;
-    uacpi_size bytes_left, namesegs;
+    uacpi_size bytes_left, namesegs = 0;
     struct uacpi_namespace_node *parent, *cur_node = frame->cur_scope;
     uacpi_char prev_char = 0;
     uacpi_bool just_one_nameseg = UACPI_TRUE;
@@ -318,13 +318,14 @@ static uacpi_status resolve_name_string(
         }
 
         if (cur_node == UACPI_NULL)
-            return UACPI_STATUS_NOT_FOUND;
+            break;
     }
 
 out:
+    cursor += namesegs * 4;
     frame->code_offset = cursor - frame->method->code;
     *out_node = cur_node;
-    return UACPI_STATUS_OK;
+    return ret;
 }
 
 static uacpi_status get_op(struct execution_context *ctx)
