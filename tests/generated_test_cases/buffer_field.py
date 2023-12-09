@@ -108,7 +108,7 @@ _READS_TEST_NAME = "2080-buffer-reads"
 
 
 def generate_buffer_reads_test(compiler: str, bin_dir: str) -> str:
-    output_path = os.path.join(bin_dir, _READS_TEST_NAME + ".aml")
+    output_path = os.path.join(bin_dir, _READS_TEST_NAME + ".asl")
     if os.path.exists(output_path):
         return output_path
 
