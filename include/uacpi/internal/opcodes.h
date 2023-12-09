@@ -63,6 +63,12 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_EXISTING_NAMESTRING,
 
+    /*
+     * Same as UACPI_PARSE_OP_EXISTING_NAMESTRING except the op doesn't error
+     * out if namestring couldn't be resolved.
+     */
+    UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL,
+
     // Invoke a handler at op_handlers[spec->code]
     UACPI_PARSE_OP_INVOKE_HANDLER,
 
