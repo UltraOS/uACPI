@@ -101,6 +101,10 @@ enum uacpi_parse_op {
     // Same as UACPI_PARSE_OP_LOAD_IMM, expect the resulting value is an object
     UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT,
 
+    // Create & Load an integer constant representing either true or false
+    UACPI_PARSE_OP_LOAD_FALSE_OBJECT,
+    UACPI_PARSE_OP_LOAD_TRUE_OBJECT,
+
     // Truncate the last item in the list if needed
     UACPI_PARSE_OP_TRUNCATE_NUMBER,
 
