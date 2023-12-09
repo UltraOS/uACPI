@@ -1845,6 +1845,8 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_LOAD_FALSE_OBJECT] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_LOAD_TRUE_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC] = ITEM_OBJECT,
     [UACPI_PARSE_OP_OBJECT_ALLOC_TYPED] = ITEM_OBJECT,
     [UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC] = ITEM_EMPTY_OBJECT,
@@ -2240,6 +2242,14 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             uacpi_memcpy(dst, call_frame_cursor(frame), width);
             frame->code_offset += width;
+            break;
+        }
+
+        case UACPI_PARSE_OP_LOAD_FALSE_OBJECT:
+        case UACPI_PARSE_OP_LOAD_TRUE_OBJECT: {
+            uacpi_object *obj = item->obj;
+            obj->type = UACPI_OBJECT_INTEGER;
+            obj->integer = op == UACPI_PARSE_OP_LOAD_FALSE_OBJECT ? 0 : ones();
             break;
         }
 
