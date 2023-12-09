@@ -7,7 +7,7 @@ import platform
 from typing import List, Tuple, Optional
 
 from utilities.asl import ASLSource
-from generated_test_cases.buffer_field import generate_buffer_reads_test
+import generated_test_cases.buffer_field as bf
 
 
 def abs_path_to_current_dir() -> str:
@@ -16,7 +16,8 @@ def abs_path_to_current_dir() -> str:
 
 def generate_test_cases(compiler: str, bin_dir: str) -> List[str]:
     return [
-        generate_buffer_reads_test(compiler, bin_dir)
+        bf.generate_buffer_reads_test(compiler, bin_dir),
+        bf.generate_buffer_writes_test(compiler, bin_dir),
     ]
 
 
