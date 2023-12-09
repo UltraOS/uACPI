@@ -18,10 +18,10 @@ jobs:
           pip install flake8 mypy
 
       - name: Run flake8 on the project
-        run: flake8 tests/*.py
+        run: flake8 --ignore=E743 tests/*.py tests/utilities/*.py
 
       - name: Run mypy on the project
-        run: mypy --disallow-incomplete-defs --no-implicit-optional tests/*.py
+        run: mypy --disallow-incomplete-defs --no-implicit-optional tests/*.py tests/utilities/*.py
   build-and-run-tests:
     runs-on: ${{ matrix.os }}
 
