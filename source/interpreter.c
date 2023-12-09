@@ -1831,6 +1831,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_SIMPLE_NAME] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_SUPERNAME] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT] = ITEM_EMPTY_OBJECT,
@@ -1890,6 +1891,7 @@ static uacpi_bool op_wants_supername(enum uacpi_parse_op op)
     case UACPI_PARSE_OP_SIMPLE_NAME:
     case UACPI_PARSE_OP_SUPERNAME:
     case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+    case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
     case UACPI_PARSE_OP_TARGET:
         return UACPI_TRUE;
     default:
@@ -1932,6 +1934,7 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
     case UACPI_PARSE_OP_SUPERNAME:
     case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+    case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
         expected_type_str = SPEC_SUPER_NAME;
         ok_mask |= UACPI_OP_PROPERTY_SUPERNAME;
         break;
@@ -2187,6 +2190,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_SIMPLE_NAME:
         case UACPI_PARSE_OP_SUPERNAME:
         case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+        case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
         case UACPI_PARSE_OP_TERM_ARG:
         case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
         case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
@@ -2355,6 +2359,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 break;
             case UACPI_PARSE_OP_SUPERNAME:
             case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
+            case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
                 if (prev_op == UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF)
                     src = object_deref_implicit(item->obj);
                 else
@@ -2471,6 +2476,12 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_CONVERT_NAMESTRING: {
             uacpi_aml_op new_op = UACPI_AML_OP_InternalOpNamedObject;
             uacpi_object *obj;
+
+            if (item->node == UACPI_NULL) {
+                if (prev_op != UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED)
+                    ret = UACPI_STATUS_NOT_FOUND;
+                break;
+            }
 
             obj = uacpi_namespace_node_get_object(item->node);
 
