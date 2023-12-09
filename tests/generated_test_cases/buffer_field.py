@@ -1,0 +1,164 @@
+import os
+import copy
+import subprocess
+from typing import List, Optional, Callable
+from utilities.asl import ASL, ASLSource
+
+
+ACPICA_BUFFER_PRINT_PREFIX = "    0000: "
+
+
+def _parse_acpiexec_buffers(raw_output: str) -> List[List[int]]:
+    lines = raw_output.split("\n")
+    answers = []
+
+    for i, line in enumerate(lines):
+        if "Evaluating" in line:
+            lines = lines[i + 1:]
+            break
+
+    for line in lines:
+        if not line.startswith(ACPICA_BUFFER_PRINT_PREFIX):
+            continue
+
+        line = line.removeprefix(ACPICA_BUFFER_PRINT_PREFIX)
+        buffer_bytes = []
+
+        for x in line.split(" "):
+            # Buffers are printed out with ascii disassembly at the end.
+            # Skip as soon as we encounter empty space.
+            if x == "":
+                break
+
+            buffer_bytes.append(int(x, base=16))
+
+        answers.append(buffer_bytes)
+
+    return answers
+
+
+def _generate_for_each_bit_combination(
+    src: ASLSource, per_combo_cb: Callable,
+    final_cb: Optional[Callable] = None
+) -> None:
+    methods = []
+
+    for i in range(0, 64):
+        method_name = f"FT{i}"
+        methods.append(method_name)
+
+        src.l(ASL.method(method_name))
+        src.block_begin()
+
+        for j in range(0, 65):
+            if (i >= j):
+                continue
+
+            per_combo_cb(i, j, src)
+
+        src.block_end()
+
+    src.l(ASL.method("MAIN"))
+    src.block_begin()
+    for method in methods:
+        src.l(ASL.invoke(method))
+
+    if final_cb is not None:
+        final_cb(src)
+
+    src.block_end()
+    src.finalize()
+
+
+_READS_ANSWERS_NAME = "buffer-reads-answers"
+
+
+def _generate_buffer_reads_answers(
+    compiler: str, bin_dir: str, src: ASLSource
+) -> List[List[int]]:
+    output_path = os.path.join(bin_dir, _READS_ANSWERS_NAME + ".aml")
+    if not os.path.exists(output_path):
+        _do_generate_buffer_reads_answers(compiler, bin_dir, src)
+
+    raw_answers = subprocess.check_output(
+        ["acpiexec", "-b", "execute MAIN", output_path],
+        universal_newlines=True
+    )
+    return _parse_acpiexec_buffers(raw_answers)
+
+
+def _do_generate_buffer_reads_answers(
+    compiler: str, bin_dir: str, src: ASLSource
+) -> None:
+    def gen_buffer_dump(i, j, src):
+        field_size = j - i
+        field_name = f"FI{field_size:02X}"
+
+        src.l(ASL.create_field("BUFF", i, field_size, field_name))
+        src.l(ASL.assign("Debug", field_name))
+
+    _generate_for_each_bit_combination(src, gen_buffer_dump)
+
+    answers_src_path = os.path.join(bin_dir, _READS_ANSWERS_NAME + ".asl")
+    src.dump(answers_src_path)
+    ASLSource.compile(answers_src_path, compiler, bin_dir)
+
+
+_READS_TEST_NAME = "2080-buffer-reads"
+
+
+def generate_buffer_reads_test(compiler: str, bin_dir: str) -> str:
+    output_path = os.path.join(bin_dir, _READS_TEST_NAME + ".aml")
+    if os.path.exists(output_path):
+        return output_path
+
+    return _do_generate_buffer_reads_test(compiler, bin_dir)
+
+
+def _do_generate_buffer_reads_test(compiler: str, bin_dir: str) -> str:
+    src = ASLSource(2)
+
+    src.l(ASL.name(
+        "BUFF",
+        ASL.buffer([0xAC, 0x12, 0x42, 0xCA, 0xDE, 0xFF, 0xCB, 0xDD])
+    ))
+
+    answers = _generate_buffer_reads_answers(compiler, bin_dir,
+                                             copy.deepcopy(src))
+
+    src.l(ASL.name("FAIL", 0))
+    src.l(ASL.name("PASS", 0))
+
+    src.l(ASL.method("FDBG", 3))
+    src.block_begin()
+    src.l(ASL.assign("Debug", "Arg0"))
+    src.l(ASL.assign("Debug", "Arg1"))
+    src.l(ASL.assign("Debug", "Arg2"))
+    src.l(ASL.increment("FAIL"))
+    src.block_end()
+
+    answer_idx = 0
+
+    def gen_buffer_check(i, j, src):
+        nonlocal answer_idx
+        field_size = j - i
+        field_name = f"FI{field_size:02X}"
+
+        src.l(ASL.create_field("BUFF", i, field_size, field_name))
+        src.iff(ASL.equal(field_name, ASL.buffer(answers[answer_idx])))
+        answer_idx += 1
+        src.l(ASL.increment("PASS"))
+        src.elsee()
+        src.l(ASL.invoke("FDBG", [
+            field_name, "__LINE__", f'"{field_name}"'
+        ]))
+        src.block_end()
+
+    _generate_for_each_bit_combination(src, gen_buffer_check,
+                                       lambda src: src.l(ASL.returnn("FAIL")))
+
+    test_src_path = os.path.join(bin_dir, _READS_TEST_NAME + ".asl")
+    src.dump_as_test_case(test_src_path, "Reads from buffer fields",
+                          "int", "0")
+
+    return test_src_path
