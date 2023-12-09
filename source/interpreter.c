@@ -213,11 +213,11 @@ static uacpi_status resolve_name_string(
             if (prev_char == '^')
                 return UACPI_STATUS_BAD_BYTECODE;
 
-            cur_node = UACPI_NULL;
+            cur_node = uacpi_namespace_root();
             break;
         case '^':
             // Tried to go behind root
-            if (uacpi_unlikely(cur_node == UACPI_NULL))
+            if (uacpi_unlikely(cur_node == uacpi_namespace_root()))
                 return UACPI_STATUS_BAD_BYTECODE;
 
             cur_node = cur_node->parent;
@@ -305,7 +305,7 @@ static uacpi_status resolve_name_string(
             break;
         case RESOLVE_FAIL_IF_DOESNT_EXIST:
             if (just_one_nameseg) {
-                while (!cur_node && parent) {
+                while (!cur_node && parent != uacpi_namespace_root()) {
                     cur_node = parent;
                     parent = cur_node->parent;
 
@@ -758,7 +758,7 @@ static void update_scope(struct call_frame *frame)
 
     block = find_last_block(&frame->code_blocks, CODE_BLOCK_SCOPE);
     if (block == UACPI_NULL) {
-        frame->cur_scope = UACPI_NULL;
+        frame->cur_scope = uacpi_namespace_root();
         return;
     }
 
