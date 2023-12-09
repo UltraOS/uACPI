@@ -1422,33 +1422,37 @@ static uacpi_object_type buffer_field_get_read_type(
     return UACPI_OBJECT_INTEGER;
 }
 
+static void do_misaligned_buffer_read(uacpi_buffer_field *field, uacpi_u8 *dst)
+{
+    struct bit_span src_span = {
+        .index = field->bit_index,
+        .length = field->bit_length,
+        .data = field->backing->data,
+    };
+    struct bit_span dst_span = {
+        .data = dst,
+    };
+
+    dst_span.length = buffer_field_byte_size(field) * 8;
+    do_rw_misaligned_buffer_field(&dst_span, &src_span);
+}
+
 static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
 {
-    uacpi_u8 *src = field->backing->data;
-    uacpi_u64 i, start, end;
-    uacpi_size count;
-    uacpi_u8 head_shift = field->bit_index & 7;
+    if (!(field->bit_index & 7)) {
+        uacpi_u8 *src = field->backing->data;
+        uacpi_size count;
 
-    start = field->bit_index / 8;
-    count = buffer_field_byte_size(field);
-    end = start + count - 1;
+        count = buffer_field_byte_size(field);
+        uacpi_memcpy(dst, src + (field->bit_index / 8), count);
 
-    if (head_shift) {
-        for (i = start; i < end; i++) {
-            dst[i - start] = (src[i] >> head_shift) |
-                             (src[i + 1] << (8 - head_shift));
-        }
+        if (field->bit_length & 7)
+            dst[count - 1] &= (1ul << (field->bit_length & 7)) - 1;
 
-        dst[count - 1] = src[end] >> head_shift;
-        if ((field->bit_index + field->bit_length - 1) / 8 > end)
-            dst[count - 1] |= (src[end + 1] << (8 - head_shift));
-
-    } else {
-        uacpi_memcpy(dst, src + start, count);
+        return;
     }
 
-    if (field->bit_length & 7)
-        dst[count - 1] &= (1ul << (field->bit_length & 7)) - 1;
+    do_misaligned_buffer_read(field, dst);
 }
 
 static uacpi_status handle_field_read(struct execution_context *ctx)
