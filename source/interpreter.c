@@ -25,6 +25,7 @@ struct package_length {
 struct item {
     uacpi_u8 type;
     union {
+        uacpi_handle handle;
         uacpi_object *obj;
         struct uacpi_namespace_node *node;
         struct package_length pkg;
