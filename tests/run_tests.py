@@ -7,10 +7,17 @@ import platform
 from typing import List, Tuple, Optional
 
 from utilities.asl import ASLSource
+from generated_test_cases.buffer_field import generate_buffer_reads_test
 
 
 def abs_path_to_current_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def generate_test_cases(compiler: str, bin_dir: str) -> List[str]:
+    return [
+        generate_buffer_reads_test(compiler, bin_dir)
+    ]
 
 
 def get_case_name_and_expected_result(case: str) -> Tuple[str, str, str]:
@@ -124,6 +131,7 @@ def main() -> int:
                              "'bin' in the same directory")
     args = parser.parse_args()
 
+    test_compiler = args.asl_compiler
     test_dir = args.test_dir
     test_runner = args.test_runner
     if test_runner is None:
@@ -137,8 +145,9 @@ def main() -> int:
         for f in os.listdir(test_dir)
         if os.path.splitext(f)[1] == ".asl"
     ]
+    test_cases.extend(generate_test_cases(test_compiler, bin_dir))
 
-    ret = run_tests(test_cases, test_runner, args.asl_compiler, bin_dir)
+    ret = run_tests(test_cases, test_runner, test_compiler, bin_dir)
     sys.exit(ret)
 
 
