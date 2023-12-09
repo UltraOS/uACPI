@@ -165,6 +165,13 @@ enum uacpi_parse_op {
     UACPI_PARSE_OP_IF_HAS_DATA,
 
     /*
+     * Execute the next instruction only if the handle at
+     * items[decode_ops[pc + 1]] is null. Otherwise skip
+     * decode_ops[pc + 2] bytes.
+     */
+    UACPI_PARSE_OP_IF_NULL,
+
+    /*
      * pc = decode_ops[pc + 1]
      */
     UACPI_PARSE_OP_JMP,
