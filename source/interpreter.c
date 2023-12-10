@@ -2078,6 +2078,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_OPERAND] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_COMPUTATIONAL_DATA] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TARGET] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_PKGLEN] = ITEM_PACKAGE_LENGTH,
     [UACPI_PARSE_OP_TRACKED_PKGLEN] = ITEM_PACKAGE_LENGTH,
@@ -2129,6 +2130,10 @@ static uacpi_u8 op_decode_byte(struct op_context *ctx)
 #define SPEC_OPERAND "Operand := TermArg => Integer"
 #define SPEC_TARGET "Target := SuperName | NullName"
 
+#define SPEC_COMPUTATIONAL_DATA                                             \
+    "ComputationalData := ByteConst | WordConst | DWordConst | QWordConst " \
+    "| String | ConstObj | RevisionOp | DefBuffer"
+
 static uacpi_bool op_wants_supername(enum uacpi_parse_op op)
 {
     switch (op) {
@@ -2149,6 +2154,7 @@ static uacpi_bool op_wants_term_arg_or_operand(enum uacpi_parse_op op)
     case UACPI_PARSE_OP_TERM_ARG:
     case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
     case UACPI_PARSE_OP_OPERAND:
+    case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
         return UACPI_TRUE;
     default:
         return UACPI_FALSE;
@@ -2188,6 +2194,7 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
     case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
     case UACPI_PARSE_OP_OPERAND:
+    case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
         expected_type_str = SPEC_TERM_ARG;
         ok_mask |= UACPI_OP_PROPERTY_TERM_ARG;
         break;
@@ -2213,6 +2220,26 @@ static uacpi_status typecheck_operand(
     EXEC_OP_WARN_2("invalid argument type: %s, expected a %s",
                    uacpi_object_type_to_string(obj->type), SPEC_OPERAND);
     return UACPI_STATUS_BAD_BYTECODE;
+}
+
+static uacpi_status typecheck_computational_data(
+    const struct op_context *op_ctx,
+    const uacpi_object *obj
+)
+{
+    switch (obj->type) {
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER:
+    case UACPI_OBJECT_INTEGER:
+        return UACPI_STATUS_OK;
+    default:
+        EXEC_OP_WARN_2(
+            "invalid argument type: %s, expected a %s",
+            uacpi_object_type_to_string(obj->type),
+            SPEC_COMPUTATIONAL_DATA
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
 }
 
 static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
@@ -2452,6 +2479,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
         case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
         case UACPI_PARSE_OP_OPERAND:
+        case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
         case UACPI_PARSE_OP_TARGET:
             /*
              * Preempt this op parsing for now as we wait for the dynamic arg
@@ -2528,24 +2556,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             if (uacpi_unlikely(item->obj->type != expected_type)) {
                 EXEC_OP_WARN_2("bad object type: expected %d, got %d!",
                                expected_type, item->obj->type);
-                ret = UACPI_STATUS_BAD_BYTECODE;
-            }
-
-            break;
-        }
-
-        case UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT: {
-            uacpi_object_type type = item->obj->type;
-
-            switch (type) {
-            case UACPI_OBJECT_STRING:
-            case UACPI_OBJECT_BUFFER:
-            case UACPI_OBJECT_INTEGER:
-                break;
-            default:
-                EXEC_OP_WARN_1("bad object type: expected one of "
-                               "String, Buffer, Integer, got %s\n",
-                               uacpi_object_type_to_string(type));
                 ret = UACPI_STATUS_BAD_BYTECODE;
             }
 
@@ -2645,11 +2655,14 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             switch (prev_op) {
             case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
+            case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
             case UACPI_PARSE_OP_OPERAND:
                 src = uacpi_unwrap_internal_reference(item->obj);
 
                 if (prev_op == UACPI_PARSE_OP_OPERAND)
                     ret = typecheck_operand(ctx->prev_op_ctx, src);
+                else if (prev_op == UACPI_PARSE_OP_COMPUTATIONAL_DATA)
+                    ret = typecheck_computational_data(ctx->prev_op_ctx, src);
 
                 break;
             case UACPI_PARSE_OP_SUPERNAME:
