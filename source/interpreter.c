@@ -1320,7 +1320,7 @@ static uacpi_status handle_logical_not(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status handle_logical_equality(struct execution_context *ctx)
+static uacpi_status handle_binary_logic(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *lhs, *rhs, *dst;
@@ -1354,7 +1354,6 @@ static uacpi_status handle_logical_equality(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
     }
 
-    dst->type = UACPI_OBJECT_INTEGER;
     dst->integer = res ? ones() : 0;
     return UACPI_STATUS_OK;
 }
@@ -2124,7 +2123,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define INC_DEC_HANDLER_IDX 10
 #define REF_OR_DEREF_OF_HANDLER_IDX 11
 #define LOGICAL_NOT_HANDLER_IDX 12
-#define LOGICAL_EQUALITY_HANDLER_IDX 13
+#define BINARY_LOGIC_HANDLER_IDX 13
 #define NAMED_OBJECT_HANDLER_IDX 14
 #define BUFFER_HANDLER_IDX 15
 #define PACKAGE_HANDLER_IDX 16
@@ -2151,7 +2150,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [INC_DEC_HANDLER_IDX] = handle_inc_dec,
     [REF_OR_DEREF_OF_HANDLER_IDX] = handle_ref_or_deref_of,
     [LOGICAL_NOT_HANDLER_IDX] = handle_logical_not,
-    [LOGICAL_EQUALITY_HANDLER_IDX] = handle_logical_equality,
+    [BINARY_LOGIC_HANDLER_IDX] = handle_binary_logic,
     [BUFFER_HANDLER_IDX] = handle_buffer,
     [PACKAGE_HANDLER_IDX] = handle_package,
     [CREATE_NAMED_HANDLER_IDX] = handle_create_named,
@@ -2215,7 +2214,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 
     [UACPI_AML_OP_LnotOp] = LOGICAL_NOT_HANDLER_IDX,
 
-    [UACPI_AML_OP_LEqualOp] = LOGICAL_EQUALITY_HANDLER_IDX,
+    [UACPI_AML_OP_LEqualOp] = BINARY_LOGIC_HANDLER_IDX,
 
     [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
 
