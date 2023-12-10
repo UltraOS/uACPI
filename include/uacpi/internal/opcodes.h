@@ -804,8 +804,15 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     ToIntegerOp, 0x99,                                           \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
+        UACPI_PARSE_OP_TARGET,                                   \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
+    UACPI_OP_PROPERTY_OPERAND |                                  \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_BAD_OPCODE(0x9A)                                           \
