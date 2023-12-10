@@ -2404,6 +2404,24 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
+        case UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT: {
+            uacpi_object_type type = item->obj->type;
+
+            switch (type) {
+            case UACPI_OBJECT_STRING:
+            case UACPI_OBJECT_BUFFER:
+            case UACPI_OBJECT_INTEGER:
+                break;
+            default:
+                EXEC_OP_WARN_1("bad object type: expected one of "
+                               "String, Buffer, Integer, got %s\n",
+                               uacpi_object_type_to_string(type));
+                ret = UACPI_STATUS_BAD_BYTECODE;
+            }
+
+            break;
+        }
+
         case UACPI_PARSE_OP_TODO:
             EXEC_OP_WARN("not yet implemented");
             ret = UACPI_STATUS_UNIMPLEMENTED;
