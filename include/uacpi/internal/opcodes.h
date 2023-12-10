@@ -1132,7 +1132,9 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     RevisionOp, UACPI_EXT_OP(0x30),                         \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT,           \
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,     \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
