@@ -114,6 +114,8 @@ enum uacpi_parse_op {
     // Ensure the type of item is decode_ops[pc + 1]
     UACPI_PARSE_OP_TYPECHECK,
 
+    UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,
+
     // Install the namespace node specified in items[decode_ops[pc + 1]]
     UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE,
 
