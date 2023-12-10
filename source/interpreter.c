@@ -318,8 +318,10 @@ static uacpi_status resolve_name_string(
             return UACPI_STATUS_INVALID_ARGUMENT;
         }
 
-        if (cur_node == UACPI_NULL)
+        if (cur_node == UACPI_NULL) {
+            ret = UACPI_STATUS_NOT_FOUND;
             break;
+        }
     }
 
 out:
