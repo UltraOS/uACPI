@@ -804,6 +804,19 @@ static uacpi_status handle_named_object(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_create_alias(struct execution_context *ctx)
+{
+    uacpi_namespace_node *src, *dst;
+
+    src = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
+    dst = item_array_at(&ctx->cur_op_ctx->items, 1)->node;
+
+    dst->object = src->object;
+    uacpi_object_ref(dst->object);
+
+    return UACPI_STATUS_OK;
+}
+
 static void truncate_number_if_needed(uacpi_object *obj)
 {
     if (!g_uacpi_rt_ctx.is_rev1)
@@ -2230,6 +2243,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define CREATE_BUFFER_FIELD_HANDLER_IDX 18
 #define READ_FIELD_HANDLER_IDX 19
 #define TO_INTEGER_HANDLER_IDX 20
+#define ALIAS_HANDLER_IDX 21
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2257,6 +2271,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [CREATE_BUFFER_FIELD_HANDLER_IDX] = handle_create_buffer_field,
     [READ_FIELD_HANDLER_IDX] = handle_field_read,
     [TO_INTEGER_HANDLER_IDX] = handle_to_integer,
+    [ALIAS_HANDLER_IDX] = handle_create_alias,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2340,6 +2355,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_InternalOpReadFieldAsInteger] = READ_FIELD_HANDLER_IDX,
 
     [UACPI_AML_OP_ToIntegerOp] = TO_INTEGER_HANDLER_IDX,
+
+    [UACPI_AML_OP_AliasOp] = ALIAS_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
