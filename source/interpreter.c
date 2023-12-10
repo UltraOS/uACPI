@@ -385,6 +385,13 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
     }
 
+    if (uacpi_unlikely(declared_size->integer == 0)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN, "attempted to create an empty buffer\n"
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
     buffer_size = declared_size->integer;
     if (uacpi_unlikely(init_size > buffer_size)) {
         uacpi_kernel_log(
