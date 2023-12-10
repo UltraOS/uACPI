@@ -69,7 +69,7 @@ enum uacpi_parse_op {
      * Same as UACPI_PARSE_OP_EXISTING_NAMESTRING except the op doesn't error
      * out if namestring couldn't be resolved.
      */
-    UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL,
+    UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,
 
     // Invoke a handler at op_handlers[spec->code]
     UACPI_PARSE_OP_INVOKE_HANDLER,
@@ -264,7 +264,7 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
         UACPI_InternalOpUnresolvedNameString_##character, code, \
         {                                                       \
             UACPI_PARSE_OP_AML_PC_DECREMENT,                    \
-            UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL,          \
+            UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,         \
             UACPI_PARSE_OP_CONVERT_NAMESTRING,                  \
         },                                                      \
         UACPI_OP_PROPERTY_SIMPLE_NAME |                         \
