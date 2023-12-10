@@ -2083,7 +2083,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_TRACKED_PKGLEN] = ITEM_PACKAGE_LENGTH,
     [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
-    [UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
+    [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
@@ -2600,7 +2600,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_CREATE_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING:
-        case UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL: {
+        case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL: {
             enum resolve_behavior behavior;
 
             if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
@@ -2610,7 +2610,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             ret = resolve_name_string(frame, behavior, &item->node);
             if (ret == UACPI_STATUS_NOT_FOUND &&
-                op == UACPI_PARSE_OP_EXISTNG_NAMESTRING_OR_NULL) {
+                op == UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL) {
                 ret = UACPI_STATUS_OK;
             }
 
