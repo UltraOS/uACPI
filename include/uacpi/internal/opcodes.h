@@ -906,7 +906,7 @@ UACPI_BAD_OPCODE(0xCB)                                           \
 UACPI_OP(                                                        \
     BreakPointOp, 0xCC,                                          \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_END,                                      \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0xCD)                                           \
