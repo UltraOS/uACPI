@@ -114,9 +114,6 @@ enum uacpi_parse_op {
     // Truncate the last item in the list if needed
     UACPI_PARSE_OP_TRUNCATE_NUMBER,
 
-    // Set object type to decode_ops[pc + 1]
-    UACPI_PARSE_OP_SET_OBJECT_TYPE,
-
     // Ensure the type of item is decode_ops[pc + 1]
     UACPI_PARSE_OP_TYPECHECK,
 
