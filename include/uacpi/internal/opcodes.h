@@ -196,8 +196,7 @@ enum uacpi_op_property {
     UACPI_OP_PROPERTY_TERM_ARG = 1,
     UACPI_OP_PROPERTY_SUPERNAME = 2,
     UACPI_OP_PROPERTY_SIMPLE_NAME = 4,
-    UACPI_OP_PROPERTY_OPERAND = 8,
-    UACPI_OP_PROPERTY_TARGET = 16,
+    UACPI_OP_PROPERTY_TARGET = 8,
 
     /*
      * Op wants named fields to be read even if the desired argument is a
@@ -329,8 +328,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, bytes,                \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 
 #define UACPI_BUILD_BINARY_LOGIC_OP(type, code)                  \
@@ -345,7 +343,6 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_OPERAND |                                  \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
@@ -357,9 +354,8 @@ UACPI_OP(                                                        \
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,          \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND |                                  \
-    UACPI_OP_PROPERTY_TARGET                                     \
+    UACPI_OP_PROPERTY_TARGET |                                   \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_OP(                                                        \
     OneOp, 0x01,                                                 \
@@ -368,8 +364,7 @@ UACPI_OP(                                                        \
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,          \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_BAD_OPCODE(0x02)                                           \
 UACPI_BAD_OPCODE(0x03)                                           \
@@ -772,7 +767,6 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_STORE_TO_TARGET, 1,                       \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_OPERAND |                                  \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_BAD_OPCODE(0x9A)                                           \
@@ -949,7 +943,6 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_OPERAND |                                  \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
     UACPI_OP_PROPERTY_RESERVED                                   \
 )                                                                \
@@ -1023,8 +1016,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
 #define UACPI_ENUMERATE_EXT_OPCODES                         \
@@ -1061,7 +1053,6 @@ UACPI_OP(                                                   \
         UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
-    UACPI_OP_PROPERTY_OPERAND |                             \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
 UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
