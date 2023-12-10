@@ -367,7 +367,10 @@ UACPI_BAD_OPCODE(0x05)                                           \
 UACPI_OP(                                                        \
     AliasOp, 0x06,                                               \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING,                      \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0x07)                                           \
