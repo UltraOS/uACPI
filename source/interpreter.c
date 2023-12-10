@@ -1306,6 +1306,45 @@ static uacpi_status handle_binary_math(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_u64 object_to_integer(const uacpi_object *obj,
+                                   uacpi_size max_buffer_bytes)
+{
+    uacpi_u64 dst;
+
+    switch (obj->type) {
+    case UACPI_OBJECT_INTEGER:
+        dst = obj->integer;
+        break;
+    case UACPI_OBJECT_BUFFER: {
+        uacpi_size bytes;
+        bytes = UACPI_MIN(max_buffer_bytes, obj->buffer->size);
+        uacpi_memcpy_zerout(&dst, obj->buffer->data, sizeof(dst), bytes);
+        break;
+    }
+    case UACPI_OBJECT_STRING:
+        dst = uacpi_strtoull(obj->buffer->text, UACPI_NULL, 0);
+        break;
+    default:
+        dst = 0;
+        break;
+    }
+
+    return dst;
+}
+
+static uacpi_status handle_to_integer(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src, *dst;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 2)->obj;
+
+    // NT always takes the first 8 bytes, even for revision 1
+    dst->integer = object_to_integer(src, 8);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -2130,6 +2169,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define CREATE_NAMED_HANDLER_IDX 17
 #define CREATE_BUFFER_FIELD_HANDLER_IDX 18
 #define READ_FIELD_HANDLER_IDX 19
+#define TO_INTEGER_HANDLER_IDX 20
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2156,6 +2196,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [CREATE_NAMED_HANDLER_IDX] = handle_create_named,
     [CREATE_BUFFER_FIELD_HANDLER_IDX] = handle_create_buffer_field,
     [READ_FIELD_HANDLER_IDX] = handle_field_read,
+    [TO_INTEGER_HANDLER_IDX] = handle_to_integer,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2233,6 +2274,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 
     [UACPI_AML_OP_InternalOpReadFieldAsBuffer] = READ_FIELD_HANDLER_IDX,
     [UACPI_AML_OP_InternalOpReadFieldAsInteger] = READ_FIELD_HANDLER_IDX,
+
+    [UACPI_AML_OP_ToIntegerOp] = TO_INTEGER_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
