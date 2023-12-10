@@ -322,6 +322,17 @@ UACPI_OP(                                                             \
 #define UACPI_BUILD_BUFFER_FIELD_OP(type, code) \
     UACPI_DO_BUILD_BUFFER_FIELD_OP(Create##type, code, 2)
 
+#define UACPI_INTEGER_LITERAL_OP(type, code, bytes)              \
+UACPI_OP(                                                        \
+    type##Prefix, code,                                          \
+    {                                                            \
+        UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, bytes,                \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_OPERAND                                    \
+)                                                                \
+
 #define UACPI_BUILD_BINARY_LOGIC_OP(type, code)                  \
 UACPI_OP(                                                        \
     type##Op, code,                                              \
@@ -385,33 +396,9 @@ UACPI_OP(                                                        \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0x09)                                           \
-UACPI_OP(                                                        \
-    BytePrefix, 0x0A,                                            \
-    {                                                            \
-        UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, 1,                    \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
-)                                                                \
-UACPI_OP(                                                        \
-    WordPrefix, 0x0B,                                            \
-    {                                                            \
-        UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, 2,                    \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
-)                                                                \
-UACPI_OP(                                                        \
-    DWordPrefix, 0x0C,                                           \
-    {                                                            \
-        UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, 4,                    \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
-)                                                                \
+UACPI_INTEGER_LITERAL_OP(Byte, 0x0A, 1)                          \
+UACPI_INTEGER_LITERAL_OP(Word, 0x0B, 2)                          \
+UACPI_INTEGER_LITERAL_OP(DWord, 0x0C, 4)                         \
 UACPI_OP(                                                        \
     StringPrefix, 0x0D,                                          \
     {                                                            \
@@ -421,15 +408,7 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    QWordPrefix, 0x0E,                                           \
-    {                                                            \
-        UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, 8,                    \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_OPERAND                                    \
-)                                                                \
+UACPI_INTEGER_LITERAL_OP(QWord, 0x0E, 8)                         \
 UACPI_BAD_OPCODE(0x0F)                                           \
 UACPI_OP(                                                        \
     ScopeOp, 0x10,                                               \
