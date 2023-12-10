@@ -404,7 +404,6 @@ UACPI_OP(                                                        \
     QWordPrefix, 0x0E,                                           \
     {                                                            \
         UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT, 8,                    \
-        UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
