@@ -40,6 +40,12 @@ enum uacpi_parse_op {
     // Operand := TermArg => Integer
     UACPI_PARSE_OP_OPERAND,
 
+    /*
+     * ComputationalData := ByteConst | WordConst | DWordConst | QWordConst |
+     *                      String | ConstObj | RevisionOp | DefBuffer
+     */
+    UACPI_PARSE_OP_COMPUTATIONAL_DATA,
+
     // Target := SuperName | NullName
     UACPI_PARSE_OP_TARGET,
 
@@ -113,8 +119,6 @@ enum uacpi_parse_op {
 
     // Ensure the type of item is decode_ops[pc + 1]
     UACPI_PARSE_OP_TYPECHECK,
-
-    UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,
 
     // Install the namespace node specified in items[decode_ops[pc + 1]]
     UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE,
@@ -335,10 +339,8 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     type##Op, code,                                              \
     {                                                            \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
@@ -759,8 +761,7 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     ToIntegerOp, 0x99,                                           \
     {                                                            \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
         UACPI_PARSE_OP_TARGET,                                   \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
