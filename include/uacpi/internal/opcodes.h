@@ -322,6 +322,22 @@ UACPI_OP(                                                             \
 #define UACPI_BUILD_BUFFER_FIELD_OP(type, code) \
     UACPI_DO_BUILD_BUFFER_FIELD_OP(Create##type, code, 2)
 
+#define UACPI_BUILD_BINARY_LOGIC_OP(type, code)                  \
+UACPI_OP(                                                        \
+    type##Op, code,                                              \
+    {                                                            \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_TYPECHECK_STRING_OR_BUFFER_OR_INT,        \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_OPERAND |                                  \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
+)
+
 #define UACPI_ENUMERATE_OPCODES                                  \
 UACPI_OP(                                                        \
     ZeroOp, 0x00,                                                \
