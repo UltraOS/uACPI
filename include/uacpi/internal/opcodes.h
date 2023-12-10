@@ -496,7 +496,9 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     ExternalOp, 0x15,                                            \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,              \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                              \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                              \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0x16)                                           \
