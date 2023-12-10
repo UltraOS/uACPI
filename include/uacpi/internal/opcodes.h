@@ -741,20 +741,8 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_BUILD_BUFFER_FIELD_OP(QWord, 0x8F)                         \
-UACPI_OP(                                                        \
-    LandOp, 0x90,                                                \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
-UACPI_OP(                                                        \
-    LorOp, 0x91,                                                 \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_BINARY_LOGIC_OP(Land, 0x90)                          \
+UACPI_BUILD_BINARY_LOGIC_OP(Lor, 0x91)                           \
 UACPI_OP(                                                        \
     LnotOp, 0x92,                                                \
     {                                                            \

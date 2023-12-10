@@ -1359,27 +1359,13 @@ static uacpi_status handle_logical_not(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status handle_binary_logic(struct execution_context *ctx)
+static uacpi_bool handle_logical_equality(uacpi_object *lhs, uacpi_object *rhs)
 {
-    struct op_context *op_ctx = ctx->cur_op_ctx;
-    uacpi_object *lhs, *rhs, *dst;
-    uacpi_bool res;
+    uacpi_bool res = UACPI_FALSE;
 
-    lhs = item_array_at(&op_ctx->items, 0)->obj;
-    rhs = item_array_at(&op_ctx->items, 1)->obj;
-    dst = item_array_at(&op_ctx->items, 2)->obj;
-
-    // TODO: typecheck at parse time
-    if (lhs->type != rhs->type)
-        return UACPI_STATUS_BAD_BYTECODE;
-
-    switch (lhs->type) {
-    case UACPI_OBJECT_INTEGER:
-        res = lhs->integer == rhs->integer;
-        break;
-    case UACPI_OBJECT_STRING:
-    case UACPI_OBJECT_BUFFER:
+    if (lhs->type == UACPI_OBJECT_STRING || lhs->type == UACPI_OBJECT_BUFFER) {
         res = lhs->buffer->size == rhs->buffer->size;
+
         if (res && lhs->buffer->size) {
             res = uacpi_memcmp(
                 lhs->buffer->data,
@@ -1387,10 +1373,41 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
                 lhs->buffer->size
             ) == 0;
         }
-        break;
-    default:
-        // TODO: Type check at parse time
-        return UACPI_STATUS_BAD_BYTECODE;
+    } else if (lhs->type == UACPI_OBJECT_INTEGER) {
+        res = lhs->integer == rhs->integer;
+    }
+
+    return res;
+}
+
+static uacpi_status handle_binary_logic(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_aml_op op = op_ctx->op->code;
+    uacpi_object *lhs, *rhs, *dst;
+    uacpi_bool res;
+
+    lhs = item_array_at(&op_ctx->items, 0)->obj;
+    rhs = item_array_at(&op_ctx->items, 1)->obj;
+    dst = item_array_at(&op_ctx->items, 2)->obj;
+
+    if (op == UACPI_AML_OP_LEqualOp) {
+        // TODO: typecheck at parse time
+        if (lhs->type != rhs->type)
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        res = handle_logical_equality(lhs, rhs);
+    } else {
+        uacpi_u64 lhs_int, rhs_int;
+
+        // NT only looks at the first 4 bytes of a buffer
+        lhs_int = object_to_integer(lhs, 4);
+        rhs_int = object_to_integer(rhs, 4);
+
+        if (op == UACPI_AML_OP_LandOp)
+            res = lhs_int && rhs_int;
+        else
+            res = lhs_int || rhs_int;
     }
 
     dst->integer = res ? ones() : 0;
@@ -2256,6 +2273,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_LnotOp] = LOGICAL_NOT_HANDLER_IDX,
 
     [UACPI_AML_OP_LEqualOp] = BINARY_LOGIC_HANDLER_IDX,
+    [UACPI_AML_OP_LandOp] = BINARY_LOGIC_HANDLER_IDX,
+    [UACPI_AML_OP_LorOp] = BINARY_LOGIC_HANDLER_IDX,
 
     [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
 
