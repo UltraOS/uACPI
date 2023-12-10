@@ -1382,6 +1382,38 @@ static uacpi_bool handle_logical_equality(uacpi_object *lhs, uacpi_object *rhs)
     return res;
 }
 
+static uacpi_bool handle_logical_less_or_greater(
+    uacpi_aml_op op, uacpi_object *lhs, uacpi_object *rhs
+)
+{
+    if (lhs->type == UACPI_OBJECT_STRING || lhs->type == UACPI_OBJECT_BUFFER) {
+        int res;
+        uacpi_buffer *lhs_buf, *rhs_buf;
+
+        lhs_buf = lhs->buffer;
+        rhs_buf = rhs->buffer;
+
+        res = uacpi_memcmp(lhs_buf->data, rhs_buf->data,
+                           UACPI_MIN(lhs_buf->size, rhs_buf->size));
+        if (res == 0) {
+            if (lhs_buf->size < rhs_buf->size)
+                res = -1;
+            else if (lhs_buf->size > rhs_buf->size)
+                res = 1;
+        }
+
+        if (op == UACPI_AML_OP_LLessOp)
+            return res < 0;
+
+        return res > 0;
+    }
+
+    if (op == UACPI_AML_OP_LLessOp)
+        return lhs->integer < rhs->integer;
+
+    return lhs->integer > rhs->integer;
+}
+
 static uacpi_status handle_binary_logic(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -1393,13 +1425,20 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
     rhs = item_array_at(&op_ctx->items, 1)->obj;
     dst = item_array_at(&op_ctx->items, 2)->obj;
 
-    if (op == UACPI_AML_OP_LEqualOp) {
+    switch (op) {
+    case UACPI_AML_OP_LEqualOp:
+    case UACPI_AML_OP_LLessOp:
+    case UACPI_AML_OP_LGreaterOp:
         // TODO: typecheck at parse time
         if (lhs->type != rhs->type)
             return UACPI_STATUS_BAD_BYTECODE;
 
-        res = handle_logical_equality(lhs, rhs);
-    } else {
+        if (op == UACPI_AML_OP_LEqualOp)
+            res = handle_logical_equality(lhs, rhs);
+        else
+            res = handle_logical_less_or_greater(op, lhs, rhs);
+        break;
+    default: {
         uacpi_u64 lhs_int, rhs_int;
 
         // NT only looks at the first 4 bytes of a buffer
@@ -1410,6 +1449,8 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
             res = lhs_int && rhs_int;
         else
             res = lhs_int || rhs_int;
+        break;
+    }
     }
 
     dst->integer = res ? ones() : 0;
@@ -2277,6 +2318,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_LEqualOp] = BINARY_LOGIC_HANDLER_IDX,
     [UACPI_AML_OP_LandOp] = BINARY_LOGIC_HANDLER_IDX,
     [UACPI_AML_OP_LorOp] = BINARY_LOGIC_HANDLER_IDX,
+    [UACPI_AML_OP_LGreaterOp] = BINARY_LOGIC_HANDLER_IDX,
+    [UACPI_AML_OP_LLessOp] = BINARY_LOGIC_HANDLER_IDX,
 
     [UACPI_AML_OP_InternalOpNamedObject] = NAMED_OBJECT_HANDLER_IDX,
 
