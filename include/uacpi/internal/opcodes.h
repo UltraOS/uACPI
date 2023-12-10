@@ -1142,8 +1142,8 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     DebugOp, UACPI_EXT_OP(0x31),                            \
     {                                                       \
-        UACPI_PARSE_OP_OBJECT_ALLOC,                        \
-        UACPI_PARSE_OP_SET_OBJECT_TYPE, UACPI_OBJECT_DEBUG, \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
+        UACPI_OBJECT_DEBUG,                                 \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG |                            \
