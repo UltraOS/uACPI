@@ -765,17 +765,7 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    LEqualOp, 0x93,                                              \
-    {                                                            \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_OBJECT_ALLOC,                             \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_BINARY_LOGIC_OP(LEqual, 0x93)                        \
 UACPI_OP(                                                        \
     LGreaterOp, 0x94,                                            \
     {                                                            \
