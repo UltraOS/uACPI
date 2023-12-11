@@ -1330,6 +1330,27 @@ static uacpi_status handle_binary_math(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_unary_math(struct execution_context *ctx)
+{
+    uacpi_object *arg, *tgt;
+    struct item_array *items = &ctx->cur_op_ctx->items;
+    uacpi_aml_op op = ctx->cur_op_ctx->op->code;
+
+    arg = item_array_at(items, 0)->obj;
+    tgt = item_array_at(items, 2)->obj;
+
+    switch (op) {
+    case UACPI_AML_OP_NotOp:
+        tgt->integer = ~arg->integer;
+        truncate_number_if_needed(tgt);
+        break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_u64 object_to_integer(const uacpi_object *obj,
                                    uacpi_size max_buffer_bytes)
 {
@@ -2383,6 +2404,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define ALIAS_HANDLER_IDX 21
 #define CONCATENATE_HANDLER_IDX 22
 #define SIZEOF_HANDLER_IDX 23
+#define UNARY_MATH_HANDLER_IDX 24
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2413,6 +2435,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [ALIAS_HANDLER_IDX] = handle_create_alias,
     [CONCATENATE_HANDLER_IDX] = handle_concatenate,
     [SIZEOF_HANDLER_IDX] = handle_sizeof,
+    [UNARY_MATH_HANDLER_IDX] = handle_unary_math,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2502,6 +2525,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_ConcatOp] = CONCATENATE_HANDLER_IDX,
 
     [UACPI_AML_OP_SizeOfOp] = SIZEOF_HANDLER_IDX,
+
+    [UACPI_AML_OP_NotOp] = UNARY_MATH_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
