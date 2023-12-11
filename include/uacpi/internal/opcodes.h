@@ -660,20 +660,8 @@ UACPI_BUILD_BINARY_MATH_OP(Or, 0x7D)                             \
 UACPI_BUILD_BINARY_MATH_OP(Nor, 0x7E)                            \
 UACPI_BUILD_BINARY_MATH_OP(Xor, 0x7F)                            \
 UACPI_BUILD_UNARY_MATH_OP(Not, 0x80)                             \
-UACPI_OP(                                                        \
-    FindSetLeftBitOp, 0x81,                                      \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
-UACPI_OP(                                                        \
-    FindSetRightBitOp, 0x82,                                     \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_UNARY_MATH_OP(FindSetLeftBit, 0x81)                  \
+UACPI_BUILD_UNARY_MATH_OP(FindSetRightBit, 0x82)                 \
 UACPI_OP(                                                        \
     DerefOfOp, 0x83,                                             \
     {                                                            \
