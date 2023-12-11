@@ -1462,6 +1462,44 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_sizeof(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src, *dst;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (uacpi_likely(src->type == UACPI_OBJECT_REFERENCE))
+        src = reference_unwind(src)->inner_object;
+
+    switch (src->type) {
+    case UACPI_OBJECT_STRING:
+    case UACPI_OBJECT_BUFFER: {
+        struct object_storage_as_buffer buf;
+        get_object_storage(src, &buf, UACPI_FALSE);
+
+        dst->integer = buf.len;
+        break;
+    }
+
+    case UACPI_OBJECT_PACKAGE:
+        dst->integer = src->package->count;
+        break;
+
+    default:
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid argument for Sizeof: %s, "
+            "expected String/Buffer/Package\n",
+            uacpi_object_type_to_string(src->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -2344,6 +2382,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define TO_INTEGER_HANDLER_IDX 20
 #define ALIAS_HANDLER_IDX 21
 #define CONCATENATE_HANDLER_IDX 22
+#define SIZEOF_HANDLER_IDX 23
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2373,6 +2412,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [TO_INTEGER_HANDLER_IDX] = handle_to_integer,
     [ALIAS_HANDLER_IDX] = handle_create_alias,
     [CONCATENATE_HANDLER_IDX] = handle_concatenate,
+    [SIZEOF_HANDLER_IDX] = handle_sizeof,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2460,6 +2500,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_AliasOp] = ALIAS_HANDLER_IDX,
 
     [UACPI_AML_OP_ConcatOp] = CONCATENATE_HANDLER_IDX,
+
+    [UACPI_AML_OP_SizeOfOp] = SIZEOF_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
