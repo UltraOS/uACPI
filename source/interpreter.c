@@ -1344,6 +1344,12 @@ static uacpi_status handle_unary_math(struct execution_context *ctx)
         tgt->integer = ~arg->integer;
         truncate_number_if_needed(tgt);
         break;
+    case UACPI_AML_OP_FindSetRightBitOp:
+        tgt->integer = uacpi_bit_scan_forward(arg->integer);
+        break;
+    case UACPI_AML_OP_FindSetLeftBitOp:
+        tgt->integer = uacpi_bit_scan_backward(arg->integer);
+        break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
@@ -2527,6 +2533,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_SizeOfOp] = SIZEOF_HANDLER_IDX,
 
     [UACPI_AML_OP_NotOp] = UNARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_FindSetLeftBitOp] = UNARY_MATH_HANDLER_IDX,
+    [UACPI_AML_OP_FindSetRightBitOp] = UNARY_MATH_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
