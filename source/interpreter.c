@@ -2553,10 +2553,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             truncate_number_if_needed(item->obj);
             break;
 
-        case UACPI_PARSE_OP_SET_OBJECT_TYPE:
-            item->obj->type = op_decode_byte(op_ctx);
-            break;
-
         case UACPI_PARSE_OP_TYPECHECK: {
             enum uacpi_object_type expected_type;
 
