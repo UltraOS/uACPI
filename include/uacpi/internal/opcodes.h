@@ -304,6 +304,20 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
+#define UACPI_BUILD_UNARY_MATH_OP(type, code)                    \
+UACPI_OP(                                                        \
+    type##Op, code,                                              \
+    {                                                            \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_TARGET,                                   \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
+)
+
 #define UACPI_DO_BUILD_BUFFER_FIELD_OP(type, code, node_idx, ...)     \
 UACPI_OP(                                                             \
     type##FieldOp, code,                                              \
@@ -645,13 +659,7 @@ UACPI_BUILD_BINARY_MATH_OP(Nand, 0x7C)                           \
 UACPI_BUILD_BINARY_MATH_OP(Or, 0x7D)                             \
 UACPI_BUILD_BINARY_MATH_OP(Nor, 0x7E)                            \
 UACPI_BUILD_BINARY_MATH_OP(Xor, 0x7F)                            \
-UACPI_OP(                                                        \
-    NotOp, 0x80,                                                 \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_UNARY_MATH_OP(Not, 0x80)                             \
 UACPI_OP(                                                        \
     FindSetLeftBitOp, 0x81,                                      \
     {                                                            \
