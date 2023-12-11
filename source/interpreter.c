@@ -559,7 +559,8 @@ struct object_storage_as_buffer {
 };
 
 static uacpi_status get_object_storage(uacpi_object *obj,
-                                       struct object_storage_as_buffer *out_buf)
+                                       struct object_storage_as_buffer *out_buf,
+                                       uacpi_bool include_null)
 {
     switch (obj->type) {
     case UACPI_OBJECT_INTEGER:
@@ -567,7 +568,10 @@ static uacpi_status get_object_storage(uacpi_object *obj,
         out_buf->ptr = &obj->integer;
         break;
     case UACPI_OBJECT_STRING:
-        out_buf->len = obj->buffer->size ? obj->buffer->size - 1 : 0;
+        out_buf->len = obj->buffer->size;
+        if (out_buf->len && !include_null)
+            out_buf->len--;
+
         out_buf->ptr = obj->buffer->text;
         break;
     case UACPI_OBJECT_BUFFER:
@@ -697,7 +701,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     uacpi_status ret;
     struct object_storage_as_buffer src_buf;
 
-    ret = get_object_storage(src, &src_buf);
+    ret = get_object_storage(src, &src_buf, UACPI_FALSE);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -707,7 +711,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     case UACPI_OBJECT_BUFFER: {
         struct object_storage_as_buffer dst_buf;
 
-        ret = get_object_storage(dst, &dst_buf);
+        ret = get_object_storage(dst, &dst_buf, UACPI_FALSE);
         if (uacpi_unlikely_error(ret))
             return ret;
 
