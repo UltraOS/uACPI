@@ -1369,6 +1369,99 @@ static uacpi_status handle_to_integer(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_concatenate(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *arg0, *arg1, *dst;
+    uacpi_u8 *dst_buf;
+    uacpi_size buf_size = 0;
+
+    arg0 = item_array_at(&op_ctx->items, 0)->obj;
+    arg1 = item_array_at(&op_ctx->items, 1)->obj;
+    dst = item_array_at(&op_ctx->items, 3)->obj;
+
+    switch (arg0->type) {
+    case UACPI_OBJECT_INTEGER: {
+        uacpi_u64 arg1_as_int;
+        uacpi_size int_size;
+
+        int_size = sizeof_int();
+        buf_size = int_size * 2;
+
+        dst_buf = uacpi_kernel_alloc(buf_size);
+        if (uacpi_unlikely(dst_buf == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        arg1_as_int = object_to_integer(arg1, 8);
+
+        uacpi_memcpy(dst_buf, &arg0->integer, int_size);
+        uacpi_memcpy(dst_buf+ int_size, &arg1_as_int, int_size);
+        break;
+    }
+    case UACPI_OBJECT_BUFFER: {
+        uacpi_buffer *arg0_buf = arg0->buffer;
+        struct object_storage_as_buffer arg1_buf;
+
+        get_object_storage(arg1, &arg1_buf, UACPI_TRUE);
+        buf_size = arg0_buf->size + arg1_buf.len;
+
+        dst_buf = uacpi_kernel_alloc(buf_size);
+        if (uacpi_unlikely(dst_buf == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        uacpi_memcpy(dst_buf, arg0_buf->data, arg0_buf->size);
+        uacpi_memcpy(dst_buf + arg0_buf->size, arg1_buf.ptr, arg1_buf.len);
+        break;
+    }
+    case UACPI_OBJECT_STRING: {
+        char int_buf[17];
+        void *arg1_ptr;
+        uacpi_size arg0_size, arg1_size;
+        uacpi_buffer *arg0_buf = arg0->buffer;
+
+        switch (arg1->type) {
+        case UACPI_OBJECT_INTEGER: {
+            int ret;
+            ret = uacpi_snprintf(int_buf, sizeof(int_buf), "%"UACPI_PRIx64,
+                                 arg1->integer);
+            if (ret < 0)
+                return UACPI_STATUS_INVALID_ARGUMENT;
+
+            arg1_ptr = int_buf;
+            arg1_size = ret + 1;
+            break;
+        }
+        case UACPI_OBJECT_STRING:
+            arg1_ptr = arg1->buffer->data;
+            arg1_size = arg1->buffer->size;
+            break;
+        case UACPI_OBJECT_BUFFER:
+        default:
+            // NT doesn't support this, so we don't as well
+            return UACPI_STATUS_INVALID_ARGUMENT;
+        }
+
+        arg0_size = arg0_buf->size ? arg0_buf->size - 1 : arg0_buf->size;
+        buf_size = arg0_size + arg1_size;
+
+        dst_buf = uacpi_kernel_alloc(buf_size);
+        if (uacpi_unlikely(dst_buf == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        uacpi_memcpy(dst_buf, arg0_buf->data, arg0_size);
+        uacpi_memcpy(dst_buf + arg0_size, arg1_ptr, arg1_size);
+        dst->type = UACPI_OBJECT_STRING;
+        break;
+    }
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    dst->buffer->data = dst_buf;
+    dst->buffer->size = buf_size;
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -2280,6 +2373,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define READ_FIELD_HANDLER_IDX 19
 #define TO_INTEGER_HANDLER_IDX 20
 #define ALIAS_HANDLER_IDX 21
+#define CONCATENATE_HANDLER_IDX 22
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2308,6 +2402,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [READ_FIELD_HANDLER_IDX] = handle_field_read,
     [TO_INTEGER_HANDLER_IDX] = handle_to_integer,
     [ALIAS_HANDLER_IDX] = handle_create_alias,
+    [CONCATENATE_HANDLER_IDX] = handle_concatenate,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2393,6 +2488,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_ToIntegerOp] = TO_INTEGER_HANDLER_IDX,
 
     [UACPI_AML_OP_AliasOp] = ALIAS_HANDLER_IDX,
+
+    [UACPI_AML_OP_ConcatOp] = CONCATENATE_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)

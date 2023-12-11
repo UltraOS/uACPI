@@ -588,7 +588,13 @@ UACPI_BUILD_BINARY_MATH_OP(Add, 0x72)                            \
 UACPI_OP(                                                        \
     ConcatOp, 0x73,                                              \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
+        UACPI_PARSE_OP_TARGET,                                   \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER,  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 2,                       \
+        UACPI_PARSE_OP_OBJECT_COPY_TO_PREV,                      \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
