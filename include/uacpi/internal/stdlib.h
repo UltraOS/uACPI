@@ -23,3 +23,6 @@ void uacpi_memcpy_zerout(void *dst, const void *src,
 
 // Returns the one-based bit location of LSb or 0
 uacpi_u8 uacpi_bit_scan_forward(uacpi_u64);
+
+// Returns the one-based bit location of MSb or 0
+uacpi_u8 uacpi_bit_scan_backward(uacpi_u64);
