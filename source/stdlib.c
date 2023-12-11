@@ -27,3 +27,22 @@ uacpi_u8 uacpi_bit_scan_forward(uacpi_u64 value)
     return __builtin_ffsll(value);
 #endif
 }
+
+uacpi_u8 uacpi_bit_scan_backward(uacpi_u64 value)
+{
+#ifdef _MSC_VER
+    unsigned char ret;
+    unsigned long index;
+
+    ret = _BitScanReverse64(&index, value);
+    if (ret == 0)
+        return 0;
+
+    return (uacpi_u8)index + 1;
+#else
+    if (value == 0)
+        return 0;
+
+    return 64 - __builtin_clzll(value);
+#endif
+}
