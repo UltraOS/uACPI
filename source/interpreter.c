@@ -553,6 +553,11 @@ static uacpi_size buffer_field_byte_size(struct uacpi_buffer_field *field)
     return UACPI_ALIGN_UP(field->bit_length, 8, uacpi_u32) / 8;
 }
 
+static uacpi_size sizeof_int()
+{
+    return g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
+}
+
 struct object_storage_as_buffer {
     void *ptr;
     uacpi_size len;
@@ -564,7 +569,7 @@ static uacpi_status get_object_storage(uacpi_object *obj,
 {
     switch (obj->type) {
     case UACPI_OBJECT_INTEGER:
-        out_buf->len = g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
+        out_buf->len = sizeof_int();
         out_buf->ptr = &obj->integer;
         break;
     case UACPI_OBJECT_STRING:
