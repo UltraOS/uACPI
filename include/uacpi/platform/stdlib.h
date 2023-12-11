@@ -8,6 +8,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
+
+#define UACPI_PRIx64 PRIx64
 
 #define uacpi_memcpy memcpy
 #define uacpi_memset memset
