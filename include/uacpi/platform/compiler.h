@@ -8,6 +8,8 @@
 #define UACPI_ALIGN(x) __declspec(align(x))
 
 #ifdef _MSC_VER
+    #include <intrin.h>
+
     #define UACPI_ALWAYS_INLINE __forceinline
 
     #define UACPI_PACKED(decl)  \

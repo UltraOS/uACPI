@@ -11,3 +11,19 @@ void uacpi_memcpy_zerout(void *dst, const void *src,
     if (dst_size > bytes_to_copy)
         uacpi_memzero((uacpi_u8*)dst + bytes_to_copy, dst_size - bytes_to_copy);
 }
+
+uacpi_u8 uacpi_bit_scan_forward(uacpi_u64 value)
+{
+#ifdef _MSC_VER
+    unsigned char ret;
+    unsigned long index;
+
+    ret = _BitScanForward64(&index, value);
+    if (ret == 0)
+        return 0;
+
+    return (uacpi_u8)index + 1;
+#else
+    return __builtin_ffsll(value);
+#endif
+}
