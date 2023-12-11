@@ -1943,27 +1943,6 @@ static uacpi_status handle_return(struct execution_context *ctx)
     );
 }
 
-static void execution_context_release(struct execution_context *ctx)
-{
-    if (ctx->ret)
-        uacpi_object_unref(ctx->ret);
-    call_frame_array_clear(&ctx->call_stack);
-    uacpi_kernel_free(ctx);
-}
-
-static void call_frame_clear(struct call_frame *frame)
-{
-    uacpi_size i;
-
-    op_context_array_clear(&frame->pending_ops);
-    code_block_array_clear(&frame->code_blocks);
-
-    for (i = 0; i < 7; ++i)
-        uacpi_object_unref(frame->args[i]);
-    for (i = 0; i < 8; ++i)
-        uacpi_object_unref(frame->locals[i]);
-}
-
 static void refresh_ctx_pointers(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
@@ -1978,15 +1957,6 @@ static void refresh_ctx_pointers(struct execution_context *ctx)
     ctx->cur_op_ctx = op_context_array_last(&frame->pending_ops);
     ctx->prev_op_ctx = op_context_array_one_before_last(&frame->pending_ops);
     ctx->cur_block = code_block_array_last(&frame->code_blocks);
-}
-
-static void ctx_reload_post_ret(struct execution_context *ctx)
-{
-    call_frame_clear(ctx->cur_frame);
-    call_frame_array_pop(&ctx->call_stack);
-
-    ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
-    refresh_ctx_pointers(ctx);
 }
 
 static bool ctx_has_non_preempted_op(struct execution_context *ctx)
@@ -2944,6 +2914,44 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
     }
+}
+
+static void call_frame_clear(struct call_frame *frame)
+{
+    uacpi_size i;
+    op_context_array_clear(&frame->pending_ops);
+    code_block_array_clear(&frame->code_blocks);
+
+    for (i = 0; i < 7; ++i)
+        uacpi_object_unref(frame->args[i]);
+    for (i = 0; i < 8; ++i)
+        uacpi_object_unref(frame->locals[i]);
+}
+
+static void execution_context_release(struct execution_context *ctx)
+{
+    if (ctx->ret)
+        uacpi_object_unref(ctx->ret);
+
+    while (call_frame_array_size(&ctx->call_stack) != 0) {
+        while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
+            pop_op(ctx);
+
+        call_frame_clear(call_frame_array_last(&ctx->call_stack));
+        call_frame_array_pop(&ctx->call_stack);
+    }
+
+    call_frame_array_clear(&ctx->call_stack);
+    uacpi_kernel_free(ctx);
+}
+
+static void ctx_reload_post_ret(struct execution_context *ctx)
+{
+    call_frame_clear(ctx->cur_frame);
+    call_frame_array_pop(&ctx->call_stack);
+
+    ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
+    refresh_ctx_pointers(ctx);
 }
 
 uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
