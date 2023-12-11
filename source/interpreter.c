@@ -2858,8 +2858,6 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
 {
     uacpi_status st = UACPI_STATUS_OK;
     struct execution_context *ctx;
-    struct call_frame *cur_frame;
-    struct op *cur_op;
 
     ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
     if (ctx == UACPI_NULL)
