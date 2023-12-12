@@ -27,12 +27,20 @@ void uacpi_make_shareable_bugged(uacpi_handle handle)
 uacpi_u32 uacpi_shareable_ref(uacpi_handle handle)
 {
     struct uacpi_shareable *shareable = handle;
+
+    if (uacpi_unlikely(uacpi_bugged_shareable(shareable)))
+        return BUGGED_REFCOUNT;
+
     return shareable->reference_count++;
 }
 
 uacpi_u32 uacpi_shareable_unref(uacpi_handle handle)
 {
     struct uacpi_shareable *shareable = handle;
+
+    if (uacpi_unlikely(uacpi_bugged_shareable(shareable)))
+        return BUGGED_REFCOUNT;
+
     return shareable->reference_count--;
 }
 
