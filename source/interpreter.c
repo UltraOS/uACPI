@@ -1100,8 +1100,7 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
         uacpi_object *referenced_obj;
 
         referenced_obj = uacpi_unwrap_internal_reference(dst);
-        if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
+        if (referenced_obj->type == UACPI_OBJECT_REFERENCE) {
             dst = reference_unwind(referenced_obj);
             break;
         }
@@ -1154,8 +1153,7 @@ static uacpi_status store_to_reference(uacpi_object *dst,
         uacpi_object *referenced_obj;
 
         referenced_obj = uacpi_unwrap_internal_reference(dst);
-        if (referenced_obj->type == UACPI_OBJECT_REFERENCE &&
-            referenced_obj->flags == UACPI_REFERENCE_KIND_REFOF) {
+        if (referenced_obj->type == UACPI_OBJECT_REFERENCE) {
             overwrite = dst->flags == UACPI_REFERENCE_KIND_ARG;
             dst = reference_unwind(referenced_obj);
             break;
