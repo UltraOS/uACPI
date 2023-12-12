@@ -143,6 +143,12 @@ class ASLSource:
             "-vw", "3144",
             # Remark 2098 Recursive method call
             "-vw", "2098",
+
+            # Invalid type [Reference] found, RefOf operator requires
+            # [Integer|String|Buffer|Package|FieldUnit|Device|Event|
+            #  Method|Mutex|Region|Power|Processor|Thermal|BufferField|
+            #  DdbHandle|DebugObject]
+            "-vw", "6058",
         ]
 
         args = [compiler, *ignored_warnings, "-p", out_case, path]
