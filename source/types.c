@@ -230,9 +230,9 @@ static void unref_chain_no_recurse(uacpi_object *obj, struct free_queue *queue)
             next_obj = obj->inner_object;
 
         if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
-            continue;
+            goto do_next;
         if (uacpi_shareable_unref(obj) > 1)
-            continue;
+            goto do_next;
 
         if (obj->type == UACPI_OBJECT_REFERENCE) {
             uacpi_kernel_free(obj);
@@ -240,6 +240,7 @@ static void unref_chain_no_recurse(uacpi_object *obj, struct free_queue *queue)
             free_plain_no_recurse(obj, queue);
         }
 
+    do_next:
         obj = next_obj;
         next_obj = UACPI_NULL;
     }
