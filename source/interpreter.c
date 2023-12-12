@@ -695,6 +695,23 @@ static void write_buffer_field(uacpi_buffer_field *field,
     do_write_misaligned_buffer_field(field, src_buf);
 }
 
+static uacpi_u8 *buffer_index_cursor(uacpi_buffer_index *buf_idx)
+{
+    uacpi_u8 *out_cursor;
+
+    out_cursor = buf_idx->buffer->data;
+    out_cursor += buf_idx->idx;
+
+    return out_cursor;
+}
+
+static void write_buffer_index(uacpi_buffer_index *buf_idx,
+                               struct object_storage_as_buffer *src_buf)
+{
+    uacpi_memcpy_zerout(buffer_index_cursor(buf_idx), src_buf->ptr,
+                        1, src_buf->len);
+}
+
 /*
  * The word "implicit cast" here is only because it's called that in
  * the specification. In reality, we just copy one buffer to another
@@ -726,6 +743,10 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
     case UACPI_OBJECT_BUFFER_FIELD:
         write_buffer_field(dst->buffer_field, src_buf);
+        break;
+
+    case UACPI_OBJECT_BUFFER_INDEX:
+        write_buffer_index(&dst->buffer_index, &src_buf);
         break;
 
     default:
@@ -1006,6 +1027,13 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         uacpi_kernel_log(
             UACPI_LOG_INFO, "%s Buffer @%p (%p) (%zu bytes)\n",
             prefix, src, src->buffer, src->buffer->size
+        );
+        break;
+    case UACPI_OBJECT_BUFFER_INDEX:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Buffer Index %p[%zu] => 0x%02X\n",
+            prefix, src->buffer_index.buffer->data, src->buffer_index.idx,
+            *buffer_index_cursor(&src->buffer_index)
         );
         break;
     default:
@@ -2140,6 +2168,11 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
     case UACPI_OBJECT_REFERENCE:
         ret = store_to_reference(dst, src);
         break;
+
+    case UACPI_OBJECT_BUFFER_INDEX:
+        ret = object_assign_with_implicit_cast(dst, src);
+        break;
+
     case UACPI_OBJECT_INTEGER:
         // NULL target
         if (dst->integer == 0) {

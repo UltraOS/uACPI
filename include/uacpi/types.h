@@ -28,6 +28,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_DEBUG = 16,
 
     UACPI_OBJECT_REFERENCE = 20,
+    UACPI_OBJECT_BUFFER_INDEX = 21,
 } uacpi_object_type;
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type);
@@ -60,6 +61,11 @@ typedef struct uacpi_buffer_field {
     uacpi_bool force_buffer;
 } uacpi_buffer_field;
 
+typedef struct uacpi_buffer_index {
+    uacpi_size idx;
+    uacpi_buffer *buffer;
+} uacpi_buffer_index;
+
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
     uacpi_u8 type;
@@ -72,6 +78,7 @@ typedef struct uacpi_object {
         uacpi_object *inner_object;
         uacpi_control_method *method;
         uacpi_buffer *buffer;
+        uacpi_buffer_index buffer_index;
     };
 } uacpi_object;
 
