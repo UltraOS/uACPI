@@ -636,7 +636,8 @@ uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object)
 {
     for (;;) {
         if (object->type != UACPI_OBJECT_REFERENCE ||
-            object->flags == UACPI_REFERENCE_KIND_REFOF)
+            (object->flags == UACPI_REFERENCE_KIND_REFOF ||
+             object->flags == UACPI_REFERENCE_KIND_PKG_INDEX))
             return object;
 
         object = object->inner_object;

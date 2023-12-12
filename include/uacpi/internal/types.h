@@ -9,6 +9,7 @@ enum uacpi_reference_kind {
     UACPI_REFERENCE_KIND_LOCAL = 1,
     UACPI_REFERENCE_KIND_ARG = 2,
     UACPI_REFERENCE_KIND_NAMED = 3,
+    UACPI_REFERENCE_KIND_PKG_INDEX = 4,
 };
 
 /*
