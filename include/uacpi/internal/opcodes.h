@@ -699,10 +699,17 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     IndexOp, 0x88,                                               \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_TARGET,                                   \
+        UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,                       \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 2,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_SUPERNAME                                  \
+    UACPI_OP_PROPERTY_SUPERNAME |                                \
+    UACPI_OP_PROPERTY_SIMPLE_NAME                                \
 )                                                                \
 UACPI_OP(                                                        \
     MatchOp, 0x89,                                               \
