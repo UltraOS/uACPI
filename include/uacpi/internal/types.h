@@ -5,30 +5,9 @@
 
 // object->flags field if object->type == UACPI_OBJECT_REFERENCE
 enum uacpi_reference_kind {
-    /*
-     * Stores to this reference type change the referenced object.
-     * The reference is created with this kind when a RefOf result is stored
-     * in an object. Detailed explanation below.
-     */
     UACPI_REFERENCE_KIND_REFOF = 0,
-
-    /*
-     * Reference to a local variable, stores go into the referenced object
-     * _unless_ the referenced object is a REFERENCE_KIND_REFOF. In that case,
-     * the reference is unwound one more level as if the expression was
-     * Store(..., DerefOf(ArgX))
-     */
     UACPI_REFERENCE_KIND_LOCAL = 1,
-
-    /*
-     * Reference to an argument. Same semantics for stores as
-     * REFERENCE_KIND_LOCAL.
-     */
     UACPI_REFERENCE_KIND_ARG = 2,
-
-    /*
-     * Reference to a named object. Same semantics as REFERENCE_KIND_LOCAL.
-     */
     UACPI_REFERENCE_KIND_NAMED = 3,
 };
 
