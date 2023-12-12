@@ -20,6 +20,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Package";
     case UACPI_OBJECT_REFERENCE:
         return "Reference";
+    case UACPI_OBJECT_BUFFER_INDEX:
+        return "Buffer Index";
     case UACPI_OBJECT_METHOD:
         return "Method";
     case UACPI_OBJECT_DEBUG:
@@ -298,6 +300,10 @@ static void free_object_storage(uacpi_object *obj)
     case UACPI_OBJECT_BUFFER_FIELD:
         uacpi_shareable_unref_and_delete_if_last(obj->buffer_field,
                                                  free_buffer_field);
+        break;
+    case UACPI_OBJECT_BUFFER_INDEX:
+        uacpi_shareable_unref_and_delete_if_last(obj->buffer_index.buffer,
+                                                 free_buffer);
         break;
     case UACPI_OBJECT_METHOD:
         uacpi_kernel_free(obj->method);
@@ -584,6 +590,10 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_BUFFER_FIELD:
         dst->buffer_field = src->buffer_field;
         uacpi_shareable_ref(dst->buffer_field);
+        break;
+    case UACPI_OBJECT_BUFFER_INDEX:
+        dst->buffer_index = src->buffer_index;
+        uacpi_shareable_ref(dst->buffer_index.buffer);
         break;
     case UACPI_OBJECT_INTEGER:
         dst->integer = src->integer;
