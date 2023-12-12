@@ -1054,8 +1054,14 @@ static uacpi_status debug_store(uacpi_object *src)
         uacpi_package *pkg = src->package;
         uacpi_size i;
 
-        for (i = 0; i < pkg->count; ++i)
-            debug_store_no_recurse("Element:", pkg->objects[i]);
+        for (i = 0; i < pkg->count; ++i) {
+            uacpi_object *obj = pkg->objects[i];
+            if (obj->type == UACPI_OBJECT_REFERENCE &&
+                obj->flags == UACPI_REFERENCE_KIND_PKG_INDEX)
+                obj = obj->inner_object;
+
+            debug_store_no_recurse("Element:", obj);
+        }
     }
 
     return UACPI_STATUS_OK;
@@ -1115,6 +1121,7 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
  * 3. ArgX -> Overwrite ArgX unless ArgX is a reference, in that case
  *            overwrite the referenced object.
  * 4. RefOf -> Not allowed here.
+ * 5. Index -> Overwrite Object stored at the index.
  */
  static uacpi_status copy_object_to_reference(uacpi_object *dst,
                                               uacpi_object *src)
@@ -1136,6 +1143,7 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
         // FALLTHROUGH intended here
     }
     case UACPI_REFERENCE_KIND_LOCAL:
+    case UACPI_REFERENCE_KIND_PKG_INDEX:
     case UACPI_REFERENCE_KIND_NAMED:
         break;
     default:
@@ -1161,9 +1169,9 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
 
 /*
  * if Store(..., Obj) where Obj is:
- * 1. LocalX -> OVERWRITE unless the object is a reference, in that
- *              case store to the referenced object _with_ implicit
- *              cast.
+ * 1. LocalX/Index -> OVERWRITE unless the object is a reference, in that
+ *                    case store to the referenced object _with_ implicit
+ *                    cast.
  * 2. ArgX -> OVERWRITE unless the object is a reference, in that
  *            case OVERWRITE the referenced object.
  * 3. NAME -> Store with implicit cast.
@@ -1177,10 +1185,15 @@ static uacpi_status store_to_reference(uacpi_object *dst,
 
     switch (dst->flags) {
     case UACPI_REFERENCE_KIND_LOCAL:
-    case UACPI_REFERENCE_KIND_ARG: {
+    case UACPI_REFERENCE_KIND_ARG:
+    case UACPI_REFERENCE_KIND_PKG_INDEX: {
         uacpi_object *referenced_obj;
 
-        referenced_obj = uacpi_unwrap_internal_reference(dst);
+        if (dst->flags == UACPI_REFERENCE_KIND_PKG_INDEX)
+            referenced_obj = dst->inner_object;
+        else
+            referenced_obj = uacpi_unwrap_internal_reference(dst);
+
         if (referenced_obj->type == UACPI_OBJECT_REFERENCE) {
             overwrite = dst->flags == UACPI_REFERENCE_KIND_ARG;
             dst = reference_unwind(referenced_obj);
