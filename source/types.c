@@ -252,16 +252,16 @@ static void unref_object_no_recurse(uacpi_object *obj, struct free_queue *queue)
     unref_plain_no_recurse(obj, queue);
 }
 
-static void free_package(uacpi_object *obj)
+static void free_package(uacpi_handle handle)
 {
     struct free_queue queue = { 0 };
+    uacpi_package *pkg = handle;
+    uacpi_object *obj;
     uacpi_size i;
 
-    free_queue_push(&queue, obj->package);
+    free_queue_push(&queue, pkg);
 
     while (free_queue_size(&queue) != 0) {
-        uacpi_package *pkg;
-
         pkg = *free_queue_last(&queue);
         free_queue_pop(&queue);
 
@@ -303,7 +303,8 @@ static void free_object_storage(uacpi_object *obj)
         uacpi_kernel_free(obj->method);
         break;
     case UACPI_OBJECT_PACKAGE:
-        free_package(obj);
+        uacpi_shareable_unref_and_delete_if_last(obj->package,
+                                                 free_package);
         break;
     default:
         break;
