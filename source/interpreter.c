@@ -1264,14 +1264,41 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
         dst = item_array_at(&op_ctx->items, 1)->obj;
 
     if (op_ctx->op->code == UACPI_AML_OP_DerefOfOp) {
-        /*
-         * Explicit dereferencing [DerefOf] behavior:
-         * Simply grabs the bottom-most object that is not a reference.
-         * This mimics the behavior of NT Acpi.sys: any DerfOf fetches
-         * the bottom-most reference. Note that this is different from
-         * ACPICA where DerefOf dereferences one level.
-         */
-        src = reference_unwind(src)->inner_object;
+        uacpi_bool was_a_reference = UACPI_FALSE;
+
+        if (src->type == UACPI_OBJECT_REFERENCE) {
+            was_a_reference = UACPI_TRUE;
+
+            /*
+             * Explicit dereferencing [DerefOf] behavior:
+             * Simply grabs the bottom-most object that is not a reference.
+             * This mimics the behavior of NT Acpi.sys: any DerfOf fetches
+             * the bottom-most reference. Note that this is different from
+             * ACPICA where DerefOf dereferences one level.
+             */
+            src = reference_unwind(src)->inner_object;
+        }
+
+        if (src->type == UACPI_OBJECT_BUFFER_INDEX) {
+            uacpi_buffer_index *buf_idx = &src->buffer_index;
+
+            dst->type = UACPI_OBJECT_INTEGER;
+            uacpi_memcpy_zerout(
+                &dst->integer, buffer_index_cursor(buf_idx),
+                sizeof(dst->integer), 1
+            );
+            return UACPI_STATUS_OK;
+        }
+
+        if (!was_a_reference) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "Invalid DerefOf argument: %s, expected a reference\n",
+                uacpi_object_type_to_string(src->type)
+            );
+            return UACPI_STATUS_BAD_BYTECODE;
+        }
+
         return uacpi_object_assign(dst, src,
                                    UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
     }
