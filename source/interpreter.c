@@ -1423,6 +1423,106 @@ static uacpi_status handle_unary_math(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status ensure_valid_idx(uacpi_size idx, uacpi_size src_size)
+{
+    if (uacpi_likely(idx < src_size))
+        return UACPI_STATUS_OK;
+
+    uacpi_kernel_log(
+        UACPI_LOG_WARN,
+        "Invalid index %zu, object has %zu elements\n",
+        idx, src_size
+    );
+    return UACPI_STATUS_BAD_BYTECODE;
+}
+
+static uacpi_status handle_index(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src;
+    struct item *dst;
+    uacpi_size idx;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    idx = item_array_at(&op_ctx->items, 1)->obj->integer;
+    dst = item_array_at(&op_ctx->items, 3);
+
+    switch (src->type) {
+    case UACPI_OBJECT_BUFFER:
+    case UACPI_OBJECT_STRING: {
+        uacpi_buffer_index *buf_idx;
+        struct object_storage_as_buffer buf;
+        get_object_storage(src, &buf, UACPI_FALSE);
+
+        ret = ensure_valid_idx(idx, buf.len);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        dst->type = ITEM_OBJECT;
+        dst->obj = uacpi_create_object(UACPI_OBJECT_BUFFER_INDEX);
+        if (uacpi_unlikely(dst->obj == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        buf_idx = &dst->obj->buffer_index;
+        buf_idx->idx = idx;
+        buf_idx->buffer = src->buffer;
+        if (uacpi_likely(!uacpi_bugged_shareable(buf_idx->buffer)))
+            uacpi_shareable_ref(buf_idx->buffer);
+
+        break;
+    }
+    case UACPI_OBJECT_PACKAGE: {
+        uacpi_package *pkg = src->package;
+        uacpi_object *obj;
+
+        ret = ensure_valid_idx(idx, pkg->count);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        /*
+         * Lazily transform the package element into an internal reference
+         * to itself of type PKG_INDEX. This is needed to support stuff like
+         * CopyObject(..., Index(pkg, X)) where the new object must be
+         * propagated to anyone else with a currently alive index object.
+         *
+         * Sidenote: Yes, IndexOp is not a SimpleName, so technically it is
+         *           illegal to CopyObject to it. However, yet again we fall
+         *           victim to the NT ACPI driver implementation, which allows
+         *           it just fine.
+         */
+        obj = pkg->objects[idx];
+        if (obj->type != UACPI_OBJECT_REFERENCE ||
+            obj->flags != UACPI_REFERENCE_KIND_PKG_INDEX) {
+
+            obj = uacpi_create_internal_reference(
+                UACPI_REFERENCE_KIND_PKG_INDEX, obj
+            );
+            if (uacpi_unlikely(obj == UACPI_NULL))
+                return UACPI_STATUS_OUT_OF_MEMORY;
+
+            pkg->objects[idx] = obj;
+            uacpi_object_unref(obj->inner_object);
+        }
+
+        dst->obj = obj;
+        dst->type = ITEM_OBJECT;
+        uacpi_object_ref(dst->obj);
+        break;
+    }
+    default:
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid argument for Index: %s, "
+            "expected String/Buffer/Package\n",
+            uacpi_object_type_to_string(src->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_u64 object_to_integer(const uacpi_object *obj,
                                    uacpi_size max_buffer_bytes)
 {
@@ -2237,6 +2337,9 @@ static uacpi_status handle_copy_object_or_store(struct execution_context *ctx)
     if (op_ctx->op->code == UACPI_AML_OP_StoreOp)
         return store_to_target(dst, src);
 
+    if (dst->type != UACPI_OBJECT_REFERENCE)
+        return UACPI_STATUS_BAD_BYTECODE;
+
     return copy_object_to_reference(dst, src);
 }
 
@@ -2482,6 +2585,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define CONCATENATE_HANDLER_IDX 22
 #define SIZEOF_HANDLER_IDX 23
 #define UNARY_MATH_HANDLER_IDX 24
+#define INDEX_HANDLER_IDX 25
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2513,6 +2617,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [CONCATENATE_HANDLER_IDX] = handle_concatenate,
     [SIZEOF_HANDLER_IDX] = handle_sizeof,
     [UNARY_MATH_HANDLER_IDX] = handle_unary_math,
+    [INDEX_HANDLER_IDX] = handle_index,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2606,6 +2711,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_NotOp] = UNARY_MATH_HANDLER_IDX,
     [UACPI_AML_OP_FindSetLeftBitOp] = UNARY_MATH_HANDLER_IDX,
     [UACPI_AML_OP_FindSetRightBitOp] = UNARY_MATH_HANDLER_IDX,
+
+    [UACPI_AML_OP_IndexOp] = INDEX_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
