@@ -666,7 +666,6 @@ UACPI_OP(                                                        \
     DerefOfOp, 0x83,                                             \
     {                                                            \
         UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_REFERENCE,        \
         UACPI_PARSE_OP_OBJECT_ALLOC,                             \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
