@@ -1467,8 +1467,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
         buf_idx = &dst->obj->buffer_index;
         buf_idx->idx = idx;
         buf_idx->buffer = src->buffer;
-        if (uacpi_likely(!uacpi_bugged_shareable(buf_idx->buffer)))
-            uacpi_shareable_ref(buf_idx->buffer);
+        uacpi_shareable_ref(buf_idx->buffer);
 
         break;
     }
@@ -2082,8 +2081,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
     }
 
     field->backing = src_buf;
-    if (uacpi_likely(!uacpi_bugged_shareable(field->backing)))
-        uacpi_shareable_ref(field->backing);
+    uacpi_shareable_ref(field->backing);
     node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
                                                    field_obj);
     if (uacpi_unlikely(node->object == UACPI_NULL))

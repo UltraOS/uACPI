@@ -187,8 +187,6 @@ static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
 {
     switch (obj->type) {
     case UACPI_OBJECT_PACKAGE:
-        if (uacpi_unlikely(uacpi_bugged_shareable(obj->package)))
-            break;
         if (uacpi_shareable_unref(obj->package) > 1)
             break;
 
@@ -215,8 +213,6 @@ static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
 
 static void unref_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
 {
-    if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
-        return;
     if (uacpi_shareable_unref(obj) > 1)
         return;
 
@@ -231,8 +227,6 @@ static void unref_chain_no_recurse(uacpi_object *obj, struct free_queue *queue)
         if (obj->type == UACPI_OBJECT_REFERENCE)
             next_obj = obj->inner_object;
 
-        if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
-            goto do_next;
         if (uacpi_shareable_unref(obj) > 1)
             goto do_next;
 
