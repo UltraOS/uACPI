@@ -95,20 +95,6 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
-static uacpi_bool buffer_field_alloc(uacpi_object *obj)
-{
-    uacpi_buffer_field *field;
-
-    field = uacpi_kernel_calloc(1, sizeof(uacpi_buffer_field));
-    if (uacpi_unlikely(field == UACPI_NULL))
-        return UACPI_FALSE;
-
-    uacpi_shareable_init(field);
-    obj->buffer_field = field;
-
-    return UACPI_TRUE;
-}
-
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -132,11 +118,6 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
             break;
 
         goto out_free_ret;
-    case UACPI_OBJECT_BUFFER_FIELD:
-        if (uacpi_likely(buffer_field_alloc(ret)))
-            break;
-
-        goto out_free_ret;
     default:
         break;
     }
@@ -154,15 +135,6 @@ static void free_buffer(uacpi_handle handle)
 
     uacpi_kernel_free(buf->data);
     uacpi_kernel_free(buf);
-}
-
-static void free_buffer_field(uacpi_handle handle)
-{
-    uacpi_buffer_field *field = handle;
-
-    uacpi_shareable_unref_and_delete_if_last(field->backing,
-                                             free_buffer);
-    uacpi_kernel_free(field);
 }
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(free_queue, uacpi_package*, 4)
@@ -292,8 +264,8 @@ static void free_object_storage(uacpi_object *obj)
         uacpi_shareable_unref_and_delete_if_last(obj->buffer, free_buffer);
         break;
     case UACPI_OBJECT_BUFFER_FIELD:
-        uacpi_shareable_unref_and_delete_if_last(obj->buffer_field,
-                                                 free_buffer_field);
+        uacpi_shareable_unref_and_delete_if_last(obj->buffer_field.backing,
+                                                 free_buffer);
         break;
     case UACPI_OBJECT_BUFFER_INDEX:
         uacpi_shareable_unref_and_delete_if_last(obj->buffer_index.buffer,
@@ -589,7 +561,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_BUFFER_FIELD:
         dst->buffer_field = src->buffer_field;
-        uacpi_shareable_ref(dst->buffer_field);
+        uacpi_shareable_ref(dst->buffer_field.backing);
         break;
     case UACPI_OBJECT_BUFFER_INDEX:
         dst->buffer_index = src->buffer_index;
