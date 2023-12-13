@@ -473,6 +473,11 @@ static uacpi_status deep_copy_package_no_recurse(
         uacpi_object *src_obj = src->objects[i];
         uacpi_object *dst_obj = dst_package->objects[i];
 
+        // Don't copy the internal package index reference
+        if (src_obj->type == UACPI_OBJECT_REFERENCE &&
+            src_obj->flags == UACPI_REFERENCE_KIND_PKG_INDEX)
+            src_obj = src_obj->inner_object;
+
         if (src_obj->type == UACPI_OBJECT_PACKAGE) {
             uacpi_bool ret;
 
