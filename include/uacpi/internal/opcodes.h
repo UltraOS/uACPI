@@ -725,7 +725,10 @@ UACPI_BUILD_BUFFER_FIELD_OP(Bit, 0x8D)                           \
 UACPI_OP(                                                        \
     ObjectTypeOp, 0x8E,                                          \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,                 \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \

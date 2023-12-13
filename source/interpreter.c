@@ -1692,6 +1692,24 @@ static uacpi_status handle_sizeof(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_object_type(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src, *dst;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (uacpi_likely(src->type == UACPI_OBJECT_REFERENCE))
+        src = reference_unwind(src)->inner_object;
+
+    dst->integer = src->type;
+    if (dst->integer == UACPI_OBJECT_BUFFER_INDEX)
+        dst->integer = UACPI_OBJECT_BUFFER_FIELD;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -2584,6 +2602,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 #define SIZEOF_HANDLER_IDX 23
 #define UNARY_MATH_HANDLER_IDX 24
 #define INDEX_HANDLER_IDX 25
+#define OBJECT_TYPE_HANDLER_IDX 26
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     /*
@@ -2616,6 +2635,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [SIZEOF_HANDLER_IDX] = handle_sizeof,
     [UNARY_MATH_HANDLER_IDX] = handle_unary_math,
     [INDEX_HANDLER_IDX] = handle_index,
+    [OBJECT_TYPE_HANDLER_IDX] = handle_object_type,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2711,6 +2731,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_FindSetRightBitOp] = UNARY_MATH_HANDLER_IDX,
 
     [UACPI_AML_OP_IndexOp] = INDEX_HANDLER_IDX,
+
+    [UACPI_AML_OP_ObjectTypeOp] = OBJECT_TYPE_HANDLER_IDX,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
