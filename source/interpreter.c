@@ -1029,6 +1029,14 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
             prefix, src, src->buffer, src->buffer->size
         );
         break;
+    case UACPI_OBJECT_OPERATION_REGION:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO,
+            "%s OperationRegion (ASID %d) 0x%016llX -> 0x%016llX\n",
+            prefix, src->op_region.space, src->op_region.offset,
+            src->op_region.offset + src->op_region.length
+        );
+        break;
     case UACPI_OBJECT_BUFFER_INDEX:
         uacpi_kernel_log(
             UACPI_LOG_INFO, "%s Buffer Index %p[%zu] => 0x%02X\n",
