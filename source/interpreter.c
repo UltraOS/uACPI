@@ -847,6 +847,26 @@ static uacpi_status handle_create_alias(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_create_op_region(struct execution_context *ctx)
+{
+    uacpi_namespace_node *node;
+    uacpi_object *obj;
+    uacpi_operation_region *op_region;
+
+    node = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
+    obj = item_array_at(&ctx->cur_op_ctx->items, 4)->obj;
+    op_region = &obj->op_region;
+
+    op_region->space = item_array_at(&ctx->cur_op_ctx->items, 1)->immediate;
+    op_region->offset = item_array_at(&ctx->cur_op_ctx->items, 2)->obj->integer;
+    op_region->length = item_array_at(&ctx->cur_op_ctx->items, 3)->obj->integer;
+
+    node->object = obj;
+    uacpi_object_ref(obj);
+
+    return UACPI_STATUS_OK;
+}
+
 static void truncate_number_if_needed(uacpi_object *obj)
 {
     if (!g_uacpi_rt_ctx.is_rev1)
@@ -2613,6 +2633,7 @@ enum op_handler {
     OP_HANDLER_UNARY_MATH,
     OP_HANDLER_INDEX,
     OP_HANDLER_OBJECT_TYPE,
+    OP_HANDLER_CREATE_OP_REGION,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -2647,6 +2668,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_UNARY_MATH] = handle_unary_math,
     [OP_HANDLER_INDEX] = handle_index,
     [OP_HANDLER_OBJECT_TYPE] = handle_object_type,
+    [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2751,6 +2773,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_CreateFieldOp)] = OP_HANDLER_CREATE_BUFFER_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_CondRefOfOp)] = OP_HANDLER_REF_OR_DEREF_OF,
+    [EXT_OP_IDX(UACPI_AML_OP_OpRegionOp)] = OP_HANDLER_CREATE_OP_REGION,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
