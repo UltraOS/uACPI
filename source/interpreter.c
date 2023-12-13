@@ -742,7 +742,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     }
 
     case UACPI_OBJECT_BUFFER_FIELD:
-        write_buffer_field(dst->buffer_field, src_buf);
+        write_buffer_field(&dst->buffer_field, src_buf);
         break;
 
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -1992,7 +1992,7 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
     void *dst;
 
     node = item_array_at(&op_ctx->items, 0)->node;
-    field = uacpi_namespace_node_get_object(node)->buffer_field;
+    field = &uacpi_namespace_node_get_object(node)->buffer_field;
 
     dst_obj = item_array_at(&op_ctx->items, 1)->obj;
 
@@ -2042,7 +2042,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         len_obj = item_array_at(&op_ctx->items, 2)->obj;
         node = item_array_at(&op_ctx->items, 3)->node;
         field_obj = item_array_at(&op_ctx->items, 4)->obj;
-        field = field_obj->buffer_field;
+        field = &field_obj->buffer_field;
 
         field->bit_index = idx_obj->integer;
 
@@ -2063,7 +2063,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         idx_obj = item_array_at(&op_ctx->items, 1)->obj;
         node = item_array_at(&op_ctx->items, 2)->node;
         field_obj = item_array_at(&op_ctx->items, 3)->obj;
-        field = field_obj->buffer_field;
+        field = &field_obj->buffer_field;
 
         field->bit_index = idx_obj->integer * 8;
         switch (op_ctx->op->code) {
@@ -3160,7 +3160,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                         break;
                 }
 
-                switch (buffer_field_get_read_type(obj->buffer_field)) {
+                switch (buffer_field_get_read_type(&obj->buffer_field)) {
                 case UACPI_OBJECT_BUFFER:
                     new_op = UACPI_AML_OP_InternalOpReadFieldAsBuffer;
                     break;
