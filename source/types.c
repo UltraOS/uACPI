@@ -24,6 +24,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Buffer Index";
     case UACPI_OBJECT_METHOD:
         return "Method";
+    case UACPI_OBJECT_OPERATION_REGION:
+        return "Operation Region";
     case UACPI_OBJECT_DEBUG:
         return "Debug";
     default:

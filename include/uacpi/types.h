@@ -24,6 +24,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
     UACPI_OBJECT_METHOD = 8,
+    UACPI_OBJECT_OPERATION_REGION = 10,
     UACPI_OBJECT_BUFFER_FIELD = 14,
     UACPI_OBJECT_DEBUG = 16,
 
@@ -65,6 +66,26 @@ typedef struct uacpi_buffer_index {
     uacpi_buffer *buffer;
 } uacpi_buffer_index;
 
+enum uacpi_operation_region_space {
+    UACPI_OP_REGION_SPACE_SYSTEM_MEMORY = 0,
+    UACPI_OP_REGION_SPACE_SYSTEM_IO = 1,
+    UACPI_OP_REGION_SPACE_PCI_CONFIG = 2,
+    UACPI_OP_REGION_SPACE_EMBEDDED_CONTROLLER = 3,
+    UACPI_OP_REGION_SPACE_SMBUS = 4,
+    UACPI_OP_REGION_SPACE_SYSTEM_CMOS = 5,
+    UACPI_OP_REGION_SPACE_PCI_BAR_TARGET = 6,
+    UACPI_OP_REGION_SPACE_IPMI = 7,
+    UACPI_OP_REGION_SPACE_GENERAL_PURPOSE_IO = 8,
+    UACPI_OP_REGION_SPACE_GENERIC_SERIAL_BUS = 9,
+    UACPI_OP_REGION_SPACE_PCC = 0x0A,
+};
+
+typedef struct uacpi_operation_region {
+    uacpi_u8 space;
+    uacpi_u64 offset;
+    uacpi_u64 length;
+} uacpi_operation_region;
+
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
     uacpi_u8 type;
@@ -78,6 +99,7 @@ typedef struct uacpi_object {
         uacpi_control_method *method;
         uacpi_buffer *buffer;
         uacpi_buffer_index buffer_index;
+        uacpi_operation_region op_region;
     };
 } uacpi_object;
 
