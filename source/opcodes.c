@@ -1,7 +1,7 @@
 #include <uacpi/internal/opcodes.h>
 
 #define UACPI_OP(opname, opcode, ...) \
-    { #opname, opcode, __VA_ARGS__ },
+    { #opname, .decode_ops = __VA_ARGS__, .code = opcode },
 
 static const struct uacpi_op_spec opcode_table[0x100] = {
     UACPI_ENUMERATE_OPCODES

@@ -214,6 +214,9 @@ enum uacpi_op_property {
     UACPI_OP_PROPERTY_SIMPLE_NAME = 4,
     UACPI_OP_PROPERTY_TARGET = 8,
 
+    // The ops to execute are pointed to by indirect_decode_ops
+    UACPI_OP_PROPERTY_OUT_OF_LINE = 16,
+
     /*
      * Op wants named fields to be read even if the desired argument is a
      * supername or term_arg_or_named_object.
@@ -226,9 +229,12 @@ enum uacpi_op_property {
 
 struct uacpi_op_spec {
     uacpi_char *name;
-    uacpi_aml_op code;
-    uacpi_u8 decode_ops[16];
+    union {
+        uacpi_u8 decode_ops[16];
+        uacpi_u8 *indirect_decode_ops;
+    };
     uacpi_u8 properties;
+    uacpi_aml_op code;
 };
 
 const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
