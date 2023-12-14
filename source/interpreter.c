@@ -2257,12 +2257,13 @@ static uacpi_status frame_push_args(struct call_frame *frame,
     /*
      * MethodCall items:
      * items[0] -> method namespace node
-     * items[1...nargs-1] -> method arguments
+     * items[1] -> immediate that was used for parsing the arguments
+     * items[2...nargs-1] -> method arguments
      * items[-1] -> return value object
      *
      * Here we only care about the arguments though.
      */
-    for (i = 1; i < item_array_size(&op_ctx->items) - 1; i++) {
+    for (i = 2; i < item_array_size(&op_ctx->items) - 1; i++) {
         uacpi_object *src, *dst;
 
         src = item_array_at(&op_ctx->items, i)->obj;
@@ -2271,7 +2272,7 @@ static uacpi_status frame_push_args(struct call_frame *frame,
         if (uacpi_unlikely(dst == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
 
-        frame->args[i - 1] = dst;
+        frame->args[i - 2] = dst;
     }
 
     return UACPI_STATUS_OK;

@@ -233,21 +233,22 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
 #define UACPI_BAD_OPCODE(code) \
     UACPI_OP(Reserved_##code, code, { UACPI_PARSE_OP_BAD_OPCODE })
 
-#define UACPI_PARSE_OP_METHOD_ARGUMENT            \
-    UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,      \
-    UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY
-
-#define UACPI_METHOD_CALL_OPCODE(nargs, ...)             \
-    UACPI_OP(                                            \
-        InternalOpMethodCall##nargs##Args, 0xF7 + nargs, \
-        {                                                \
-            __VA_ARGS__                                  \
-            UACPI_PARSE_OP_OBJECT_ALLOC,                 \
-            UACPI_PARSE_OP_DISPATCH_METHOD_CALL,         \
-            UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,      \
-        },                                               \
-        UACPI_OP_PROPERTY_TERM_ARG |                     \
-        UACPI_OP_PROPERTY_RESERVED                       \
+#define UACPI_METHOD_CALL_OPCODE(nargs)                        \
+    UACPI_OP(                                                  \
+        InternalOpMethodCall##nargs##Args, 0xF7 + nargs,       \
+        {                                                      \
+            UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, nargs,          \
+            UACPI_PARSE_OP_IF_NOT_NULL, 1, 6,                  \
+                UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,       \
+                UACPI_PARSE_OP_OBJECT_CONVERT_TO_SHALLOW_COPY, \
+                UACPI_PARSE_OP_IMM_DECREMENT, 1,               \
+                UACPI_PARSE_OP_JMP, 3,                         \
+            UACPI_PARSE_OP_OBJECT_ALLOC,                       \
+            UACPI_PARSE_OP_DISPATCH_METHOD_CALL,               \
+            UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,            \
+        },                                                     \
+        UACPI_OP_PROPERTY_TERM_ARG |                           \
+        UACPI_OP_PROPERTY_RESERVED                             \
     )
 
 /*
@@ -980,55 +981,13 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_RESERVED                                   \
 )                                                                \
 UACPI_METHOD_CALL_OPCODE(0)                                      \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    1,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    2,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    3,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    4,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    5,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    6,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
-UACPI_METHOD_CALL_OPCODE(                                        \
-    7,                                                           \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-    UACPI_PARSE_OP_METHOD_ARGUMENT,                              \
-)                                                                \
+UACPI_METHOD_CALL_OPCODE(1)                                      \
+UACPI_METHOD_CALL_OPCODE(2)                                      \
+UACPI_METHOD_CALL_OPCODE(3)                                      \
+UACPI_METHOD_CALL_OPCODE(4)                                      \
+UACPI_METHOD_CALL_OPCODE(5)                                      \
+UACPI_METHOD_CALL_OPCODE(6)                                      \
+UACPI_METHOD_CALL_OPCODE(7)                                      \
 UACPI_OP(                                                        \
     OnesOp, 0xFF,                                                \
     {                                                            \
