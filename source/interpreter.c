@@ -2969,6 +2969,10 @@ static uacpi_status exec_op(struct execution_context *ctx)
             frame->code_offset--;
             break;
 
+        case UACPI_PARSE_OP_IMM_DECREMENT:
+            item_array_at(&op_ctx->items, op_decode_byte(op_ctx))->immediate--;
+            break;
+
         case UACPI_PARSE_OP_IF_HAS_DATA: {
             uacpi_size pkg_idx = op_ctx->tracked_pkg_idx - 1;
             struct package_length *pkg;

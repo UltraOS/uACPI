@@ -159,6 +159,9 @@ enum uacpi_parse_op {
     // Decrement the current AML instruction pointer
     UACPI_PARSE_OP_AML_PC_DECREMENT,
 
+    // Decrement the immediate at decode_ops[pc + 1]
+    UACPI_PARSE_OP_IMM_DECREMENT,
+
     // Dispatch the method call from items[0] and return from current op_exec
     UACPI_PARSE_OP_DISPATCH_METHOD_CALL,
 
