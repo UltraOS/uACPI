@@ -1011,6 +1011,8 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
+extern uacpi_u8 uacpi_field_op_decode_ops[];
+
 #define UACPI_ENUMERATE_EXT_OPCODES                         \
 UACPI_OP(                                                   \
     ReservedExtOp, UACPI_EXT_OP(0x00),                      \
@@ -1169,11 +1171,10 @@ UACPI_OP(                                                   \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,           \
     }                                                       \
 )                                                           \
-UACPI_OP(                                                   \
+UACPI_OUT_OF_LINE_OP(                                       \
     FieldOp, UACPI_EXT_OP(0x81),                            \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+    uacpi_field_op_decode_ops,                              \
+    UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
 UACPI_OP(                                                   \
     DeviceOp, UACPI_EXT_OP(0x82),                           \
@@ -1220,7 +1221,9 @@ UACPI_OP(                                                   \
 
 enum uacpi_aml_op {
 #define UACPI_OP(name, code, ...) UACPI_AML_OP_##name = code,
+#define UACPI_OUT_OF_LINE_OP(name, code, ...) UACPI_AML_OP_##name = code,
     UACPI_ENUMERATE_OPCODES
     UACPI_ENUMERATE_EXT_OPCODES
 #undef UACPI_OP
+#undef UACPI_OUT_OF_LINE_OP
 };

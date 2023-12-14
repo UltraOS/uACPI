@@ -867,6 +867,11 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_create_field(struct execution_context *ctx)
+{
+    return UACPI_STATUS_OK;
+}
+
 static void truncate_number_if_needed(uacpi_object *obj)
 {
     if (!g_uacpi_rt_ctx.is_rev1)
@@ -2641,6 +2646,7 @@ enum op_handler {
     OP_HANDLER_INDEX,
     OP_HANDLER_OBJECT_TYPE,
     OP_HANDLER_CREATE_OP_REGION,
+    OP_HANDLER_CREATE_FIELD,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -2675,7 +2681,8 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_UNARY_MATH] = handle_unary_math,
     [OP_HANDLER_INDEX] = handle_index,
     [OP_HANDLER_OBJECT_TYPE] = handle_object_type,
-    [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region
+    [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region,
+    [OP_HANDLER_CREATE_FIELD] = handle_create_field,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -2781,6 +2788,7 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_CreateFieldOp)] = OP_HANDLER_CREATE_BUFFER_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_CondRefOfOp)] = OP_HANDLER_REF_OR_DEREF_OF,
     [EXT_OP_IDX(UACPI_AML_OP_OpRegionOp)] = OP_HANDLER_CREATE_OP_REGION,
+    [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
