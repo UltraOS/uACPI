@@ -3005,6 +3005,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
+        case UACPI_PARSE_OP_IF_EQUALS: {
+            uacpi_u8 value, bytes_skip;
+
+            value = op_decode_byte(op_ctx);
+            bytes_skip = op_decode_byte(op_ctx);
+
+            if (item->immediate != value)
+                op_ctx->pc += bytes_skip;
+
+            break;
+        }
+
         case UACPI_PARSE_OP_JMP: {
             op_ctx->pc = op_decode_byte(op_ctx);
             break;
