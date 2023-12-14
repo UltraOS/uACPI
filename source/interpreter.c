@@ -2457,7 +2457,12 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
 
 static const uacpi_u8 *op_decode_cursor(const struct op_context *ctx)
 {
-    return &ctx->op->decode_ops[ctx->pc];
+    const struct uacpi_op_spec *spec = ctx->op;
+
+    if (spec->properties & UACPI_OP_PROPERTY_OUT_OF_LINE)
+        return &spec->indirect_decode_ops[ctx->pc];
+
+    return &spec->decode_ops[ctx->pc];
 }
 
 static uacpi_u8 op_decode_byte(struct op_context *ctx)
