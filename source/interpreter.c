@@ -2970,13 +2970,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
+        case UACPI_PARSE_OP_IF_NOT_NULL:
         case UACPI_PARSE_OP_IF_NULL: {
-            uacpi_u8 item_idx, bytes_skip;
+            uacpi_u8 idx, bytes_skip;
+            bool is_null, skip_if_null;
 
-            item_idx = op_decode_byte(op_ctx);
+            idx = op_decode_byte(op_ctx);
             bytes_skip = op_decode_byte(op_ctx);
 
-            if (item_array_at(&op_ctx->items, item_idx)->handle != UACPI_NULL)
+            is_null = item_array_at(&op_ctx->items, idx)->handle == UACPI_NULL;
+            skip_if_null = op == UACPI_PARSE_OP_IF_NOT_NULL;
+
+            if (is_null == skip_if_null)
                 op_ctx->pc += bytes_skip;
 
             break;
