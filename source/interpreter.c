@@ -2441,6 +2441,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
+    [UACPI_PARSE_OP_LOAD_INLINE_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_FALSE_OBJECT] = ITEM_OBJECT,
@@ -2878,15 +2879,27 @@ static uacpi_status exec_op(struct execution_context *ctx)
             ret = parse_package_length(frame, &item->pkg);
             break;
 
-        case UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT:
-            item->obj->type = UACPI_OBJECT_INTEGER;
-            uacpi_memcpy(
-                &item->obj->integer,
-                op_decode_cursor(op_ctx),
-                8
+        case UACPI_PARSE_OP_LOAD_INLINE_IMM:
+        case UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT: {
+            void *dst;
+            uacpi_u8 src_width;
+
+            if (op == UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT) {
+                item->obj->type = UACPI_OBJECT_INTEGER;
+                dst = &item->obj->integer;
+                src_width = 8;
+            } else {
+                dst = &item->immediate;
+                src_width = op_decode_byte(op_ctx);
+            }
+
+            uacpi_memcpy_zerout(
+                dst, op_decode_cursor(op_ctx),
+                sizeof(uacpi_u64), src_width
             );
-            op_ctx->pc += 8;
+            op_ctx->pc += src_width;
             break;
+        }
 
         case UACPI_PARSE_OP_LOAD_IMM:
         case UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT: {

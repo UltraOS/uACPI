@@ -101,6 +101,9 @@ enum uacpi_parse_op {
     // Load a QWORD immediate located at decode_ops[pc + 1]
     UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT,
 
+    // Load a decode_ops[pc + 1] byte imm at decode_ops[pc + 2]
+    UACPI_PARSE_OP_LOAD_INLINE_IMM,
+
     // Load a decode_ops[pc + 1] byte imm from the instructions stream
     UACPI_PARSE_OP_LOAD_IMM,
 
