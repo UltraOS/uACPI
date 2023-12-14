@@ -3,6 +3,14 @@
 #define UACPI_OP(opname, opcode, ...) \
     { #opname, .decode_ops = __VA_ARGS__, .code = opcode },
 
+#define UACPI_OUT_OF_LINE_OP(opname, opcode, out_of_line_buf, props) \
+    {                                                                \
+      .name = #opname,                                               \
+      .indirect_decode_ops = out_of_line_buf,                        \
+      .properties = props,                                           \
+      .code = opcode,                                                \
+    },
+
 static const struct uacpi_op_spec opcode_table[0x100] = {
     UACPI_ENUMERATE_OPCODES
 };
@@ -37,3 +45,47 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op op)
 
     return &opcode_table[op];
 }
+
+uacpi_u8 uacpi_field_op_decode_ops[] = {
+    UACPI_PARSE_OP_TRACKED_PKGLEN,
+    UACPI_PARSE_OP_EXISTING_NAMESTRING,
+    UACPI_PARSE_OP_LOAD_IMM, 1,
+
+    // Parse every field element found inside
+    UACPI_PARSE_OP_IF_HAS_DATA, 41,
+        // Look at the first byte
+        UACPI_PARSE_OP_LOAD_IMM, 1,
+
+        // ReservedField := 0x00 PkgLength
+        UACPI_PARSE_OP_IF_EQUALS, 0x00, 3,
+            UACPI_PARSE_OP_PKGLEN,
+            UACPI_PARSE_OP_JMP, 4,
+
+        // AccessField := 0x01 AccessType AccessAttrib
+        UACPI_PARSE_OP_IF_EQUALS, 0x01, 6,
+            UACPI_PARSE_OP_LOAD_IMM, 1,
+            UACPI_PARSE_OP_LOAD_IMM, 1,
+            UACPI_PARSE_OP_JMP, 4,
+
+        // ConnectField := <0x02 NameString> | <0x02 BufferData>
+        UACPI_PARSE_OP_IF_EQUALS, 0x02, 5,
+            UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
+            UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,
+            UACPI_PARSE_OP_JMP, 4,
+
+        // 0x03 AccessType ExtendedAccessAttrib AccessLength
+        UACPI_PARSE_OP_IF_EQUALS, 0x03, 8,
+            UACPI_PARSE_OP_LOAD_IMM, 1,
+            UACPI_PARSE_OP_LOAD_IMM, 1,
+            UACPI_PARSE_OP_LOAD_IMM, 1,
+            UACPI_PARSE_OP_JMP, 4,
+
+        // NamedField := NameSeg PkgLength
+        UACPI_PARSE_OP_AML_PC_DECREMENT,
+        UACPI_PARSE_OP_CREATE_NAMESTRING,
+        UACPI_PARSE_OP_PKGLEN,
+        UACPI_PARSE_OP_JMP, 4,
+
+    UACPI_PARSE_OP_INVOKE_HANDLER,
+    UACPI_PARSE_OP_END,
+};
