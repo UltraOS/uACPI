@@ -221,7 +221,7 @@ enum uacpi_op_property {
 struct uacpi_op_spec {
     uacpi_char *name;
     uacpi_aml_op code;
-    uacpi_u8 decode_ops[21];
+    uacpi_u8 decode_ops[16];
     uacpi_u8 properties;
 };
 
