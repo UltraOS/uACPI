@@ -178,6 +178,9 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_IF_NULL,
 
+    // The inverse of UACPI_PARSE_OP_IF_NULL
+    UACPI_PARSE_OP_IF_NOT_NULL,
+
     /*
      * pc = decode_ops[pc + 1]
      */
