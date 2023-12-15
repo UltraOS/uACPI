@@ -982,6 +982,10 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         block->type = CODE_BLOCK_WHILE;
         break;
     case UACPI_AML_OP_ScopeOp:
+    case UACPI_AML_OP_DeviceOp:
+    case UACPI_AML_OP_ProcessorOp:
+    case UACPI_AML_OP_PowerResOp:
+    case UACPI_AML_OP_ThermalZoneOp:
         block->type = CODE_BLOCK_SCOPE;
         block->node = item_array_at(&op_ctx->items, 1)->node;
         break;
@@ -2177,6 +2181,42 @@ static uacpi_status handle_control_flow(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status create_named_scope(struct op_context *op_ctx)
+{
+    uacpi_namespace_node *node;
+    uacpi_object *obj;
+
+    node = item_array_at(&op_ctx->items, 1)->node;
+    obj = item_array_last(&op_ctx->items)->obj;
+
+    switch (op_ctx->op->code) {
+    case UACPI_AML_OP_ProcessorOp: {
+        uacpi_processor *proc = &obj->processor;
+        proc->id = item_array_at(&op_ctx->items, 2)->immediate;
+        proc->block_address = item_array_at(&op_ctx->items, 3)->immediate;
+        proc->block_length = item_array_at(&op_ctx->items, 4)->immediate;
+        break;
+    }
+
+    case UACPI_AML_OP_PowerResOp: {
+        uacpi_power_resource *power_res = &obj->power_resource;
+        power_res->system_level = item_array_at(&op_ctx->items, 2)->immediate;
+        power_res->resource_order = item_array_at(&op_ctx->items, 3)->immediate;
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
+                                                   obj);
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_code_block(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -2189,6 +2229,18 @@ static uacpi_status handle_code_block(struct execution_context *ctx)
     case UACPI_AML_OP_ElseOp:
         skip_block = ctx->skip_else;
         break;
+    case UACPI_AML_OP_ProcessorOp:
+    case UACPI_AML_OP_PowerResOp:
+    case UACPI_AML_OP_ThermalZoneOp:
+    case UACPI_AML_OP_DeviceOp: {
+        uacpi_status ret;
+
+        ret = create_named_scope(op_ctx);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        // FALLTHROUGH intended
+    }
     case UACPI_AML_OP_ScopeOp:
         skip_block = UACPI_FALSE;
         break;
@@ -2803,6 +2855,10 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_CondRefOfOp)] = OP_HANDLER_REF_OR_DEREF_OF,
     [EXT_OP_IDX(UACPI_AML_OP_OpRegionOp)] = OP_HANDLER_CREATE_OP_REGION,
     [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
+    [EXT_OP_IDX(UACPI_AML_OP_DeviceOp)] = OP_HANDLER_CODE_BLOCK,
+    [EXT_OP_IDX(UACPI_AML_OP_ProcessorOp)] = OP_HANDLER_CODE_BLOCK,
+    [EXT_OP_IDX(UACPI_AML_OP_PowerResOp)] = OP_HANDLER_CODE_BLOCK,
+    [EXT_OP_IDX(UACPI_AML_OP_ThermalZoneOp)] = OP_HANDLER_CODE_BLOCK,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)

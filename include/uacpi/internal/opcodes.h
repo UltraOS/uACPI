@@ -1013,6 +1013,20 @@ UACPI_OP(                                                        \
 
 extern uacpi_u8 uacpi_field_op_decode_ops[];
 
+
+#define UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(name, code, type, ...) \
+UACPI_OP(                                                        \
+    name##Op, UACPI_EXT_OP(code),                                \
+    {                                                            \
+        UACPI_PARSE_OP_PKGLEN,                                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        __VA_ARGS__                                              \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, type,                 \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
+    }                                                            \
+)
+
 #define UACPI_ENUMERATE_EXT_OPCODES                         \
 UACPI_OP(                                                   \
     ReservedExtOp, UACPI_EXT_OP(0x00),                      \
@@ -1176,29 +1190,22 @@ UACPI_OUT_OF_LINE_OP(                                       \
     uacpi_field_op_decode_ops,                              \
     UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
-UACPI_OP(                                                   \
-    DeviceOp, UACPI_EXT_OP(0x82),                           \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
+    Device, 0x82, UACPI_OBJECT_DEVICE                       \
 )                                                           \
-UACPI_OP(                                                   \
-    ProcessorOp, UACPI_EXT_OP(0x83),                        \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
+    Processor, 0x83, UACPI_OBJECT_PROCESSOR,                \
+    UACPI_PARSE_OP_LOAD_IMM, 1,                             \
+    UACPI_PARSE_OP_LOAD_IMM, 4,                             \
+    UACPI_PARSE_OP_LOAD_IMM, 1,                             \
 )                                                           \
-UACPI_OP(                                                   \
-    PowerResOp, UACPI_EXT_OP(0x84),                         \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
+    PowerRes, 0x84, UACPI_OBJECT_POWER_RESOURCE,            \
+    UACPI_PARSE_OP_LOAD_IMM, 1,                             \
+    UACPI_PARSE_OP_LOAD_IMM, 2,                             \
 )                                                           \
-UACPI_OP(                                                   \
-    ThermalZoneOp, UACPI_EXT_OP(0x85),                      \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
+    ThermalZone, 0x85, UACPI_OBJECT_THERMAL_ZONE            \
 )                                                           \
 UACPI_OP(                                                   \
     IndexFieldOp, UACPI_EXT_OP(0x86),                       \
