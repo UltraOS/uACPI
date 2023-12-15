@@ -310,6 +310,23 @@ UACPI_OP(                                                 \
 #define UACPI_LOCALX_OP(idx) UACPI_BUILD_LOCAL_OR_ARG_OP(Local, 0x60, idx)
 #define UACPI_ARGX_OP(idx) UACPI_BUILD_LOCAL_OR_ARG_OP(Arg, 0x68, idx)
 
+#define UACPI_BUILD_PACKAGE_OP(name, code, jmp_off, ...)         \
+UACPI_OP(                                                        \
+    name##Op, code,                                              \
+    {                                                            \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        __VA_ARGS__                                              \
+        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
+            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
+            UACPI_PARSE_OP_JMP, jmp_off,                         \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_TERM_ARG |                                 \
+    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
+)
+
 #define UACPI_BUILD_BINARY_MATH_OP(prefix, code)                 \
 UACPI_OP(                                                        \
     prefix##Op, code,                                            \
@@ -460,35 +477,13 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    PackageOp, 0x12,                                             \
-    {                                                            \
-        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
-        UACPI_PARSE_OP_LOAD_IMM, 1,                              \
-        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
-            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
-            UACPI_PARSE_OP_JMP, 3,                               \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
+UACPI_BUILD_PACKAGE_OP(                                          \
+    Package, 0x12, 3,                                            \
+    UACPI_PARSE_OP_LOAD_IMM, 1,                                  \
 )                                                                \
-UACPI_OP(                                                        \
-    VarPackageOp, 0x13,                                          \
-    {                                                            \
-        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
-        UACPI_PARSE_OP_OPERAND,                                  \
-        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
-            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
-            UACPI_PARSE_OP_JMP, 2,                               \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
+UACPI_BUILD_PACKAGE_OP(                                          \
+    VarPackage, 0x13, 2,                                         \
+    UACPI_PARSE_OP_OPERAND,                                      \
 )                                                                \
 UACPI_OP(                                                        \
     MethodOp, 0x14,                                              \
