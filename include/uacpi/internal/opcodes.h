@@ -316,21 +316,22 @@ UACPI_OP(                                                 \
 #define UACPI_LOCALX_OP(idx) UACPI_BUILD_LOCAL_OR_ARG_OP(Local, 0x60, idx)
 #define UACPI_ARGX_OP(idx) UACPI_BUILD_LOCAL_OR_ARG_OP(Arg, 0x68, idx)
 
-#define UACPI_BUILD_PACKAGE_OP(name, code, jmp_off, ...)         \
-UACPI_OP(                                                        \
-    name##Op, code,                                              \
-    {                                                            \
-        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
-        __VA_ARGS__                                              \
-        UACPI_PARSE_OP_IF_HAS_DATA, 3,                           \
-            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,             \
-            UACPI_PARSE_OP_JMP, jmp_off,                         \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                         \
+#define UACPI_BUILD_PACKAGE_OP(name, code, jmp_off, ...)           \
+UACPI_OP(                                                          \
+    name##Op, code,                                                \
+    {                                                              \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                             \
+        __VA_ARGS__                                                \
+        UACPI_PARSE_OP_IF_HAS_DATA, 4,                             \
+            UACPI_PARSE_OP_RECORD_AML_PC,                          \
+            UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED, \
+            UACPI_PARSE_OP_JMP, jmp_off,                           \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_PACKAGE,   \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                             \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                    \
+    },                                                             \
+    UACPI_OP_PROPERTY_TERM_ARG |                                   \
+    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                           \
 )
 
 #define UACPI_BUILD_BINARY_MATH_OP(prefix, code)                 \

@@ -567,6 +567,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING:
+        dst->flags = src->flags;
         ret = assign_buffer(dst, src, behavior);
         break;
     case UACPI_OBJECT_BUFFER_FIELD:

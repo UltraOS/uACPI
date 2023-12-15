@@ -552,7 +552,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
      * Layout of items here:
      * [0] -> Package length, not interesting
      * [1] -> Immediate or integer object, depending on PackageOp/VarPackageOp
-     * [2..N-2] -> Package elements
+     * [2..N-2] -> AML pc+Package element pairs
      * [N-1] -> The resulting package object that we're constructing
      */
     package = item_array_last(&op_ctx->items)->obj->package;
@@ -575,7 +575,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
         num_elements = item_array_at(&op_ctx->items, 1)->immediate;
     }
 
-    num_defined_elements = item_array_size(&op_ctx->items) - 3;
+    num_defined_elements = (item_array_size(&op_ctx->items) - 3) / 2;
     if (uacpi_unlikely(num_defined_elements > num_elements)) {
         uacpi_kernel_log(
             UACPI_LOG_WARN,
@@ -592,53 +592,55 @@ static uacpi_status handle_package(struct execution_context *ctx)
 
     // 3. Go through every defined object and copy it into the package
     for (i = 0; i < num_defined_elements; ++i) {
+        uacpi_size base_pkg_index;
         uacpi_status ret;
+        struct item *item;
         uacpi_object *obj;
 
-        obj = item_array_at(&op_ctx->items, i + 2)->obj;
+        base_pkg_index = (i * 2) + 2;
+        item = item_array_at(&op_ctx->items, base_pkg_index + 1);
+        obj = item->obj;
 
-        /*
-         * These Named References to Data Objects are resolved to actual
-         * data by the AML Interpreter at runtime:
-         * - Integer reference
-         * - String reference
-         * - Buffer reference
-         * - Buffer Field reference
-         * - Field Unit reference
-         * - Package reference
-         */
-        if (obj->type == UACPI_OBJECT_REFERENCE) {
-            uacpi_object *unwrapped_obj;
-
-            unwrapped_obj = uacpi_unwrap_internal_reference(obj);
-
+        if (obj != UACPI_NULL && obj->type == UACPI_OBJECT_REFERENCE) {
+            /*
+             * For named objects we don't actually need the object itself, but
+             * simply the path to it. Often times objects referenced by the
+             * package are not defined until later so it's not possible to
+             * resolve them. For uniformity and to follow the behavior of NT,
+             * simply convert the name string to a path string object to be
+             * resolved later when actually needed.
+             */
             if (obj->flags == UACPI_REFERENCE_KIND_NAMED) {
-                switch (unwrapped_obj->type) {
-                case UACPI_OBJECT_INTEGER:
-                case UACPI_OBJECT_STRING:
-                case UACPI_OBJECT_BUFFER:
-                case UACPI_OBJECT_PACKAGE:
-                    obj = unwrapped_obj;
-                    break;
-
-                /*
-                 * These Named References to non-Data Objects cannot be resolved to
-                 * values. They are instead returned in the package as references:
-                 * - Device reference
-                 * - Event reference
-                 * - Method reference
-                 * - Mutex reference
-                 * - Operation Region reference
-                 * - Power Resource reference
-                 * - Processor reference
-                 * - Thermal Zone reference
-                 */
-                default:
-                    break;
-                }
+                uacpi_object_unref(obj);
+                item->obj = UACPI_NULL;
+                obj = UACPI_NULL;
             } else {
-                obj = unwrapped_obj;
+                obj = uacpi_unwrap_internal_reference(obj);
             }
+        }
+
+        if (obj == UACPI_NULL) {
+            uacpi_size length;
+            uacpi_char *path;
+
+            obj = uacpi_create_object(UACPI_OBJECT_STRING);
+            if (uacpi_unlikely(obj == UACPI_NULL))
+                return UACPI_STATUS_OUT_OF_MEMORY;
+
+            ret = name_string_to_path(
+                ctx->cur_frame,
+                item_array_at(&op_ctx->items, base_pkg_index)->immediate,
+                &path, &length
+            );
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
+            obj->flags = UACPI_STRING_KIND_PATH;
+            obj->buffer->text = path;
+            obj->buffer->size = length;
+
+            item->obj = obj;
+            item->type = ITEM_OBJECT;
         }
 
         ret = uacpi_object_assign(package->objects[i], obj,
