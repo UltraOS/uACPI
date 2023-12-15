@@ -1062,6 +1062,20 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
             src->op_region.offset + src->op_region.length
         );
         break;
+    case UACPI_OBJECT_POWER_RESOURCE:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Power Resource %d %d\n",
+            prefix, src->power_resource.system_level,
+            src->power_resource.resource_order
+        );
+        break;
+    case UACPI_OBJECT_PROCESSOR:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Processor[%d] 0x%08X (%d)\n",
+            prefix, src->processor.id, src->processor.block_address,
+            src->processor.block_length
+        );
+        break;
     case UACPI_OBJECT_BUFFER_INDEX:
         uacpi_kernel_log(
             UACPI_LOG_INFO, "%s Buffer Index %p[%zu] => 0x%02X\n",

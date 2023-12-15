@@ -18,6 +18,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Buffer";
     case UACPI_OBJECT_PACKAGE:
         return "Package";
+    case UACPI_OBJECT_DEVICE:
+        return "Device";
     case UACPI_OBJECT_REFERENCE:
         return "Reference";
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -26,6 +28,12 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Method";
     case UACPI_OBJECT_OPERATION_REGION:
         return "Operation Region";
+    case UACPI_OBJECT_POWER_RESOURCE:
+        return "Power Resource";
+    case UACPI_OBJECT_PROCESSOR:
+        return "Processor";
+    case UACPI_OBJECT_THERMAL_ZONE:
+        return "Thermal Zone";
     case UACPI_OBJECT_DEBUG:
         return "Debug";
     default:
