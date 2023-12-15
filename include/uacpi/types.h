@@ -23,8 +23,12 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_STRING = 2,
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
+    UACPI_OBJECT_DEVICE = 6,
     UACPI_OBJECT_METHOD = 8,
     UACPI_OBJECT_OPERATION_REGION = 10,
+    UACPI_OBJECT_POWER_RESOURCE = 11,
+    UACPI_OBJECT_PROCESSOR = 12,
+    UACPI_OBJECT_THERMAL_ZONE = 13,
     UACPI_OBJECT_BUFFER_FIELD = 14,
     UACPI_OBJECT_DEBUG = 16,
 
@@ -86,6 +90,17 @@ typedef struct uacpi_operation_region {
     uacpi_u64 length;
 } uacpi_operation_region;
 
+typedef struct uacpi_processor {
+    uacpi_u8 id;
+    uacpi_u32 block_address;
+    uacpi_u8 block_length;
+} uacpi_processor;
+
+typedef struct uacpi_power_resource {
+    uacpi_u8 system_level;
+    uacpi_u16 resource_order;
+} uacpi_power_resource;
+
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
     uacpi_u8 type;
@@ -100,6 +115,8 @@ typedef struct uacpi_object {
         uacpi_buffer *buffer;
         uacpi_buffer_index buffer_index;
         uacpi_operation_region op_region;
+        uacpi_processor processor;
+        uacpi_power_resource power_resource;
     };
 } uacpi_object;
 
