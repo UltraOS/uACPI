@@ -12,6 +12,12 @@ enum uacpi_reference_kind {
     UACPI_REFERENCE_KIND_PKG_INDEX = 4,
 };
 
+// object->flags field if object->type == UACPI_OBJECT_STRING
+enum uacpi_string_kind {
+    UACPI_STRING_KIND_NORMAL = 0,
+    UACPI_STRING_KIND_PATH,
+};
+
 /*
  * TODO: Write a note here explaining how references are currently implemented
  *       and how some of the edge cases are handled.
