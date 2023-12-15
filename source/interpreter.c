@@ -2394,12 +2394,11 @@ static uacpi_bool maybe_end_block(struct execution_context *ctx)
 {
     struct code_block *block = ctx->cur_block;
     struct call_frame *cur_frame = ctx->cur_frame;
-    uacpi_bool ret = UACPI_FALSE;
 
     if (!block)
-        return ret;
+        return UACPI_FALSE;
     if (cur_frame->code_offset != block->end)
-        return ret;
+        return UACPI_FALSE;
 
     ctx->skip_else = UACPI_FALSE;
 
@@ -2407,11 +2406,10 @@ static uacpi_bool maybe_end_block(struct execution_context *ctx)
         cur_frame->code_offset = block->begin;
     } else if (block->type == CODE_BLOCK_IF) {
         ctx->skip_else = UACPI_TRUE;
-        ret = UACPI_TRUE;
     }
 
     frame_reset_post_end_block(ctx, block->type);
-    return ret;
+    return UACPI_TRUE;
 }
 
 static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
