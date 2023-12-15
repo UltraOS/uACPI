@@ -149,6 +149,11 @@ class ASLSource:
             #  Method|Mutex|Region|Power|Processor|Thermal|BufferField|
             #  DdbHandle|DebugObject]
             "-vw", "6058",
+
+            # One or more objects within the Pathname do not exist
+            "-vw", "6161",
+            # Object does not exist
+            "-vw", "6084"
         ]
 
         args = [compiler, *ignored_warnings, "-p", out_case, path]
