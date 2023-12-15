@@ -478,10 +478,11 @@ static uacpi_status handle_package(struct execution_context *ctx)
     if (uacpi_unlikely(num_defined_elements > num_elements)) {
         uacpi_kernel_log(
             UACPI_LOG_WARN,
-            "too many package initializers: %u (size is %u)\n",
+            "too many package initializers: %u, truncating to %u\n",
             num_defined_elements, num_elements
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+
+        num_defined_elements = num_elements;
     }
 
     // 2. Create every object in the package, start as uninitialized
