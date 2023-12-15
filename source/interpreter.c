@@ -2503,6 +2503,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_TERM_ARG] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT] = ITEM_EMPTY_OBJECT,
+    [UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_OPERAND] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_COMPUTATIONAL_DATA] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TARGET] = ITEM_EMPTY_OBJECT,
@@ -2593,6 +2594,18 @@ static uacpi_bool op_wants_term_arg_or_operand(enum uacpi_parse_op op)
     }
 }
 
+static uacpi_bool op_allows_unresolved(enum uacpi_parse_op op)
+{
+    switch (op) {
+    case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
+    case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
+    case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL:
+        return UACPI_TRUE;
+    default:
+        return UACPI_FALSE;
+    }
+}
+
 static uacpi_status op_typecheck(const struct op_context *op_ctx,
                                  const struct op_context *cur_op_ctx)
 {
@@ -2625,6 +2638,7 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     case UACPI_PARSE_OP_TERM_ARG:
     case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
     case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
+    case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
     case UACPI_PARSE_OP_OPERAND:
     case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
         expected_type_str = SPEC_TERM_ARG;
@@ -2945,6 +2959,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_TERM_ARG:
         case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
         case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
+        case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
         case UACPI_PARSE_OP_OPERAND:
         case UACPI_PARSE_OP_COMPUTATIONAL_DATA:
         case UACPI_PARSE_OP_TARGET:
@@ -3115,8 +3130,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 behavior = RESOLVE_FAIL_IF_DOESNT_EXIST;
 
             ret = resolve_name_string(frame, behavior, &item->node);
-            if (ret == UACPI_STATUS_NOT_FOUND &&
-                op == UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL) {
+            if (ret == UACPI_STATUS_NOT_FOUND && op_allows_unresolved(op)) {
                 ret = UACPI_STATUS_OK;
             }
 
@@ -3173,6 +3187,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
             case UACPI_PARSE_OP_SIMPLE_NAME:
             case UACPI_PARSE_OP_TERM_ARG:
             case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
+            case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
             case UACPI_PARSE_OP_TARGET:
                 src = item->obj;
                 break;
@@ -3282,7 +3297,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
             uacpi_object *obj;
 
             if (item->node == UACPI_NULL) {
-                if (prev_op != UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED)
+                if (!op_allows_unresolved(prev_op))
                     ret = UACPI_STATUS_NOT_FOUND;
                 break;
             }
@@ -3290,15 +3305,26 @@ static uacpi_status exec_op(struct execution_context *ctx)
             obj = uacpi_namespace_node_get_object(item->node);
 
             switch (obj->type) {
-            case UACPI_OBJECT_METHOD:
-                if (prev_op == UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT)
+            case UACPI_OBJECT_METHOD: {
+                uacpi_bool should_invoke;
+
+                switch (prev_op) {
+                case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT:
+                case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
+                    should_invoke = UACPI_FALSE;
                     break;
-                if (op_wants_supername(prev_op))
+                default:
+                    should_invoke = !op_wants_supername(prev_op);
+                }
+
+                if (!should_invoke)
                     break;
 
                 new_op = UACPI_AML_OP_InternalOpMethodCall0Args;
                 new_op += obj->method->args;
                 break;
+            }
+
             case UACPI_OBJECT_BUFFER_FIELD:
                 if (!op_wants_term_arg_or_operand(prev_op)) {
                     uacpi_u8 props;

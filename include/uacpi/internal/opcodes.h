@@ -37,6 +37,12 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT,
 
+    /*
+     * Same as UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT but allows unresolved
+     * name strings.
+     */
+    UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED,
+
     // Operand := TermArg => Integer
     UACPI_PARSE_OP_OPERAND,
 
