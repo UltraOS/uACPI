@@ -184,6 +184,107 @@ static uacpi_status parse_nameseg(uacpi_u8 *cursor,
  * MultiNamePath := MultiNamePrefix SegCount NameSeg(SegCount)
  */
 
+static uacpi_status name_string_to_path(
+    struct call_frame *frame, uacpi_size offset,
+    uacpi_char **out_string, uacpi_size *out_size
+)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_size bytes_left, prefix_bytes, nameseg_bytes, namesegs;
+    uacpi_char *base_cursor, *cursor;
+    uacpi_char prev_char;
+
+    bytes_left = frame->method->size - offset;
+    cursor = (uacpi_char*)frame->method->code + offset;
+    base_cursor = cursor;
+    namesegs = 0;
+
+    prefix_bytes = 0;
+    for (;;) {
+        if (uacpi_unlikely(bytes_left == 0))
+            return UACPI_STATUS_BAD_BYTECODE;
+
+        prev_char = *cursor;
+
+        switch (prev_char) {
+        case '^':
+        case '\\':
+            prefix_bytes++;
+            cursor++;
+            bytes_left--;
+            break;
+        default:
+            break;
+        }
+
+        if (prev_char != '^')
+            break;
+    }
+
+    // At least a NullName byte is expected here
+    if (uacpi_unlikely(bytes_left == 0))
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    namesegs = 0;
+    bytes_left--;
+    switch (*cursor++)
+    {
+    case UACPI_DUAL_NAME_PREFIX:
+        namesegs = 2;
+        break;
+    case UACPI_MULTI_NAME_PREFIX:
+        if (uacpi_unlikely(bytes_left == 0))
+            return UACPI_STATUS_BAD_BYTECODE;
+        namesegs = *(uacpi_u8*)cursor;
+        cursor++;
+        bytes_left--;
+        break;
+    case UACPI_NULL_NAME:
+        break;
+    default:
+        /*
+         * Might be an invalid byte, but assume single nameseg for now,
+         * the code below will validate it for us.
+         */
+        cursor--;
+        bytes_left++;
+        namesegs = 1;
+        break;
+    }
+
+    if (uacpi_unlikely((namesegs * 4) > bytes_left))
+        return UACPI_STATUS_BAD_BYTECODE;
+
+    // 4 chars per nameseg
+    nameseg_bytes = namesegs * 4;
+
+    // dot separator for every nameseg
+    nameseg_bytes += namesegs - 1;
+
+    *out_size = nameseg_bytes + prefix_bytes + 1;
+
+    *out_string = uacpi_kernel_alloc(*out_size);
+    if (*out_string == UACPI_NULL)
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    uacpi_memcpy(*out_string, base_cursor, prefix_bytes);
+
+    base_cursor = *out_string;
+    base_cursor += prefix_bytes;
+
+    while (namesegs-- > 0) {
+        uacpi_memcpy(base_cursor, cursor, 4);
+        cursor += 4;
+        base_cursor += 4;
+
+        if (namesegs)
+            *base_cursor++ = '.';
+    }
+
+    *base_cursor = '\0';
+    return UACPI_STATUS_OK;
+}
+
 enum resolve_behavior {
     RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS,
     RESOLVE_FAIL_IF_DOESNT_EXIST,
