@@ -156,7 +156,7 @@ class ASLSource:
             "-vw", "6084"
         ]
 
-        args = [compiler, *ignored_warnings, "-p", out_case, path]
+        args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
         proc = subprocess.Popen(args, stdout=subprocess.PIPE,
                                 universal_newlines=True)
 
