@@ -3452,16 +3452,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
             }
 
             case UACPI_OBJECT_BUFFER_FIELD:
-                if (!op_wants_term_arg_or_operand(prev_op)) {
-                    uacpi_u8 props;
-
-                    if (!ctx->prev_op_ctx)
-                        break;
-
-                    props = ctx->prev_op_ctx->op->properties;
-                    if (!(props & UACPI_OP_PROPERTY_READS_NAMED_FIELDS))
-                        break;
-                }
+                if (!op_wants_term_arg_or_operand(prev_op))
+                    break;
 
                 switch (buffer_field_get_read_type(&obj->buffer_field)) {
                 case UACPI_OBJECT_BUFFER:

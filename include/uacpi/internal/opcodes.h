@@ -223,12 +223,6 @@ enum uacpi_op_property {
     // The ops to execute are pointed to by indirect_decode_ops
     UACPI_OP_PROPERTY_OUT_OF_LINE = 16,
 
-    /*
-     * Op wants named fields to be read even if the desired argument is a
-     * supername or term_arg_or_named_object.
-     */
-    UACPI_OP_PROPERTY_READS_NAMED_FIELDS = 64,
-
     // Error if encountered in the AML byte strem
     UACPI_OP_PROPERTY_RESERVED = 128,
 };
@@ -330,8 +324,7 @@ UACPI_OP(                                                          \
         UACPI_PARSE_OP_INVOKE_HANDLER,                             \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                    \
     },                                                             \
-    UACPI_OP_PROPERTY_TERM_ARG |                                   \
-    UACPI_OP_PROPERTY_READS_NAMED_FIELDS                           \
+    UACPI_OP_PROPERTY_TERM_ARG                                     \
 )
 
 #define UACPI_BUILD_BINARY_MATH_OP(prefix, code)                 \
