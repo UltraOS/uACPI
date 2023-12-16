@@ -89,6 +89,26 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
     code_block_array, struct code_block, static
 )
 
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
+    temp_namespace_node_array, uacpi_namespace_node*, 8)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
+    temp_namespace_node_array, uacpi_namespace_node*, static
+)
+
+static uacpi_status temp_namespace_node_array_push(
+    struct temp_namespace_node_array *arr, uacpi_namespace_node *node
+)
+{
+    uacpi_namespace_node **slot;
+
+    slot = temp_namespace_node_array_alloc(arr);
+    if (uacpi_unlikely(slot == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    *slot = node;
+    return UACPI_STATUS_OK;
+}
+
 struct call_frame {
     struct uacpi_control_method *method;
 
@@ -97,6 +117,7 @@ struct call_frame {
 
     struct op_context_array pending_ops;
     struct code_block_array code_blocks;
+    struct temp_namespace_node_array temp_nodes;
     struct code_block *last_while;
     struct uacpi_namespace_node *cur_scope;
 
@@ -2590,6 +2611,8 @@ static void pop_op(struct execution_context *ctx)
             break;
         if (item->type == ITEM_OBJECT)
             uacpi_object_unref(item->obj);
+        if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL)
+            uacpi_namespace_node_free(item->node);
 
         item_array_pop(&cur_op_ctx->items);
     }
@@ -3285,6 +3308,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE:
             item = item_array_at(&op_ctx->items, op_decode_byte(op_ctx));
             ret = uacpi_node_install(item->node->parent, item->node);
+
+            if (uacpi_likely_success(ret)) {
+                if (!frame->method->named_objects_persist) {
+                    ret = temp_namespace_node_array_push(
+                        &frame->temp_nodes, item->node
+                    );
+                }
+
+                if (uacpi_likely_success(ret))
+                    item->node = UACPI_NULL;
+            }
+
             break;
 
         case UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV:
@@ -3494,6 +3529,15 @@ static void call_frame_clear(struct call_frame *frame)
     uacpi_size i;
     op_context_array_clear(&frame->pending_ops);
     code_block_array_clear(&frame->code_blocks);
+
+    while (temp_namespace_node_array_size(&frame->temp_nodes) != 0) {
+        uacpi_namespace_node *node;
+
+        node = *temp_namespace_node_array_last(&frame->temp_nodes);
+        uacpi_node_uninstall(node);
+        temp_namespace_node_array_pop(&frame->temp_nodes);
+    }
+    temp_namespace_node_array_clear(&frame->temp_nodes);
 
     for (i = 0; i < 7; ++i)
         uacpi_object_unref(frame->args[i]);
