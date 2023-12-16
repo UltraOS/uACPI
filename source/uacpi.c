@@ -144,9 +144,10 @@ uacpi_status uacpi_namespace_load(void)
     dsdt = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
     method.code = dsdt->definition_block;
     method.size = tbl->length - sizeof(dsdt->hdr);
-    method.node = uacpi_namespace_root();
 
-    return uacpi_execute_control_method(&method, NULL, NULL);
+    return uacpi_execute_control_method(
+        uacpi_namespace_root(), &method, NULL, NULL
+    );
 }
 
 uacpi_status uacpi_namespace_initialize(void)
@@ -186,5 +187,5 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
     if (obj->type != UACPI_OBJECT_METHOD)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return uacpi_execute_control_method(obj->method, args, ret);
+    return uacpi_execute_control_method(node, obj->method, args, ret);
 }
