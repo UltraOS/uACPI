@@ -779,13 +779,7 @@ UACPI_OP(                                                        \
 UACPI_BUILD_BINARY_LOGIC_OP(LEqual, 0x93)                        \
 UACPI_BUILD_BINARY_LOGIC_OP(LGreater, 0x94)                      \
 UACPI_BUILD_BINARY_LOGIC_OP(LLess, 0x95)                         \
-UACPI_OP(                                                        \
-    ToBufferOp, 0x96,                                            \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_TO_OP(Buffer, 0x96, UACPI_OBJECT_BUFFER)             \
 UACPI_OP(                                                        \
     ToDecimalStringOp, 0x97,                                     \
     {                                                            \

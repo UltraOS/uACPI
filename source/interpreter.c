@@ -1727,6 +1727,7 @@ static uacpi_u64 object_to_integer(const uacpi_object *obj,
 
 static uacpi_status handle_to(struct execution_context *ctx)
 {
+    uacpi_status ret = UACPI_STATUS_OK;
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *src, *dst;
 
@@ -1739,11 +1740,34 @@ static uacpi_status handle_to(struct execution_context *ctx)
         dst->integer = object_to_integer(src, 8);
         break;
 
+    case UACPI_AML_OP_ToBufferOp: {
+        struct object_storage_as_buffer buf;
+        uacpi_u8 *dst_buf;
+
+        ret = get_object_storage(src, &buf, UACPI_TRUE);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        /*
+         * Allocate at least 1 byte just to be safe,
+         * even for empty buffers. We still set the
+         * size to 0 here though.
+         */
+        dst_buf = uacpi_kernel_alloc(UACPI_MAX(buf.len, 1));
+        if (uacpi_unlikely(dst_buf == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        uacpi_memcpy(dst_buf, buf.ptr, buf.len);
+        dst->buffer->data = dst_buf;
+        dst->buffer->size = buf.len;
+        break;
+    }
+
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    return UACPI_STATUS_OK;
+    return ret;
 }
 
 static uacpi_status handle_concatenate(struct execution_context *ctx)
@@ -2981,6 +3005,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_InternalOpReadFieldAsInteger] = OP_HANDLER_READ_FIELD,
 
     [UACPI_AML_OP_ToIntegerOp] = OP_HANDLER_TO,
+    [UACPI_AML_OP_ToBufferOp] = OP_HANDLER_TO,
 
     [UACPI_AML_OP_AliasOp] = OP_HANDLER_ALIAS,
 
