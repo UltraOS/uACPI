@@ -41,6 +41,19 @@ uacpi_status uacpi_node_install(
     node->parent = parent;
     node->next = prev;
 
+    if (prev) {
+        if (uacpi_unlikely(prev->prev != UACPI_NULL)) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "while installing node @p: previous node @p already has "
+                " a valid prev link @p\n", node, prev, prev->prev
+            );
+
+        }
+
+        prev->prev = node;
+    }
+
     return UACPI_STATUS_OK;
 }
 
