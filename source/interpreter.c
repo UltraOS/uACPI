@@ -1725,7 +1725,7 @@ static uacpi_u64 object_to_integer(const uacpi_object *obj,
     return dst;
 }
 
-static uacpi_status handle_to_integer(struct execution_context *ctx)
+static uacpi_status handle_to(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *src, *dst;
@@ -1733,8 +1733,16 @@ static uacpi_status handle_to_integer(struct execution_context *ctx)
     src = item_array_at(&op_ctx->items, 0)->obj;
     dst = item_array_at(&op_ctx->items, 2)->obj;
 
-    // NT always takes the first 8 bytes, even for revision 1
-    dst->integer = object_to_integer(src, 8);
+    switch (op_ctx->op->code) {
+    case UACPI_AML_OP_ToIntegerOp:
+        // NT always takes the first 8 bytes, even for revision 1
+        dst->integer = object_to_integer(src, 8);
+        break;
+
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
     return UACPI_STATUS_OK;
 }
 
@@ -2853,6 +2861,7 @@ enum op_handler {
     OP_HANDLER_OBJECT_TYPE,
     OP_HANDLER_CREATE_OP_REGION,
     OP_HANDLER_CREATE_FIELD,
+    OP_HANDLER_TO,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -2880,7 +2889,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_CREATE_NAMED] = handle_create_named,
     [OP_HANDLER_CREATE_BUFFER_FIELD] = handle_create_buffer_field,
     [OP_HANDLER_READ_FIELD] = handle_field_read,
-    [OP_HANDLER_TO_INTEGER] = handle_to_integer,
+    [OP_HANDLER_TO] = handle_to,
     [OP_HANDLER_ALIAS] = handle_create_alias,
     [OP_HANDLER_CONCATENATE] = handle_concatenate,
     [OP_HANDLER_SIZEOF] = handle_sizeof,
@@ -2971,7 +2980,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_InternalOpReadFieldAsBuffer] = OP_HANDLER_READ_FIELD,
     [UACPI_AML_OP_InternalOpReadFieldAsInteger] = OP_HANDLER_READ_FIELD,
 
-    [UACPI_AML_OP_ToIntegerOp] = OP_HANDLER_TO_INTEGER,
+    [UACPI_AML_OP_ToIntegerOp] = OP_HANDLER_TO,
 
     [UACPI_AML_OP_AliasOp] = OP_HANDLER_ALIAS,
 
