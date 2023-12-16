@@ -398,7 +398,7 @@ static uacpi_status resolve_name_string(
         case RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS:
             if (namesegs == 1) {
                 if (cur_node)
-                    return UACPI_STATUS_BAD_BYTECODE;
+                    return UACPI_STATUS_ALREADY_EXISTS;
 
                 // Create the node and link to parent but don't install YET
                 cur_node = uacpi_namespace_node_alloc(name);
