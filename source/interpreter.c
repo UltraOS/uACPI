@@ -3228,12 +3228,16 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_EXISTING_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL: {
             uacpi_size offset = frame->code_offset;
+            const uacpi_char *action;
             enum resolve_behavior behavior;
 
-            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
+            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING) {
+                action = "create";
                 behavior = RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS;
-            else
+            } else {
+                action = "resolve";
                 behavior = RESOLVE_FAIL_IF_DOESNT_EXIST;
+            }
 
             ret = resolve_name_string(frame, behavior, &item->node);
 
@@ -3254,8 +3258,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
                 name_string_to_path(frame, offset, &path, &length);
                 uacpi_kernel_log(
-                    UACPI_LOG_ERROR, "Failed to resolve path '%s': %s\n",
-                    path ? path : "<unknown>", uacpi_status_to_string(ret)
+                    UACPI_LOG_ERROR, "Failed to %s named object '%s': %s\n",
+                    action, path ? path : "<unknown>",
+                    uacpi_status_to_string(ret)
                 );
                 uacpi_kernel_free(path);
             }
