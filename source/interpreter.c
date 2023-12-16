@@ -3424,9 +3424,13 @@ static uacpi_status exec_op(struct execution_context *ctx)
             if (ret == UACPI_STATUS_NOT_FOUND) {
                 uacpi_bool is_ok;
 
-                is_ok = op_allows_unresolved(op);
-                if (prev_op)
-                    is_ok &= op_allows_unresolved(prev_op);
+                if (prev_op) {
+                    is_ok = op_allows_unresolved(prev_op);
+                    is_ok &= op_allows_unresolved(op);
+                } else {
+                    // This is the only standalone op where we allow unresolved
+                    is_ok = op_ctx->op->code == UACPI_AML_OP_ExternalOp;
+                }
 
                 if (is_ok)
                     ret = UACPI_STATUS_OK;
