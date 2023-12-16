@@ -25,6 +25,8 @@ void uacpi_namespace_node_free(uacpi_namespace_node *node)
 {
     if (node == UACPI_NULL)
         return;
+    if (node->object)
+        uacpi_object_unref(node->object);
 
     uacpi_kernel_free(node);
 }
