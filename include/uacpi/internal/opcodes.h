@@ -780,20 +780,8 @@ UACPI_BUILD_BINARY_LOGIC_OP(LEqual, 0x93)                        \
 UACPI_BUILD_BINARY_LOGIC_OP(LGreater, 0x94)                      \
 UACPI_BUILD_BINARY_LOGIC_OP(LLess, 0x95)                         \
 UACPI_BUILD_TO_OP(Buffer, 0x96, UACPI_OBJECT_BUFFER)             \
-UACPI_OP(                                                        \
-    ToDecimalStringOp, 0x97,                                     \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
-UACPI_OP(                                                        \
-    ToHexStringOp, 0x98,                                         \
-    {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_TO_OP(DecimalString, 0x97, UACPI_OBJECT_STRING)      \
+UACPI_BUILD_TO_OP(HexString, 0x98, UACPI_OBJECT_STRING)          \
 UACPI_BUILD_TO_OP(Integer, 0x99, UACPI_OBJECT_INTEGER)           \
 UACPI_BAD_OPCODE(0x9A)                                           \
 UACPI_BAD_OPCODE(0x9B)                                           \

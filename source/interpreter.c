@@ -1725,6 +1725,110 @@ static uacpi_u64 object_to_integer(const uacpi_object *obj,
     return dst;
 }
 
+static uacpi_status integer_to_string(
+    uacpi_u64 integer, uacpi_buffer *str, uacpi_bool is_hex
+)
+{
+    int repr_len;
+    uacpi_char int_buf[21];
+    uacpi_size final_size;
+
+    repr_len = uacpi_snprintf(
+        int_buf, sizeof(int_buf),
+        is_hex ? "%"UACPI_PRIX64 : "%"UACPI_PRIu64,
+        integer
+    );
+    if (uacpi_unlikely(repr_len < 0))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    // 0x prefix + repr + \0
+    final_size = (is_hex ? 2 : 0) + repr_len + 1;
+
+    str->data = uacpi_kernel_alloc(final_size);
+    if (uacpi_unlikely(str->data == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    if (is_hex) {
+        str->text[0] = '0';
+        str->text[1] = 'x';
+    }
+    uacpi_memcpy(str->text + (is_hex ? 2 : 0), int_buf, repr_len + 1);
+    str->size = final_size;
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status buffer_to_string(
+    uacpi_buffer *buf, uacpi_buffer *str, uacpi_bool is_hex
+)
+{
+    int repr_len;
+    uacpi_char int_buf[5];
+    uacpi_size i, final_size;
+    uacpi_char *cursor;
+
+    if (is_hex) {
+        final_size = 4 * buf->size;
+    } else {
+        final_size = 0;
+
+        for (i = 0; i < buf->size; ++i) {
+            uacpi_u8 value = ((uacpi_u8*)buf->data)[i];
+
+            if (value < 10)
+                final_size += 1;
+            else if (value < 100)
+                final_size += 2;
+            else
+                final_size += 3;
+        }
+    }
+
+    // Comma for every value but one
+    final_size += buf->size - 1;
+
+    // Null terminator
+    final_size += 1;
+
+    str->data = uacpi_kernel_alloc(final_size);
+    if (uacpi_unlikely(str->data == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    cursor = str->data;
+
+    for (i = 0; i < buf->size; ++i) {
+        repr_len = uacpi_snprintf(
+            int_buf, sizeof(int_buf),
+            is_hex ? "0x%02X" : "%d",
+            ((uacpi_u8*)buf->data)[i]
+        );
+        if (uacpi_unlikely(repr_len < 0)) {
+            uacpi_kernel_free(str->data);
+            str->data = UACPI_NULL;
+            return UACPI_STATUS_INVALID_ARGUMENT;
+        }
+
+        uacpi_memcpy(cursor, int_buf, repr_len + 1);
+        cursor += repr_len;
+
+        if (i != buf->size - 1)
+            *cursor++ = ',';
+    }
+
+    str->size = final_size;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status make_null_string(uacpi_buffer *buf)
+{
+    buf->text = uacpi_kernel_calloc(1, sizeof(uacpi_char));
+    if (uacpi_unlikely(buf->text == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    buf->size = sizeof(uacpi_char);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_to(struct execution_context *ctx)
 {
     uacpi_status ret = UACPI_STATUS_OK;
@@ -1740,6 +1844,22 @@ static uacpi_status handle_to(struct execution_context *ctx)
         dst->integer = object_to_integer(src, 8);
         break;
 
+    case UACPI_AML_OP_ToHexStringOp:
+    case UACPI_AML_OP_ToDecimalStringOp: {
+        uacpi_bool is_hex = op_ctx->op->code == UACPI_AML_OP_ToHexStringOp;
+
+        if (src->type == UACPI_OBJECT_INTEGER) {
+            ret = integer_to_string(src->integer, dst->buffer, is_hex);
+            break;
+        } else if (src->type == UACPI_OBJECT_BUFFER) {
+            if (uacpi_unlikely(src->buffer->size == 0))
+                return make_null_string(dst->buffer);
+
+            ret = buffer_to_string(src->buffer, dst->buffer, is_hex);
+            break;
+        }
+        // FALLTHROUGH for string -> string conversion
+    }
     case UACPI_AML_OP_ToBufferOp: {
         struct object_storage_as_buffer buf;
         uacpi_u8 *dst_buf;
@@ -3006,6 +3126,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
 
     [UACPI_AML_OP_ToIntegerOp] = OP_HANDLER_TO,
     [UACPI_AML_OP_ToBufferOp] = OP_HANDLER_TO,
+    [UACPI_AML_OP_ToDecimalStringOp] = OP_HANDLER_TO,
+    [UACPI_AML_OP_ToHexStringOp] = OP_HANDLER_TO,
 
     [UACPI_AML_OP_AliasOp] = OP_HANDLER_ALIAS,
 
