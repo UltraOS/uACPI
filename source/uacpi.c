@@ -33,6 +33,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "bad bytecode";
     case UACPI_STATUS_UNIMPLEMENTED:
         return "unimplemented";
+    case UACPI_STATUS_ALREADY_EXISTS:
+        return "already exists";
     default:
         return "<invalid status>";
     }
