@@ -2072,8 +2072,6 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     if (uacpi_unlikely(node->object == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    // TODO: make node ref-counted
-    method->node = node;
     return UACPI_STATUS_OK;
 }
 
@@ -2454,7 +2452,8 @@ static uacpi_status frame_push_args(struct call_frame *frame,
 }
 
 static uacpi_status frame_setup_base_scope(struct call_frame *frame,
-                                           struct uacpi_control_method *method)
+                                           uacpi_namespace_node *scope,
+                                           uacpi_control_method *method)
 {
     struct code_block *block;
 
@@ -2463,10 +2462,11 @@ static uacpi_status frame_setup_base_scope(struct call_frame *frame,
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     block->type = CODE_BLOCK_SCOPE;
-    block->node = method->node;
+    block->node = scope;
     block->begin = 0;
     block->end = method->size;
-    frame->cur_scope = method->node;
+    frame->method = method;
+    frame->cur_scope = scope;
     return UACPI_STATUS_OK;
 }
 
@@ -3411,12 +3411,11 @@ static uacpi_status exec_op(struct execution_context *ctx)
             if (uacpi_unlikely_error(ret))
                 return ret;
 
-            ret = frame_setup_base_scope(frame, method);
+            ret = frame_setup_base_scope(frame, node, method);
             if (uacpi_unlikely_error(ret))
                 return ret;
 
             ctx->cur_frame = frame;
-            ctx->cur_frame->method = method;
             ctx->cur_op_ctx = UACPI_NULL;
             ctx->prev_op_ctx = UACPI_NULL;
             ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
@@ -3527,7 +3526,8 @@ static void ctx_reload_post_ret(struct execution_context *ctx)
     refresh_ctx_pointers(ctx);
 }
 
-uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
+uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
+                                          uacpi_control_method *method,
                                           uacpi_args *args, uacpi_object **ret)
 {
     uacpi_status st = UACPI_STATUS_OK;
@@ -3552,7 +3552,6 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
         st = UACPI_STATUS_OUT_OF_MEMORY;
         goto out;
     }
-    ctx->cur_frame->method = ctx->cur_method;
 
     if (args != UACPI_NULL) {
         uacpi_u8 i;
@@ -3571,7 +3570,7 @@ uacpi_status uacpi_execute_control_method(uacpi_control_method *method,
         goto out;
     }
 
-    frame_setup_base_scope(ctx->cur_frame, method);
+    frame_setup_base_scope(ctx->cur_frame, scope, method);
     ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
 
     for (;;) {
