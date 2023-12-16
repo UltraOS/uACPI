@@ -62,6 +62,27 @@ uacpi_status uacpi_node_install(
     return UACPI_STATUS_OK;
 }
 
+void uacpi_node_uninstall(uacpi_namespace_node *node)
+{
+    if (node->parent && node->parent->child == node)
+        node->parent->child = node->next;
+
+    if (node->prev)
+        node->prev->next = node->next;
+    if (node->next)
+        node->next->prev = node->prev;
+
+    if (uacpi_unlikely(node->child)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "trying to uninstall a node @p with a valid child link @p\n",
+            node, node->child
+        );
+    }
+
+    uacpi_namespace_node_free(node);
+}
+
 uacpi_namespace_node *uacpi_namespace_node_find(
     uacpi_namespace_node *parent,
     uacpi_object_name name
