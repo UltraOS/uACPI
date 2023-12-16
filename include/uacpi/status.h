@@ -18,6 +18,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_OUT_OF_BOUNDS = 8,
     UACPI_STATUS_BAD_BYTECODE = 9,
     UACPI_STATUS_UNIMPLEMENTED = 10,
+    UACPI_STATUS_ALREADY_EXISTS = 11,
 } uacpi_status;
 
 const char *uacpi_status_to_string(uacpi_status);
