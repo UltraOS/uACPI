@@ -2051,7 +2051,7 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     struct uacpi_object *dst;
     uacpi_u32 method_begin_offset;
 
-    method = uacpi_kernel_alloc(sizeof(*method));
+    method = uacpi_kernel_calloc(1, sizeof(*method));
     if (uacpi_unlikely(method == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
