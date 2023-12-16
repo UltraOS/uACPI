@@ -665,7 +665,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_STORE_TO_TARGET, 3,                       \
         UACPI_PARSE_OP_OBJECT_COPY_TO_PREV,                      \
-        UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT, 2, 5,           \
+        UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT, 2, 4,           \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
