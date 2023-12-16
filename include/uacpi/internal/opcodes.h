@@ -398,6 +398,20 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )
 
+#define UACPI_BUILD_TO_OP(kind, code, dst_type)      \
+UACPI_OP(                                            \
+    To##kind##Op, code,                              \
+    {                                                \
+        UACPI_PARSE_OP_COMPUTATIONAL_DATA,           \
+        UACPI_PARSE_OP_TARGET,                       \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, dst_type, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,               \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,           \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,      \
+    },                                               \
+    UACPI_OP_PROPERTY_TERM_ARG                       \
+)
+
 #define UACPI_ENUMERATE_OPCODES                                  \
 UACPI_OP(                                                        \
     ZeroOp, 0x00,                                                \
@@ -786,18 +800,7 @@ UACPI_OP(                                                        \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
-UACPI_OP(                                                        \
-    ToIntegerOp, 0x99,                                           \
-    {                                                            \
-        UACPI_PARSE_OP_COMPUTATIONAL_DATA,                       \
-        UACPI_PARSE_OP_TARGET,                                   \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                       \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_TO_OP(Integer, 0x99, UACPI_OBJECT_INTEGER)           \
 UACPI_BAD_OPCODE(0x9A)                                           \
 UACPI_BAD_OPCODE(0x9B)                                           \
 UACPI_OP(                                                        \
