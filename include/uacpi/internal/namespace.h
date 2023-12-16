@@ -8,6 +8,7 @@ typedef struct uacpi_namespace_node {
     uacpi_object *object;
     struct uacpi_namespace_node *parent;
     struct uacpi_namespace_node *child;
+    struct uacpi_namespace_node *prev;
     struct uacpi_namespace_node *next;
 } uacpi_namespace_node;
 
