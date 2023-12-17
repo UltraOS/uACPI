@@ -3,6 +3,15 @@
 #include <cstdarg>
 #include <cstdio>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach/mach_time.h>
+#else
+#include <time.h>
+#endif
+
 #include <uacpi/kernel_api.h>
 
 void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
@@ -68,4 +77,52 @@ void uacpi_kernel_log(enum uacpi_log_level lvl, const char* text, ...)
     uacpi_kernel_vlog(lvl, text, vlist);
 
     va_end(vlist);
+}
+
+uacpi_u64 uacpi_kernel_get_ticks(void)
+{
+#ifdef _WIN32
+    static LARGE_INTEGER frequency;
+    LARGE_INTEGER counter;
+
+    if (frequency.QuadPart == 0) {
+        if (!QueryPerformanceFrequency(&frequency)) {
+            puts("QueryPerformanceFrequency() returned an error");
+            std::abort();
+        }
+    }
+
+    if (!QueryPerformanceCounter(&counter)) {
+        puts("QueryPerformanceCounter() returned an error");
+        std::abort();
+    }
+
+    // Convert to 100 nanoseconds
+    counter.QuadPart *= 10000000;
+    return counter.QuadPart / frequency.QuadPart;
+#elif defined(__APPLE__)
+    static struct mach_timebase_info tb;
+    static bool initialized;
+    uacpi_u64 nanoseconds;
+
+    if (!initialized) {
+        if (mach_timebase_info(&tb) != KERN_SUCCESS) {
+            puts("mach_timebase_info() returned an error");
+            std::abort();
+        }
+        initialized = true;
+    }
+
+    nanoseconds = (mach_absolute_time() * tb.numer) / tb.denom;
+    return nanoseconds / 100;
+#else
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
+        puts("clock_gettime() returned an error");
+        std::abort();
+    }
+
+    return (ts.tv_nsec + ts.tv_sec * 1000000000) / 100;
+#endif
 }

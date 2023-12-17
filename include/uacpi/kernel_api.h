@@ -24,6 +24,11 @@ enum uacpi_log_level {
 void uacpi_kernel_log(enum uacpi_log_level, const char*, ...);
 void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
 
+/*
+ * Returns the number of 100 nanosecond ticks, strictly monotonic.
+ */
+uacpi_u64 uacpi_kernel_get_ticks(void);
+
 #ifdef __cplusplus
 }
 #endif
