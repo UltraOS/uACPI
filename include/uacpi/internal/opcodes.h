@@ -1031,7 +1031,12 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     MutexOp, UACPI_EXT_OP(0x01),                            \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                         \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
+            UACPI_OBJECT_MUTEX,                             \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,           \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \
