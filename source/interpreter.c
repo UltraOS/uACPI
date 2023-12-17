@@ -1221,6 +1221,11 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
             src->mutex->sync_level, src->mutex->owner
         );
         break;
+    case UACPI_OBJECT_METHOD:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO, "%s Method @%p (%p)\n", prefix, src, src->method
+        );
+        break;
     default:
         uacpi_kernel_log(
             UACPI_LOG_INFO, "%s %s @%p\n",
@@ -2342,21 +2347,17 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     struct uacpi_object *dst;
     uacpi_u32 method_begin_offset;
 
-    method = uacpi_kernel_calloc(1, sizeof(*method));
-    if (uacpi_unlikely(method == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
     pkg = &item_array_at(&op_ctx->items, 0)->pkg;
     node = item_array_at(&op_ctx->items, 1)->node;
+    dst = item_array_at(&op_ctx->items, 4)->obj;
+
+    method = dst->method;
     init_method_flags(method, item_array_at(&op_ctx->items, 2)->immediate);
 
     method_begin_offset = item_array_at(&op_ctx->items, 3)->immediate;
     method->code = ctx->cur_frame->method->code;
     method->code += method_begin_offset;
     method->size = pkg->end - method_begin_offset;
-
-    dst = item_array_at(&op_ctx->items, 4)->obj;
-    dst->method = method;
 
     node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
                                                    dst);
