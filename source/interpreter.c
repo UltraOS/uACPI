@@ -1890,6 +1890,33 @@ static uacpi_status handle_to(struct execution_context *ctx)
     return ret;
 }
 
+static uacpi_status handle_to_string(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_buffer *src_buf, *dst_buf;
+    uacpi_size req_len, len;
+
+    src_buf = item_array_at(&op_ctx->items, 0)->obj->buffer;
+    req_len = item_array_at(&op_ctx->items, 1)->obj->integer;
+    dst_buf = item_array_at(&op_ctx->items, 3)->obj->buffer;
+
+    len = UACPI_MIN(req_len, src_buf->size);
+    if (uacpi_unlikely(len == 0))
+        return make_null_string(dst_buf);
+
+    len = uacpi_strnlen(src_buf->text, len);
+
+    dst_buf->text = uacpi_kernel_alloc(len + 1);
+    if (uacpi_unlikely(dst_buf->text == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    uacpi_memcpy(dst_buf->text, src_buf->data, len);
+    dst_buf->text[len] = '\0';
+    dst_buf->size = len + 1;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_concatenate(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -3016,6 +3043,7 @@ enum op_handler {
     OP_HANDLER_CREATE_OP_REGION,
     OP_HANDLER_CREATE_FIELD,
     OP_HANDLER_TO,
+    OP_HANDLER_TO_STRING,
     OP_HANDLER_TIMER,
 };
 
@@ -3054,6 +3082,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region,
     [OP_HANDLER_CREATE_FIELD] = handle_create_field,
     [OP_HANDLER_TIMER] = handle_timer,
+    [OP_HANDLER_TO_STRING] = handle_to_string,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3140,6 +3169,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_ToBufferOp] = OP_HANDLER_TO,
     [UACPI_AML_OP_ToDecimalStringOp] = OP_HANDLER_TO,
     [UACPI_AML_OP_ToHexStringOp] = OP_HANDLER_TO,
+    [UACPI_AML_OP_ToStringOp] = OP_HANDLER_TO_STRING,
 
     [UACPI_AML_OP_AliasOp] = OP_HANDLER_ALIAS,
 
