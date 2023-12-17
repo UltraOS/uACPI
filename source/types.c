@@ -139,20 +139,20 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     switch (type) {
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER:
-        if (uacpi_likely(buffer_alloc(ret, 0)))
-            break;
+        if (uacpi_unlikely(!buffer_alloc(ret, 0)))
+            goto out_free_ret;
 
-        goto out_free_ret;
+        break;
     case UACPI_OBJECT_PACKAGE:
-        if (uacpi_likely(package_alloc(ret, 0)))
-            break;
+        if (uacpi_unlikely(!package_alloc(ret, 0)))
+            goto out_free_ret;
 
-        goto out_free_ret;
+        break;
     case UACPI_OBJECT_MUTEX:
-        if (uacpi_likely(mutex_alloc(ret)))
-            break;
+        if (uacpi_unlikely(!mutex_alloc(ret)))
+            goto out_free_ret;
 
-        goto out_free_ret;
+        break;
     default:
         break;
     }
