@@ -29,6 +29,19 @@ void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
  */
 uacpi_u64 uacpi_kernel_get_ticks(void);
 
+/*
+ * Create/free an opaque non-recursive kernel mutex object.
+ */
+uacpi_handle uacpi_kernel_create_mutex(void);
+void uacpi_kernel_free_mutex(uacpi_handle);
+
+/*
+ * Try to acquire the mutex with a millisecond timeout.
+ * A timeout value of 0xFFFF implies infinite wait.
+ */
+uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16);
+void uacpi_kernel_release_mutex(uacpi_handle);
+
 #ifdef __cplusplus
 }
 #endif
