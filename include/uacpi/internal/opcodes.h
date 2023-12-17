@@ -788,7 +788,14 @@ UACPI_BAD_OPCODE(0x9B)                                           \
 UACPI_OP(                                                        \
     ToStringOp, 0x9C,                                            \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,           \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_TARGET,                                   \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_STRING,  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 2,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
