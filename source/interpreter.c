@@ -1213,6 +1213,14 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
             *buffer_index_cursor(&src->buffer_index)
         );
         break;
+    case UACPI_OBJECT_MUTEX:
+        uacpi_kernel_log(
+            UACPI_LOG_INFO,
+            "%s Mutex @%p (%p => %p) sync level %d (owned by %p)\n",
+            prefix, src, src->mutex, src->mutex->handle,
+            src->mutex->sync_level, src->mutex->owner
+        );
+        break;
     default:
         uacpi_kernel_log(
             UACPI_LOG_INFO, "%s %s @%p\n",
