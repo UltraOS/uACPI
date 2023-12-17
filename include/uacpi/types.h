@@ -15,7 +15,6 @@ typedef uacpi_u64 uacpi_io_addr;
 #endif
 
 typedef void *uacpi_handle;
-typedef struct uacpi_control_method uacpi_control_method;
 
 typedef enum uacpi_object_type {
     UACPI_OBJECT_UNINITIALIZED = 0,
@@ -108,6 +107,15 @@ typedef struct uacpi_power_resource {
     uacpi_u8 system_level;
     uacpi_u16 resource_order;
 } uacpi_power_resource;
+
+typedef struct uacpi_control_method {
+    uacpi_u8 *code;
+    uacpi_u32 size;
+    uacpi_u8 sync_level : 4;
+    uacpi_u8 args : 3;
+    uacpi_u8 is_serialized : 1;
+    uacpi_u8 named_objects_persist: 1;
+} uacpi_control_method;
 
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
