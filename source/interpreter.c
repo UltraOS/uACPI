@@ -1933,6 +1933,61 @@ static uacpi_status handle_to_string(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_mid(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *src, *dst;
+    struct object_storage_as_buffer src_buf;
+    uacpi_buffer *dst_buf;
+    uacpi_size idx, len, buf_size;
+    uacpi_bool is_string;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    if (uacpi_unlikely(src->type != UACPI_OBJECT_STRING &&
+                       src->type != UACPI_OBJECT_BUFFER)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid argument for Mid: %s, expected String/Buffer\n",
+            uacpi_object_type_to_string(src->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    idx = item_array_at(&op_ctx->items, 1)->obj->integer;
+    len = item_array_at(&op_ctx->items, 2)->obj->integer;
+    dst = item_array_at(&op_ctx->items, 4)->obj;
+    dst_buf = dst->buffer;
+
+    is_string = src->type == UACPI_OBJECT_STRING;
+    get_object_storage(src, &src_buf, UACPI_FALSE);
+
+    if (uacpi_unlikely(src_buf.len == 0 || idx >= src_buf.len)) {
+        if (src->type == UACPI_OBJECT_STRING) {
+            dst->type = UACPI_OBJECT_STRING;
+            return make_null_string(dst_buf);
+        }
+
+        return make_null_buffer(dst_buf);
+    }
+
+    // Guaranteed to be at least 1 here
+    len = UACPI_MIN(len, src_buf.len - idx);
+
+    dst_buf->data = uacpi_kernel_alloc(len + is_string);
+    if (uacpi_unlikely(dst_buf->data == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    uacpi_memcpy(dst_buf->data, (uacpi_u8*)src_buf.ptr + idx, len);
+    dst_buf->size = len;
+
+    if (is_string) {
+        dst_buf->text[dst_buf->size++] = '\0';
+        dst->type = UACPI_OBJECT_STRING;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_concatenate(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -3061,6 +3116,7 @@ enum op_handler {
     OP_HANDLER_TO,
     OP_HANDLER_TO_STRING,
     OP_HANDLER_TIMER,
+    OP_HANDLER_MID,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -3099,6 +3155,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_CREATE_FIELD] = handle_create_field,
     [OP_HANDLER_TIMER] = handle_timer,
     [OP_HANDLER_TO_STRING] = handle_to_string,
+    [OP_HANDLER_MID] = handle_mid,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3200,6 +3257,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_IndexOp] = OP_HANDLER_INDEX,
 
     [UACPI_AML_OP_ObjectTypeOp] = OP_HANDLER_OBJECT_TYPE,
+
+    [UACPI_AML_OP_MidOp] = OP_HANDLER_MID,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
