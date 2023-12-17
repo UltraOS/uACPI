@@ -605,6 +605,9 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
+    if (src == dst)
+        return ret;
+
     switch (dst->type) {
     case UACPI_OBJECT_REFERENCE:
         uacpi_object_detach_child(dst);
