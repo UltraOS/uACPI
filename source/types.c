@@ -105,6 +105,26 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
+static uacpi_bool mutex_alloc(uacpi_object *obj)
+{
+    uacpi_mutex *mutex;
+
+    mutex = uacpi_kernel_calloc(1, sizeof(uacpi_mutex));
+    if (uacpi_unlikely(mutex == UACPI_NULL))
+        return UACPI_FALSE;
+
+    mutex->handle = uacpi_kernel_create_mutex();
+    if (mutex->handle == UACPI_NULL) {
+        uacpi_kernel_free(mutex);
+        return UACPI_FALSE;
+    }
+
+    uacpi_shareable_init(mutex);
+    obj->mutex = mutex;
+
+    return UACPI_TRUE;
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -125,6 +145,11 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
         goto out_free_ret;
     case UACPI_OBJECT_PACKAGE:
         if (uacpi_likely(package_alloc(ret, 0)))
+            break;
+
+        goto out_free_ret;
+    case UACPI_OBJECT_MUTEX:
+        if (uacpi_likely(mutex_alloc(ret)))
             break;
 
         goto out_free_ret;
@@ -266,6 +291,14 @@ static void free_package(uacpi_handle handle)
     free_queue_clear(&queue);
 }
 
+static void free_mutex(uacpi_handle handle)
+{
+    uacpi_mutex *mutex = handle;
+
+    uacpi_kernel_free_mutex(mutex->handle);
+    uacpi_kernel_free(mutex);
+}
+
 static void free_object_storage(uacpi_object *obj)
 {
     switch (obj->type) {
@@ -287,6 +320,10 @@ static void free_object_storage(uacpi_object *obj)
     case UACPI_OBJECT_PACKAGE:
         uacpi_shareable_unref_and_delete_if_last(obj->package,
                                                  free_package);
+        break;
+    case UACPI_OBJECT_MUTEX:
+        uacpi_shareable_unref_and_delete_if_last(obj->mutex,
+                                                 free_mutex);
         break;
     default:
         break;
@@ -501,6 +538,24 @@ static uacpi_status deep_copy_package(uacpi_object *dst, uacpi_object *src)
     return ret;
 }
 
+static uacpi_status assign_mutex(uacpi_object *dst, uacpi_object *src,
+                                 enum uacpi_assign_behavior behavior)
+{
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_DEEP_COPY) {
+        if (uacpi_likely(mutex_alloc(dst))) {
+            dst->mutex->sync_level = src->mutex->sync_level;
+            return UACPI_STATUS_OK;
+        }
+
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    dst->mutex = src->mutex;
+    uacpi_shareable_ref(dst->mutex);
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status assign_package(uacpi_object *dst, uacpi_object *src,
                                    enum uacpi_assign_behavior behavior)
 {
@@ -558,7 +613,11 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_METHOD:
     case UACPI_OBJECT_PACKAGE:
+    case UACPI_OBJECT_MUTEX:
         free_object_storage(dst);
+        break;
+    default:
+        break;
     }
 
     switch (src->type) {
@@ -583,6 +642,9 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_METHOD:
         dst->method = src->method;
+        break;
+    case UACPI_OBJECT_MUTEX:
+        ret = assign_mutex(dst, src, behavior);
         break;
     case UACPI_OBJECT_PACKAGE:
         ret = assign_package(dst, src, behavior);
