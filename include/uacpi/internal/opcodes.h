@@ -1148,7 +1148,10 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     TimerOp, UACPI_EXT_OP(0x33),                            \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
+            UACPI_OBJECT_INTEGER,                           \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
