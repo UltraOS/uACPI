@@ -153,7 +153,10 @@ class ASLSource:
             # One or more objects within the Pathname do not exist
             "-vw", "6161",
             # Object does not exist
-            "-vw", "6084"
+            "-vw", "6084",
+
+            # Not a control method, cannot invoke
+            "-vw", "6086",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
