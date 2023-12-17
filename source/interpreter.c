@@ -2039,6 +2039,17 @@ static uacpi_status handle_object_type(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_timer(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *dst;
+
+    dst = item_array_at(&op_ctx->items, 0)->obj;
+    dst->integer = uacpi_kernel_get_ticks();
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -3006,6 +3017,7 @@ enum op_handler {
     OP_HANDLER_CREATE_OP_REGION,
     OP_HANDLER_CREATE_FIELD,
     OP_HANDLER_TO,
+    OP_HANDLER_TIMER,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -3042,6 +3054,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_OBJECT_TYPE] = handle_object_type,
     [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region,
     [OP_HANDLER_CREATE_FIELD] = handle_create_field,
+    [OP_HANDLER_TIMER] = handle_timer,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3155,6 +3168,7 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_ProcessorOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_PowerResOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_ThermalZoneOp)] = OP_HANDLER_CODE_BLOCK,
+    [EXT_OP_IDX(UACPI_AML_OP_TimerOp)] = OP_HANDLER_TIMER,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
