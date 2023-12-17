@@ -1819,14 +1819,32 @@ static uacpi_status buffer_to_string(
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status make_null_string(uacpi_buffer *buf)
+static uacpi_status do_make_empty_object(uacpi_buffer *buf,
+                                         uacpi_bool is_string)
 {
     buf->text = uacpi_kernel_calloc(1, sizeof(uacpi_char));
     if (uacpi_unlikely(buf->text == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    buf->size = sizeof(uacpi_char);
+    if (is_string)
+        buf->size = sizeof(uacpi_char);
+
     return UACPI_STATUS_OK;
+}
+
+static uacpi_status make_null_string(uacpi_buffer *buf)
+{
+    return do_make_empty_object(buf, UACPI_TRUE);
+}
+
+static uacpi_status make_null_buffer(uacpi_buffer *buf)
+{
+    /*
+     * Allocate at least 1 byte just to be safe,
+     * even for empty buffers. We still set the
+     * size to 0 though.
+     */
+    return do_make_empty_object(buf, UACPI_FALSE);
 }
 
 static uacpi_status handle_to(struct execution_context *ctx)
@@ -1868,12 +1886,10 @@ static uacpi_status handle_to(struct execution_context *ctx)
         if (uacpi_unlikely_error(ret))
             return ret;
 
-        /*
-         * Allocate at least 1 byte just to be safe,
-         * even for empty buffers. We still set the
-         * size to 0 here though.
-         */
-        dst_buf = uacpi_kernel_alloc(UACPI_MAX(buf.len, 1));
+        if (uacpi_unlikely(buf.len == 0))
+            return make_null_buffer(dst->buffer);
+
+        dst_buf = uacpi_kernel_alloc(buf.len);
         if (uacpi_unlikely(dst_buf == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
 
