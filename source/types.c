@@ -125,6 +125,20 @@ static uacpi_bool mutex_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+static uacpi_bool method_alloc(uacpi_object *obj)
+{
+    uacpi_control_method *method;
+
+    method = uacpi_kernel_calloc(1, sizeof(*method));
+    if (uacpi_unlikely(method == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(method);
+    obj->method = method;
+
+    return UACPI_TRUE;
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -153,6 +167,12 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
             goto out_free_ret;
 
         break;
+
+    case UACPI_OBJECT_METHOD:
+        if (uacpi_unlikely(!method_alloc(ret)))
+            goto out_free_ret;
+
+        break;
     default:
         break;
     }
@@ -170,6 +190,13 @@ static void free_buffer(uacpi_handle handle)
 
     uacpi_kernel_free(buf->data);
     uacpi_kernel_free(buf);
+}
+
+static void free_method(uacpi_handle handle)
+{
+    uacpi_control_method *method = handle;
+
+    uacpi_kernel_free(method);
 }
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(free_queue, uacpi_package*, 4)
@@ -315,7 +342,8 @@ static void free_object_storage(uacpi_object *obj)
                                                  free_buffer);
         break;
     case UACPI_OBJECT_METHOD:
-        uacpi_kernel_free(obj->method);
+        uacpi_shareable_unref_and_delete_if_last(obj->method,
+                                                 free_method);
         break;
     case UACPI_OBJECT_PACKAGE:
         uacpi_shareable_unref_and_delete_if_last(obj->package,
@@ -645,6 +673,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_METHOD:
         dst->method = src->method;
+        uacpi_shareable_ref(dst->method);
         break;
     case UACPI_OBJECT_MUTEX:
         ret = assign_mutex(dst, src, behavior);
