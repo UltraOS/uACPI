@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <cstdio>
+#include <mutex>
+#include <chrono>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -125,4 +127,37 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
 
     return (ts.tv_nsec + ts.tv_sec * 1000000000) / 100;
 #endif
+}
+
+uacpi_handle uacpi_kernel_create_mutex(void)
+{
+    return new std::timed_mutex();
+}
+
+void uacpi_kernel_free_mutex(uacpi_handle handle)
+{
+    auto* mutex = (std::timed_mutex*)handle;
+    delete mutex;
+}
+
+uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
+{
+    auto *mutex = (std::timed_mutex*)handle;
+
+    if (timeout == 0)
+        return mutex->try_lock();
+
+    if (timeout == 0xFFFF) {
+        mutex->lock();
+        return UACPI_TRUE;
+    }
+
+    return mutex->try_lock_for(std::chrono::milliseconds(timeout));
+}
+
+void uacpi_kernel_release_mutex(uacpi_handle handle)
+{
+    auto *mutex = (std::timed_mutex*)handle;
+
+    mutex->unlock();
 }
