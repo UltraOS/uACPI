@@ -2563,7 +2563,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         uacpi_kernel_log(
             UACPI_LOG_WARN,
             "Invalid buffer field: bits [%zu..%zu], buffer size is %zu bytes\n",
-            field->bit_length, field->bit_index + field->bit_length,
+            field->bit_index, field->bit_index + field->bit_length,
             src_buf->size
         );
         return UACPI_STATUS_BAD_BYTECODE;
