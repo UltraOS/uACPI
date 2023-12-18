@@ -812,8 +812,12 @@ static void write_buffer_field(uacpi_buffer_field *field,
         tail_shift = field->bit_length & 7;
 
         uacpi_memcpy_zerout(dst, src_buf.ptr, count, src_buf.len);
-        if (tail_shift)
+        if (tail_shift) {
+            uacpi_u8 last_shift = 8 - tail_shift;
+            dst[count - 1] = dst[count - 1] << last_shift;
+            dst[count - 1] >>= last_shift;
             dst[count - 1] |= (last_byte >> tail_shift) << tail_shift;
+        }
 
         return;
     }
