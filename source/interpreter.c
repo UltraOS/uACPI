@@ -2843,6 +2843,7 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
         break;
 
     case UACPI_OBJECT_BUFFER_INDEX:
+        src = uacpi_unwrap_internal_reference(src);
         ret = object_assign_with_implicit_cast(dst, src);
         break;
 
