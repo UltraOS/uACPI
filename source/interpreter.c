@@ -2533,7 +2533,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         field_obj = item_array_at(&op_ctx->items, 3)->obj;
         field = &field_obj->buffer_field;
 
-        field->bit_index = idx_obj->integer * 8;
+        field->bit_index = idx_obj->integer;
         switch (op_ctx->op->code) {
         case UACPI_AML_OP_CreateBitFieldOp:
             field->bit_length = 1;
@@ -2553,6 +2553,9 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         default:
             return UACPI_STATUS_INVALID_ARGUMENT;
         }
+
+        if (op_ctx->op->code != UACPI_AML_OP_CreateBitFieldOp)
+            field->bit_index *= 8;
     }
 
     if (uacpi_unlikely((field->bit_index + field->bit_length) >
