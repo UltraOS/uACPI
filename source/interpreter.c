@@ -2293,6 +2293,70 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+enum match_op {
+    MTR = 0,
+    MEQ = 1,
+    MLE = 2,
+    MLT = 3,
+    MGE = 4,
+    MGT = 5,
+};
+
+static uacpi_bool match_one(enum match_op op, uacpi_u64 lhs, uacpi_u64 rhs)
+{
+    switch (op) {
+    case MTR:
+        return UACPI_TRUE;
+    case MEQ:
+        return lhs == rhs;
+    case MLE:
+        return lhs <= rhs;
+    case MLT:
+        return lhs < rhs;
+    case MGE:
+        return lhs >= rhs;
+    case MGT:
+        return lhs > rhs;
+    default:
+        return UACPI_FALSE;
+    }
+}
+
+static uacpi_status handle_match(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_package *pkg;
+    uacpi_u64 operand0, operand1, start_idx, i;
+    enum match_op mop0, mop1;
+    uacpi_object *dst;
+
+    pkg = item_array_at(&op_ctx->items, 0)->obj->package;
+    mop0 = item_array_at(&op_ctx->items, 1)->immediate;
+    operand0 = item_array_at(&op_ctx->items, 2)->obj->integer;
+    mop1 = item_array_at(&op_ctx->items, 3)->immediate;
+    operand1 = item_array_at(&op_ctx->items, 4)->obj->integer;
+    start_idx = item_array_at(&op_ctx->items, 5)->obj->integer;
+    dst = item_array_at(&op_ctx->items, 6)->obj;
+
+    for (i = start_idx; i < pkg->count; ++i) {
+        uacpi_object *obj = pkg->objects[i];
+
+        if (obj->type != UACPI_OBJECT_INTEGER)
+            continue;
+
+        if (match_one(mop0, obj->integer, operand0) &&
+            match_one(mop1, obj->integer, operand1))
+            break;
+    }
+
+    if (i < pkg->count)
+        dst->integer = i;
+    else
+        dst->integer = ones();
+
+    return UACPI_STATUS_OK;
+}
+
 /*
  * PkgLength :=
  *   PkgLeadByte |
@@ -3175,6 +3239,7 @@ enum op_handler {
     OP_HANDLER_TO_STRING,
     OP_HANDLER_TIMER,
     OP_HANDLER_MID,
+    OP_HANDLER_MATCH,
     OP_HANDLER_CREATE_MUTEX,
 };
 
@@ -3216,6 +3281,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_TIMER] = handle_timer,
     [OP_HANDLER_TO_STRING] = handle_to_string,
     [OP_HANDLER_MID] = handle_mid,
+    [OP_HANDLER_MATCH] = handle_match,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3319,6 +3385,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_ObjectTypeOp] = OP_HANDLER_OBJECT_TYPE,
 
     [UACPI_AML_OP_MidOp] = OP_HANDLER_MID,
+
+    [UACPI_AML_OP_MatchOp] = OP_HANDLER_MATCH,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
