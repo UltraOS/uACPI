@@ -2007,6 +2007,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
 
 static uacpi_status handle_concatenate(struct execution_context *ctx)
 {
+    uacpi_status ret = UACPI_STATUS_OK;
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *arg0, *arg1, *dst;
     uacpi_u8 *dst_buf;
@@ -2057,23 +2058,32 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
 
         switch (arg1->type) {
         case UACPI_OBJECT_INTEGER: {
-            int ret;
-            ret = uacpi_snprintf(int_buf, sizeof(int_buf), "%"UACPI_PRIx64,
-                                 arg1->integer);
-            if (ret < 0)
+            int size;
+            size = uacpi_snprintf(int_buf, sizeof(int_buf), "%"UACPI_PRIx64,
+                                  arg1->integer);
+            if (size < 0)
                 return UACPI_STATUS_INVALID_ARGUMENT;
 
             arg1_ptr = int_buf;
-            arg1_size = ret + 1;
+            arg1_size = size + 1;
             break;
         }
         case UACPI_OBJECT_STRING:
             arg1_ptr = arg1->buffer->data;
             arg1_size = arg1->buffer->size;
             break;
-        case UACPI_OBJECT_BUFFER:
+        case UACPI_OBJECT_BUFFER: {
+            uacpi_buffer tmp_buf;
+
+            ret = buffer_to_string(arg1->buffer, &tmp_buf, UACPI_TRUE);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
+            arg1_ptr = tmp_buf.data;
+            arg1_size = tmp_buf.size;
+            break;
+        }
         default:
-            // NT doesn't support this, so we don't as well
             return UACPI_STATUS_INVALID_ARGUMENT;
         }
 
@@ -2081,21 +2091,29 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
         buf_size = arg0_size + arg1_size;
 
         dst_buf = uacpi_kernel_alloc(buf_size);
-        if (uacpi_unlikely(dst_buf == UACPI_NULL))
-            return UACPI_STATUS_OUT_OF_MEMORY;
+        if (uacpi_unlikely(dst_buf == UACPI_NULL)) {
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+            goto cleanup;
+        }
 
         uacpi_memcpy(dst_buf, arg0_buf->data, arg0_size);
         uacpi_memcpy(dst_buf + arg0_size, arg1_ptr, arg1_size);
         dst->type = UACPI_OBJECT_STRING;
+
+    cleanup:
+        if (arg1->type == UACPI_OBJECT_BUFFER)
+            uacpi_kernel_free(arg1_ptr);
         break;
     }
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    dst->buffer->data = dst_buf;
-    dst->buffer->size = buf_size;
-    return UACPI_STATUS_OK;
+    if (uacpi_likely_success(ret)) {
+        dst->buffer->data = dst_buf;
+        dst->buffer->size = buf_size;
+    }
+    return ret;
 }
 
 static uacpi_status handle_sizeof(struct execution_context *ctx)
