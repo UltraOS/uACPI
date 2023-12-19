@@ -102,6 +102,7 @@ error_out:
 
 uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 {
+    uacpi_status ret;
     struct acpi_rsdp *rsdp;
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
@@ -127,7 +128,15 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 
     uacpi_kernel_unmap(rsdp, sizeof(struct acpi_rsdp));
 
-    return initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
+    ret = initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_namespace_initialize_predefined();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_namespace_load(void)
