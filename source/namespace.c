@@ -187,7 +187,7 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
     uacpi_namespace_node_free(node);
 }
 
-uacpi_namespace_node *uacpi_namespace_node_find(
+uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
     uacpi_namespace_node *parent,
     uacpi_object_name name
 )

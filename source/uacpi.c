@@ -188,7 +188,7 @@ uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     uacpi_memcpy(&name, path, 4);
-    node = uacpi_namespace_node_find(UACPI_NULL, name);
+    node = uacpi_namespace_node_find_sub_node(UACPI_NULL, name);
 
     if (node == UACPI_NULL)
         return UACPI_STATUS_NOT_FOUND;
