@@ -414,7 +414,7 @@ static uacpi_status resolve_name_string(
             return ret;
 
         parent = cur_node;
-        cur_node = uacpi_namespace_node_find(parent, name);
+        cur_node = uacpi_namespace_node_find_sub_node(parent, name);
 
         switch (behavior) {
         case RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS:
@@ -433,7 +433,7 @@ static uacpi_status resolve_name_string(
                     cur_node = parent;
                     parent = cur_node->parent;
 
-                    cur_node = uacpi_namespace_node_find(parent, name);
+                    cur_node = uacpi_namespace_node_find_sub_node(parent, name);
                 }
             }
             break;
