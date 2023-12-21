@@ -22,6 +22,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_STRING = 2,
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
+    UACPI_OBJECT_UNIT_FIELD = 5,
     UACPI_OBJECT_DEVICE = 6,
     UACPI_OBJECT_METHOD = 8,
     UACPI_OBJECT_MUTEX = 9,
@@ -119,6 +120,55 @@ typedef struct uacpi_control_method {
     uacpi_u8 named_objects_persist: 1;
 } uacpi_control_method;
 
+typedef enum uacpi_access_type {
+    UACPI_ACCESS_TYPE_ANY = 0,
+    UACPI_ACCESS_TYPE_BYTE = 1,
+    UACPI_ACCESS_TYPE_WORD = 2,
+    UACPI_ACCESS_TYPE_DWORD = 3,
+    UACPI_ACCESS_TYPE_QWORD = 4,
+    UACPI_ACCESS_TYPE_BUFFER = 5,
+} uacpi_access_type;
+
+typedef enum uacpi_access_attributes {
+    UACPI_ACCESS_ATTRIBUTE_QUICK = 0x02,
+    UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE = 0x04,
+    UACPI_ACCESS_ATTRIBUTE_BYTE = 0x06,
+    UACPI_ACCESS_ATTRIBUTE_WORD = 0x08,
+    UACPI_ACCESS_ATTRIBUTE_BLOCK = 0x0A,
+    UACPI_ACCESS_ATTRIBUTE_BYTES = 0x0B,
+    UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL = 0x0C,
+    UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL = 0x0D,
+    UACPI_ACCESS_ATTRIBUTE_RAW_BYTES = 0x0E,
+    UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES = 0x0F,
+} uacpi_access_attributes;
+
+typedef enum uacpi_lock_rule {
+    UACPI_LOCK_RULE_NO_LOCK = 0,
+    UACPI_LOCK_RULE_LOCK = 1,
+} uacpi_lock_rule;
+
+typedef enum uacpi_update_rule {
+    UACPI_UPDATE_RULE_PRESERVE = 0,
+    UACPI_UPDATE_RULE_WRITE_AS_ONES = 1,
+    UACPI_UPDATE_RULE_WRITE_AS_ZEROES = 2,
+} uacpi_update_rule;
+
+typedef struct uacpi_unit_field {
+    struct uacpi_shareable shareable;
+
+    uacpi_object *connection;
+    uacpi_operation_region *region;
+
+    uacpi_u32 bit_offset;
+    uacpi_u32 bit_length;
+
+    uacpi_u8 attributes : 4;
+    uacpi_u8 access_type : 3;
+    uacpi_u8 lock_rule : 1;
+    uacpi_u8 update_rule : 2;
+    uacpi_u8 access_length;
+} uacpi_unit_field;
+
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
     uacpi_u8 type;
@@ -136,6 +186,7 @@ typedef struct uacpi_object {
         uacpi_operation_region *op_region;
         uacpi_processor processor;
         uacpi_power_resource power_resource;
+        uacpi_unit_field *unit_field;
     };
 } uacpi_object;
 
