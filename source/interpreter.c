@@ -2980,25 +2980,30 @@ static uacpi_status push_op(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_bool pop_item(struct op_context *op_ctx)
+{
+    struct item *item;
+
+    if (item_array_size(&op_ctx->items) == 0)
+        return UACPI_FALSE;
+
+    item = item_array_last(&op_ctx->items);
+
+    if (item->type == ITEM_OBJECT)
+        uacpi_object_unref(item->obj);
+    if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL)
+        uacpi_namespace_node_free(item->node);
+
+    item_array_pop(&op_ctx->items);
+    return UACPI_TRUE;
+}
+
 static void pop_op(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
     struct op_context *cur_op_ctx = ctx->cur_op_ctx;
 
-    for (;;) {
-        struct item *item;
-
-        item = item_array_last(&cur_op_ctx->items);
-
-        if (item == UACPI_NULL)
-            break;
-        if (item->type == ITEM_OBJECT)
-            uacpi_object_unref(item->obj);
-        if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL)
-            uacpi_namespace_node_free(item->node);
-
-        item_array_pop(&cur_op_ctx->items);
-    }
+    while (pop_item(cur_op_ctx));
 
     item_array_clear(&cur_op_ctx->items);
     op_context_array_pop(&frame->pending_ops);
