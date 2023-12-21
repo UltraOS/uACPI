@@ -168,6 +168,9 @@ enum uacpi_parse_op {
     // Decrement the immediate at decode_ops[pc + 1]
     UACPI_PARSE_OP_IMM_DECREMENT,
 
+    // Remove the last item off the item stack
+    UACPI_PARSE_OP_ITEM_POP,
+
     // Dispatch the method call from items[0] and return from current op_exec
     UACPI_PARSE_OP_DISPATCH_METHOD_CALL,
 
