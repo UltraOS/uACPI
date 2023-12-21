@@ -92,6 +92,7 @@ enum uacpi_operation_region_space {
 };
 
 typedef struct uacpi_operation_region {
+    struct uacpi_shareable shareable;
     uacpi_u8 space;
     uacpi_u64 offset;
     uacpi_u64 length;
@@ -132,7 +133,7 @@ typedef struct uacpi_object {
         uacpi_buffer *buffer;
         uacpi_mutex *mutex;
         uacpi_buffer_index buffer_index;
-        uacpi_operation_region op_region;
+        uacpi_operation_region *op_region;
         uacpi_processor processor;
         uacpi_power_resource power_resource;
     };

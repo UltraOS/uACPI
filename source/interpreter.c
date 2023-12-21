@@ -985,7 +985,7 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
 
     node = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
     obj = item_array_at(&ctx->cur_op_ctx->items, 4)->obj;
-    op_region = &obj->op_region;
+    op_region = obj->op_region;
 
     op_region->space = item_array_at(&ctx->cur_op_ctx->items, 1)->immediate;
     op_region->offset = item_array_at(&ctx->cur_op_ctx->items, 2)->obj->integer;
@@ -1192,8 +1192,8 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         uacpi_kernel_log(
             UACPI_LOG_INFO,
             "%s OperationRegion (ASID %d) 0x%016llX -> 0x%016llX\n",
-            prefix, src->op_region.space, src->op_region.offset,
-            src->op_region.offset + src->op_region.length
+            prefix, src->op_region->space, src->op_region->offset,
+            src->op_region->offset + src->op_region->length
         );
         break;
     case UACPI_OBJECT_POWER_RESOURCE:
