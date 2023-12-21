@@ -1015,8 +1015,161 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+uacpi_u32 get_field_length(struct item *item)
+{
+    struct package_length *pkg = &item->pkg;
+    return pkg->end - pkg->begin;
+}
+
 static uacpi_status handle_create_field(struct execution_context *ctx)
 {
+    uacpi_status ret;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_namespace_node *node;
+    uacpi_object *obj, *connection_obj = UACPI_NULL;
+    uacpi_operation_region *op_region;
+    uacpi_size i, bit_offset = 0;
+
+    uacpi_u8 raw_value, access_type, lock_rule, update_rule;
+    uacpi_u8 access_attrib = 0, access_length = 0;
+
+    obj = item_array_at(&op_ctx->items, 1)->node->object;
+    if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN, "%.4s is not an operation region (%s)\n",
+            uacpi_object_type_to_string(obj->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+    op_region = obj->op_region;
+
+    /*
+     * ByteData
+     * bit 0-3: AccessType
+     *     0 AnyAcc
+     *     1 ByteAcc
+     *     2 WordAcc
+     *     3 DWordAcc
+     *     4 QWordAcc
+     *     5 BufferAcc
+     *     6 Reserved
+     *     7-15 Reserved
+     * bit 4: LockRule
+     *     0 NoLock
+     *     1 Lock
+     * bit 5-6: UpdateRule
+     *     0 Preserve
+     *     1 WriteAsOnes
+     *     2 WriteAsZeros
+     * bit 7: Reserved (must be 0)
+     */
+    raw_value = item_array_at(&op_ctx->items, 2)->immediate;
+    access_type = (raw_value >> 0) & 0b1111;
+    lock_rule   = (raw_value >> 4) & 0b1;
+    update_rule = (raw_value >> 5) & 0b11;
+
+    for (i = 3; i < item_array_size(&op_ctx->items);) {
+        struct item *item;
+        item = item_array_at(&op_ctx->items, i++);
+
+        // An actual field object
+        if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL) {
+            uacpi_u32 length;
+            uacpi_unit_field *field;
+
+            length = get_field_length(item_array_at(&op_ctx->items, i++));
+            node = item->node;
+
+            obj = item_array_at(&op_ctx->items, i++)->obj;
+            field = obj->unit_field;
+
+            field->update_rule = update_rule;
+            field->lock_rule = lock_rule;
+            field->access_type = access_type;
+            field->attributes = access_attrib;
+            field->access_length = access_length;
+            field->region = op_region;
+            uacpi_shareable_ref(field->region);
+
+            field->connection = connection_obj;
+            if (field->connection)
+                uacpi_object_ref(field->connection);
+
+            field->bit_offset = bit_offset;
+            field->bit_length = length;
+
+            node->object = uacpi_create_internal_reference(
+                UACPI_REFERENCE_KIND_NAMED, obj
+            );
+            if (uacpi_unlikely(node->object == UACPI_NULL))
+                return UACPI_STATUS_OUT_OF_MEMORY;
+
+            ret = do_install_node_item(ctx->cur_frame, item);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
+            bit_offset += length;
+            continue;
+        }
+
+        // All other stuff
+        switch (item->immediate) {
+        // ReservedField := 0x00 PkgLength
+        case 0x00:
+            bit_offset += get_field_length(item_array_at(&op_ctx->items, i++));
+            break;
+
+        // AccessField := 0x01 AccessType AccessAttrib
+        // ExtendedAccessField := 0x03 AccessType ExtendedAccessAttrib AccessLength
+        case 0x01:
+        case 0x03:
+            raw_value = item_array_at(&op_ctx->items, i++)->immediate;
+
+            access_type = raw_value & 0b1111;
+            access_attrib = access_type >> 6;
+
+            raw_value = item_array_at(&op_ctx->items, i++)->immediate;
+
+            /*
+             * Bits 7:6
+             *     0 = AccessAttrib = Normal Access Attributes
+             *     1 = AccessAttrib = AttribBytes (x)
+             *     2 = AccessAttrib = AttribRawBytes (x)
+             *     3 = AccessAttrib = AttribRawProcessBytes (x)
+             *     x is encoded as bits 0:7 of the AccessAttrib byte.
+             */
+            if (access_attrib) {
+                switch (access_attrib) {
+                case 1:
+                    access_attrib = UACPI_ACCESS_ATTRIBUTE_BYTES;
+                    break;
+                case 2:
+                    access_attrib = UACPI_ACCESS_ATTRIBUTE_RAW_BYTES;
+                    break;
+                case 3:
+                    access_attrib = UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES;
+                    break;
+                }
+
+                access_length = raw_value;
+            } else { // Normal access attributes
+                access_attrib = raw_value;
+            }
+
+            if (item->immediate == 3)
+                access_length = item_array_at(&op_ctx->items, i++)->immediate;
+            break;
+
+        // ConnectField := <0x02 NameString> | <0x02 BufferData>
+        case 0x02:
+            connection_obj = item_array_at(&op_ctx->items, i++)->obj;
+            break;
+
+        default:
+            return UACPI_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
     return UACPI_STATUS_OK;
 }
 
