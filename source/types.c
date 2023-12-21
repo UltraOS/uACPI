@@ -139,6 +139,20 @@ static uacpi_bool method_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+static uacpi_bool op_region_alloc(uacpi_object *obj)
+{
+    uacpi_operation_region *op_region;
+
+    op_region = uacpi_kernel_calloc(1, sizeof(*op_region));
+    if (uacpi_unlikely(op_region == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(op_region);
+    obj->op_region = op_region;
+
+    return UACPI_TRUE;
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -167,7 +181,11 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
             goto out_free_ret;
 
         break;
+    case UACPI_OBJECT_OPERATION_REGION:
+        if (uacpi_unlikely(!op_region_alloc(ret)))
+            goto out_free_ret;
 
+        break;
     case UACPI_OBJECT_METHOD:
         if (uacpi_unlikely(!method_alloc(ret)))
             goto out_free_ret;
@@ -326,6 +344,12 @@ static void free_mutex(uacpi_handle handle)
     uacpi_kernel_free(mutex);
 }
 
+static void free_op_region(uacpi_handle handle)
+{
+    uacpi_operation_region *op_region = handle;
+    uacpi_kernel_free(op_region);
+}
+
 static void free_object_storage(uacpi_object *obj)
 {
     switch (obj->type) {
@@ -353,6 +377,9 @@ static void free_object_storage(uacpi_object *obj)
         uacpi_shareable_unref_and_delete_if_last(obj->mutex,
                                                  free_mutex);
         break;
+    case UACPI_OBJECT_OPERATION_REGION:
+        uacpi_shareable_unref_and_delete_if_last(obj->op_region,
+                                                 free_op_region);
     default:
         break;
     }
@@ -677,6 +704,10 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_MUTEX:
         ret = assign_mutex(dst, src, behavior);
+        break;
+    case UACPI_OBJECT_OPERATION_REGION:
+        dst->op_region = src->op_region;
+        uacpi_shareable_ref(dst->op_region);
         break;
     case UACPI_OBJECT_PACKAGE:
         ret = assign_package(dst, src, behavior);
