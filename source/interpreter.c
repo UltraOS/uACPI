@@ -692,9 +692,21 @@ static uacpi_status handle_package(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_size buffer_field_byte_size(struct uacpi_buffer_field *field)
+static uacpi_size round_up_field_size_to_bytes(uacpi_size bit_length)
 {
-    return UACPI_ALIGN_UP(field->bit_length, 8, uacpi_u32) / 8;
+    return UACPI_ALIGN_UP(bit_length, 8, uacpi_size) / 8;
+}
+
+static uacpi_size field_byte_size(uacpi_object *obj)
+{
+    uacpi_size bit_length;
+
+    if (obj->type == UACPI_OBJECT_BUFFER_FIELD)
+        bit_length = obj->buffer_field.bit_length;
+    else
+        bit_length = obj->unit_field->bit_length;
+
+    return round_up_field_size_to_bytes(bit_length);
 }
 
 static uacpi_size sizeof_int()
@@ -824,7 +836,7 @@ static void write_buffer_field(uacpi_buffer_field *field,
 
         dst = field->backing->data;
         dst += field->bit_index / 8;
-        count = buffer_field_byte_size(field);
+        count = round_up_field_size_to_bytes(field->bit_length);
 
         last_byte = dst[count - 1];
         tail_shift = field->bit_length & 7;
@@ -841,6 +853,12 @@ static void write_buffer_field(uacpi_buffer_field *field,
     }
 
     do_write_misaligned_buffer_field(field, src_buf);
+}
+
+static void write_unit_field(uacpi_unit_field *field,
+                             struct object_storage_as_buffer src_buf)
+{
+    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement writing unit fields\n");
 }
 
 static uacpi_u8 *buffer_index_cursor(uacpi_buffer_index *buf_idx)
@@ -891,6 +909,10 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
     case UACPI_OBJECT_BUFFER_FIELD:
         write_buffer_field(&dst->buffer_field, src_buf);
+        break;
+
+    case UACPI_OBJECT_UNIT_FIELD:
+        write_unit_field(dst->unit_field, src_buf);
         break;
 
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -2675,6 +2697,24 @@ static uacpi_object_type buffer_field_get_read_type(
     return UACPI_OBJECT_INTEGER;
 }
 
+static uacpi_object_type unit_field_get_read_type(
+    struct uacpi_unit_field *field
+)
+{
+    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32 : 64))
+        return UACPI_OBJECT_BUFFER;
+
+    return UACPI_OBJECT_INTEGER;
+}
+
+static uacpi_object_type field_get_read_type(uacpi_object *obj)
+{
+    if (obj->type == UACPI_OBJECT_BUFFER_FIELD)
+        return buffer_field_get_read_type(&obj->buffer_field);
+
+    return unit_field_get_read_type(obj->unit_field);
+}
+
 static void do_misaligned_buffer_read(uacpi_buffer_field *field, uacpi_u8 *dst)
 {
     struct bit_span src_span = {
@@ -2686,7 +2726,7 @@ static void do_misaligned_buffer_read(uacpi_buffer_field *field, uacpi_u8 *dst)
         .data = dst,
     };
 
-    dst_span.length = buffer_field_byte_size(field) * 8;
+    dst_span.length = round_up_field_size_to_bytes(field->bit_length) * 8;
     do_rw_misaligned_buffer_field(&dst_span, &src_span);
 }
 
@@ -2696,7 +2736,7 @@ static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
         uacpi_u8 *src = field->backing->data;
         uacpi_size count;
 
-        count = buffer_field_byte_size(field);
+        count = round_up_field_size_to_bytes(field->bit_length);
         uacpi_memcpy(dst, src + (field->bit_index / 8), count);
 
         if (field->bit_length & 7)
@@ -2708,25 +2748,35 @@ static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
     do_misaligned_buffer_read(field, dst);
 }
 
+static void do_read_unit_field(uacpi_unit_field *field, uacpi_u8 *dst)
+{
+    uacpi_size i, bytes;
+    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement reading unit fields\n");
+
+    bytes = round_up_field_size_to_bytes(field->bit_length);
+    for (i = 0; i < bytes; ++i)
+        dst[i] = 0xFF;
+
+    dst[bytes - 1] &= (1ul << (field->bit_length & 7)) - 1;
+}
+
 static uacpi_status handle_field_read(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     struct uacpi_namespace_node *node;
-    uacpi_buffer_field *field;
-    uacpi_object *dst_obj;
+    uacpi_object *src_obj, *dst_obj;
     void *dst;
 
     node = item_array_at(&op_ctx->items, 0)->node;
-    field = &uacpi_namespace_node_get_object(node)->buffer_field;
-
+    src_obj = uacpi_namespace_node_get_object(node);
     dst_obj = item_array_at(&op_ctx->items, 1)->obj;
 
-    if (buffer_field_get_read_type(field) == UACPI_OBJECT_BUFFER) {
+    if (field_get_read_type(src_obj) == UACPI_OBJECT_BUFFER) {
         uacpi_buffer *buf;
         uacpi_size buf_size;
 
         buf = dst_obj->buffer;
-        buf_size = buffer_field_byte_size(field);
+        buf_size = field_byte_size(src_obj);
 
         dst = uacpi_kernel_calloc(buf_size, 1);
         if (dst == UACPI_NULL)
@@ -2738,7 +2788,11 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
         dst = &dst_obj->integer;
     }
 
-    do_read_buffer_field(field, dst);
+    if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD)
+        do_read_buffer_field(&src_obj->buffer_field, dst);
+    else
+        do_read_unit_field(src_obj->unit_field, dst);
+
     return UACPI_STATUS_OK;
 }
 
@@ -4067,10 +4121,11 @@ static uacpi_status exec_op(struct execution_context *ctx)
             }
 
             case UACPI_OBJECT_BUFFER_FIELD:
+            case UACPI_OBJECT_UNIT_FIELD:
                 if (!op_wants_term_arg_or_operand(prev_op))
                     break;
 
-                switch (buffer_field_get_read_type(&obj->buffer_field)) {
+                switch (field_get_read_type(obj)) {
                 case UACPI_OBJECT_BUFFER:
                     new_op = UACPI_AML_OP_InternalOpReadFieldAsBuffer;
                     break;
