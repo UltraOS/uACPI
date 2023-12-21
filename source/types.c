@@ -153,6 +153,20 @@ static uacpi_bool op_region_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+static uacpi_bool unit_field_alloc(uacpi_object *obj)
+{
+    uacpi_unit_field *unit_field;
+
+    unit_field = uacpi_kernel_calloc(1, sizeof(*unit_field));
+    if (uacpi_unlikely(unit_field == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(unit_field);
+    obj->unit_field = unit_field;
+
+    return UACPI_TRUE;
+}
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
@@ -173,6 +187,11 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
         break;
     case UACPI_OBJECT_PACKAGE:
         if (uacpi_unlikely(!package_alloc(ret, 0)))
+            goto out_free_ret;
+
+        break;
+    case UACPI_OBJECT_UNIT_FIELD:
+        if (uacpi_unlikely(!unit_field_alloc(ret)))
             goto out_free_ret;
 
         break;
@@ -350,6 +369,15 @@ static void free_op_region(uacpi_handle handle)
     uacpi_kernel_free(op_region);
 }
 
+static void free_unit_field(uacpi_handle handle)
+{
+    uacpi_unit_field *unit_field = handle;
+
+    uacpi_shareable_unref_and_delete_if_last(unit_field->region,
+                                             free_op_region);
+    uacpi_kernel_free(unit_field);
+}
+
 static void free_object_storage(uacpi_object *obj)
 {
     switch (obj->type) {
@@ -372,6 +400,10 @@ static void free_object_storage(uacpi_object *obj)
     case UACPI_OBJECT_PACKAGE:
         uacpi_shareable_unref_and_delete_if_last(obj->package,
                                                  free_package);
+        break;
+    case UACPI_OBJECT_UNIT_FIELD:
+        uacpi_shareable_unref_and_delete_if_last(obj->unit_field,
+                                                 free_unit_field);
         break;
     case UACPI_OBJECT_MUTEX:
         uacpi_shareable_unref_and_delete_if_last(obj->mutex,
@@ -711,6 +743,10 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_PACKAGE:
         ret = assign_package(dst, src, behavior);
+        break;
+    case UACPI_OBJECT_UNIT_FIELD:
+        dst->unit_field = src->unit_field;
+        uacpi_shareable_ref(dst->unit_field);
         break;
     case UACPI_OBJECT_REFERENCE:
         uacpi_object_attach_child(dst, src->inner_object);
