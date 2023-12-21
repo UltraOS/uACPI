@@ -454,6 +454,24 @@ out:
     return ret;
 }
 
+static uacpi_status do_install_node_item(struct call_frame *frame,
+                                         struct item *item)
+{
+    uacpi_status ret;
+
+    ret = uacpi_node_install(item->node->parent, item->node);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    if (!frame->method->named_objects_persist)
+        ret = temp_namespace_node_array_push(&frame->temp_nodes, item->node);
+
+    if (uacpi_likely_success(ret))
+        item->node = UACPI_NULL;
+
+    return ret;
+}
+
 static uacpi_status get_op(struct execution_context *ctx)
 {
     uacpi_aml_op op;
@@ -3723,19 +3741,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE:
             item = item_array_at(&op_ctx->items, op_decode_byte(op_ctx));
-            ret = uacpi_node_install(item->node->parent, item->node);
-
-            if (uacpi_likely_success(ret)) {
-                if (!frame->method->named_objects_persist) {
-                    ret = temp_namespace_node_array_push(
-                        &frame->temp_nodes, item->node
-                    );
-                }
-
-                if (uacpi_likely_success(ret))
-                    item->node = UACPI_NULL;
-            }
-
+            ret = do_install_node_item(frame, item);
             break;
 
         case UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV:
