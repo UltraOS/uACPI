@@ -1058,11 +1058,12 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
     uacpi_u8 raw_value, access_type, lock_rule, update_rule;
     uacpi_u8 access_attrib = 0, access_length = 0;
 
-    obj = item_array_at(&op_ctx->items, 1)->node->object;
+    node = item_array_at(&op_ctx->items, 1)->node;
+    obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
         uacpi_kernel_log(
             UACPI_LOG_WARN, "%.4s is not an operation region (%s)\n",
-            uacpi_object_type_to_string(obj->type)
+            node->name.text, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_BAD_BYTECODE;
     }
