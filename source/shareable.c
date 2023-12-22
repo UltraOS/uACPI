@@ -48,6 +48,9 @@ void uacpi_shareable_unref_and_delete_if_last(
     uacpi_handle handle, void (*do_free)(uacpi_handle)
 )
 {
+    if (handle == UACPI_NULL)
+        return;
+
     if (uacpi_unlikely(uacpi_bugged_shareable(handle)))
         return;
 
