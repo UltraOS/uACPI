@@ -153,11 +153,36 @@ typedef enum uacpi_update_rule {
     UACPI_UPDATE_RULE_WRITE_AS_ZEROES = 2,
 } uacpi_update_rule;
 
+typedef enum uacpi_unit_field_kind {
+    UACPI_UNIT_FIELD_KIND_NORMAL = 0,
+    UACPI_UNIT_FIELD_KIND_INDEX = 1,
+    UACPI_UNIT_FIELD_KIND_BANK = 2,
+} uacpi_unit_field_kind;
+
 typedef struct uacpi_unit_field {
     struct uacpi_shareable shareable;
 
+    union {
+        // UACPI_UNIT_FIELD_KIND_NORMAL
+        struct {
+            uacpi_operation_region *region;
+        };
+
+        // UACPI_UNIT_FIELD_KIND_INDEX
+        struct {
+            struct uacpi_unit_field *index;
+            struct uacpi_unit_field *data;
+        };
+
+        // UACPI_UNIT_FIELD_KIND_BANK
+        struct {
+            uacpi_operation_region *bank_region;
+            struct uacpi_unit_field *bank_selection;
+            uacpi_u64 bank_value;
+        };
+    };
+
     uacpi_object *connection;
-    uacpi_operation_region *region;
 
     uacpi_u32 bit_offset;
     uacpi_u32 bit_length;
@@ -166,6 +191,7 @@ typedef struct uacpi_unit_field {
     uacpi_u8 access_type : 3;
     uacpi_u8 lock_rule : 1;
     uacpi_u8 update_rule : 2;
+    uacpi_u8 kind : 2;
     uacpi_u8 access_length;
 } uacpi_unit_field;
 

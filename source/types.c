@@ -373,8 +373,29 @@ static void free_unit_field(uacpi_handle handle)
 {
     uacpi_unit_field *unit_field = handle;
 
-    uacpi_shareable_unref_and_delete_if_last(unit_field->region,
-                                             free_op_region);
+    switch (unit_field->kind) {
+    case UACPI_UNIT_FIELD_KIND_NORMAL:
+        uacpi_shareable_unref_and_delete_if_last(
+            unit_field->region, free_op_region
+        );
+        break;
+    case UACPI_UNIT_FIELD_KIND_BANK:
+        uacpi_shareable_unref_and_delete_if_last(
+            unit_field->bank_region, free_op_region
+        );
+        break;
+    case UACPI_UNIT_FIELD_KIND_INDEX:
+        uacpi_shareable_unref_and_delete_if_last(
+            unit_field->index, free_unit_field
+        );
+        uacpi_shareable_unref_and_delete_if_last(
+            unit_field->data, free_unit_field
+        );
+        break;
+    default:
+        break;
+    }
+
     uacpi_kernel_free(unit_field);
 }
 
