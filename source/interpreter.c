@@ -1046,28 +1046,100 @@ uacpi_u32 get_field_length(struct item *item)
     return pkg->end - pkg->begin;
 }
 
+struct field_specific_data {
+    uacpi_operation_region *region;
+    struct uacpi_unit_field *field0;
+    struct uacpi_unit_field *field1;
+    uacpi_u64 value;
+};
+
+static uacpi_status ensure_is_a_unit_field(uacpi_namespace_node *node,
+                                           uacpi_unit_field **out_field)
+{
+    uacpi_object *obj;
+
+    obj = uacpi_namespace_node_get_object(node);
+    if (obj->type != UACPI_OBJECT_UNIT_FIELD) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid argument: '%.4s' is not a unit field (%s)\n",
+            node->name.text, uacpi_object_type_to_string(obj->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    *out_field = obj->unit_field;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
+                                           uacpi_operation_region **out_region)
+{
+    uacpi_object *obj;
+
+    obj = uacpi_namespace_node_get_object(node);
+    if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Invalid argument: '%.4s' is not an operation region (%s)\n",
+            node->name.text, uacpi_object_type_to_string(obj->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    *out_region = obj->op_region;
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_field(struct execution_context *ctx)
 {
     uacpi_status ret;
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_namespace_node *node;
     uacpi_object *obj, *connection_obj = UACPI_NULL;
-    uacpi_operation_region *op_region;
-    uacpi_size i, bit_offset = 0;
+    struct field_specific_data field_data;
+    uacpi_size i = 1, bit_offset = 0;
 
     uacpi_u8 raw_value, access_type, lock_rule, update_rule;
     uacpi_u8 access_attrib = 0, access_length = 0;
 
-    node = item_array_at(&op_ctx->items, 1)->node;
-    obj = uacpi_namespace_node_get_object(node);
-    if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN, "%.4s is not an operation region (%s)\n",
-            node->name.text, uacpi_object_type_to_string(obj->type)
-        );
-        return UACPI_STATUS_BAD_BYTECODE;
+    switch (op_ctx->op->code) {
+    case UACPI_AML_OP_FieldOp:
+        node = item_array_at(&op_ctx->items, i++)->node;
+        ret = ensure_is_an_op_region(node, &field_data.region);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+        break;
+
+    case UACPI_AML_OP_BankFieldOp:
+        node = item_array_at(&op_ctx->items, i++)->node;
+        ret = ensure_is_an_op_region(node, &field_data.region);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        node = item_array_at(&op_ctx->items, i++)->node;
+        ret = ensure_is_a_unit_field(node, &field_data.field0);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        field_data.value = item_array_at(&op_ctx->items, i++)->obj->integer;
+        break;
+
+    case UACPI_AML_OP_IndexFieldOp:
+        node = item_array_at(&op_ctx->items, i++)->node;
+        ret = ensure_is_a_unit_field(node, &field_data.field0);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        node = item_array_at(&op_ctx->items, i++)->node;
+        ret = ensure_is_a_unit_field(node, &field_data.field1);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+        break;
+
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
-    op_region = obj->op_region;
 
     /*
      * ByteData
@@ -1089,12 +1161,12 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
      *     2 WriteAsZeros
      * bit 7: Reserved (must be 0)
      */
-    raw_value = item_array_at(&op_ctx->items, 2)->immediate;
+    raw_value = item_array_at(&op_ctx->items, i++)->immediate;
     access_type = (raw_value >> 0) & 0b1111;
     lock_rule   = (raw_value >> 4) & 0b1;
     update_rule = (raw_value >> 5) & 0b11;
 
-    for (i = 3; i < item_array_size(&op_ctx->items);) {
+    while (i < item_array_size(&op_ctx->items)) {
         struct item *item;
         item = item_array_at(&op_ctx->items, i++);
 
@@ -1114,8 +1186,36 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
             field->access_type = access_type;
             field->attributes = access_attrib;
             field->access_length = access_length;
-            field->region = op_region;
-            uacpi_shareable_ref(field->region);
+
+            switch (op_ctx->op->code) {
+            case UACPI_AML_OP_FieldOp:
+                field->region = field_data.region;
+                uacpi_shareable_ref(field->region);
+
+                field->kind = UACPI_UNIT_FIELD_KIND_NORMAL;
+                break;
+
+            case UACPI_AML_OP_BankFieldOp:
+                field->bank_region = field_data.region;
+                uacpi_shareable_ref(field->bank_region);
+
+                field->bank_value = field_data.value;
+                field->kind = UACPI_UNIT_FIELD_KIND_BANK;
+                break;
+
+            case UACPI_AML_OP_IndexFieldOp:
+                field->index = field_data.field0;
+                uacpi_shareable_ref(field->index);
+
+                field->data = field_data.field1;
+                uacpi_shareable_ref(field->data);
+
+                field->kind = UACPI_UNIT_FIELD_KIND_INDEX;
+                break;
+
+            default:
+                return UACPI_STATUS_INVALID_ARGUMENT;
+            }
 
             field->connection = connection_obj;
             if (field->connection)
@@ -3629,13 +3729,16 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_CreateFieldOp)] = OP_HANDLER_CREATE_BUFFER_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_CondRefOfOp)] = OP_HANDLER_REF_OR_DEREF_OF,
     [EXT_OP_IDX(UACPI_AML_OP_OpRegionOp)] = OP_HANDLER_CREATE_OP_REGION,
-    [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_DeviceOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_ProcessorOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_PowerResOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_ThermalZoneOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_TimerOp)] = OP_HANDLER_TIMER,
     [EXT_OP_IDX(UACPI_AML_OP_MutexOp)] = OP_HANDLER_CREATE_MUTEX,
+
+    [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
+    [EXT_OP_IDX(UACPI_AML_OP_IndexFieldOp)] = OP_HANDLER_CREATE_FIELD,
+    [EXT_OP_IDX(UACPI_AML_OP_BankFieldOp)] = OP_HANDLER_CREATE_FIELD,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
