@@ -1018,7 +1018,8 @@ UACPI_OP(                                                        \
 )
 
 extern uacpi_u8 uacpi_field_op_decode_ops[];
-
+extern uacpi_u8 uacpi_index_field_op_decode_ops[];
+extern uacpi_u8 uacpi_bank_field_op_decode_ops[];
 
 #define UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(name, code, type, ...) \
 UACPI_OP(                                                        \
@@ -1221,17 +1222,15 @@ UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
 UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
     ThermalZone, 0x85, UACPI_OBJECT_THERMAL_ZONE            \
 )                                                           \
-UACPI_OP(                                                   \
+UACPI_OUT_OF_LINE_OP(                                       \
     IndexFieldOp, UACPI_EXT_OP(0x86),                       \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+    uacpi_index_field_op_decode_ops,                        \
+    UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
-UACPI_OP(                                                   \
+UACPI_OUT_OF_LINE_OP(                                       \
     BankFieldOp, UACPI_EXT_OP(0x87),                        \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    }                                                       \
+    uacpi_bank_field_op_decode_ops,                         \
+    UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
 UACPI_OP(                                                   \
     DataRegionOp, UACPI_EXT_OP(0x88),                       \
