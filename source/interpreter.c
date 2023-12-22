@@ -1031,8 +1031,11 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     op_region->offset = item_array_at(&ctx->cur_op_ctx->items, 2)->obj->integer;
     op_region->length = item_array_at(&ctx->cur_op_ctx->items, 3)->obj->integer;
 
-    node->object = obj;
-    uacpi_object_ref(obj);
+    node->object = uacpi_create_internal_reference(
+        UACPI_REFERENCE_KIND_NAMED, obj
+    );
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
 
     return UACPI_STATUS_OK;
 }
