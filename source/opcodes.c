@@ -46,53 +46,56 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op op)
     return &opcode_table[op];
 }
 
+#define PARSE_FIELD_ELEMENTS(parse_loop_pc)                            \
+    /* Parse every field element found inside */                       \
+    UACPI_PARSE_OP_IF_HAS_DATA, 44,                                    \
+        /* Look at the first byte */                                   \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                                    \
+                                                                       \
+        /* ReservedField := 0x00 PkgLength */                          \
+        UACPI_PARSE_OP_IF_EQUALS, 0x00, 3,                             \
+            UACPI_PARSE_OP_PKGLEN,                                     \
+            UACPI_PARSE_OP_JMP, parse_loop_pc,                         \
+                                                                       \
+        /* AccessField := 0x01 AccessType AccessAttrib */              \
+        UACPI_PARSE_OP_IF_EQUALS, 0x01, 6,                             \
+            UACPI_PARSE_OP_LOAD_IMM, 1,                                \
+            UACPI_PARSE_OP_LOAD_IMM, 1,                                \
+            UACPI_PARSE_OP_JMP, parse_loop_pc,                         \
+                                                                       \
+        /* ConnectField := <0x02 NameString> | <0x02 BufferData> */    \
+        UACPI_PARSE_OP_IF_EQUALS, 0x02, 5,                             \
+            UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                   \
+            UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,             \
+            UACPI_PARSE_OP_JMP, parse_loop_pc,                         \
+                                                                       \
+        /* ExtendedAccessField := 0x03 AccessType ExtendedAccessAttrib \
+         *                                        AccessLength */      \
+        UACPI_PARSE_OP_IF_EQUALS, 0x03, 8,                             \
+            UACPI_PARSE_OP_LOAD_IMM, 1,                                \
+            UACPI_PARSE_OP_LOAD_IMM, 1,                                \
+            UACPI_PARSE_OP_LOAD_IMM, 1,                                \
+            UACPI_PARSE_OP_JMP, parse_loop_pc,                         \
+                                                                       \
+        /* NamedField := NameSeg PkgLength */                          \
+                                                                       \
+        /*                                                             \
+         * Discard the immediate, as it's the first byte of the        \
+         * nameseg. We don't need it.                                  \
+         */                                                            \
+        UACPI_PARSE_OP_ITEM_POP,                                       \
+        UACPI_PARSE_OP_AML_PC_DECREMENT,                               \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                              \
+        UACPI_PARSE_OP_PKGLEN,                                         \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_UNIT_FIELD,    \
+        UACPI_PARSE_OP_JMP, parse_loop_pc,                             \
+                                                                       \
+    UACPI_PARSE_OP_INVOKE_HANDLER,                                     \
+    UACPI_PARSE_OP_END
+
 uacpi_u8 uacpi_field_op_decode_ops[] = {
     UACPI_PARSE_OP_TRACKED_PKGLEN,
     UACPI_PARSE_OP_EXISTING_NAMESTRING,
     UACPI_PARSE_OP_LOAD_IMM, 1,
-
-    // Parse every field element found inside
-    UACPI_PARSE_OP_IF_HAS_DATA, 44,
-        // Look at the first byte
-        UACPI_PARSE_OP_LOAD_IMM, 1,
-
-        // ReservedField := 0x00 PkgLength
-        UACPI_PARSE_OP_IF_EQUALS, 0x00, 3,
-            UACPI_PARSE_OP_PKGLEN,
-            UACPI_PARSE_OP_JMP, 4,
-
-        // AccessField := 0x01 AccessType AccessAttrib
-        UACPI_PARSE_OP_IF_EQUALS, 0x01, 6,
-            UACPI_PARSE_OP_LOAD_IMM, 1,
-            UACPI_PARSE_OP_LOAD_IMM, 1,
-            UACPI_PARSE_OP_JMP, 4,
-
-        // ConnectField := <0x02 NameString> | <0x02 BufferData>
-        UACPI_PARSE_OP_IF_EQUALS, 0x02, 5,
-            UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
-            UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,
-            UACPI_PARSE_OP_JMP, 4,
-
-        // ExtendedAccessField := 0x03 AccessType ExtendedAccessAttrib AccessLength
-        UACPI_PARSE_OP_IF_EQUALS, 0x03, 8,
-            UACPI_PARSE_OP_LOAD_IMM, 1,
-            UACPI_PARSE_OP_LOAD_IMM, 1,
-            UACPI_PARSE_OP_LOAD_IMM, 1,
-            UACPI_PARSE_OP_JMP, 4,
-
-        // NamedField := NameSeg PkgLength
-
-        /*
-         * Discard the immediate, as it's the first byte of the nameseg.
-         * We don't need it.
-         */
-        UACPI_PARSE_OP_ITEM_POP,
-        UACPI_PARSE_OP_AML_PC_DECREMENT,
-        UACPI_PARSE_OP_CREATE_NAMESTRING,
-        UACPI_PARSE_OP_PKGLEN,
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_UNIT_FIELD,
-        UACPI_PARSE_OP_JMP, 4,
-
-    UACPI_PARSE_OP_INVOKE_HANDLER,
-    UACPI_PARSE_OP_END,
+    PARSE_FIELD_ELEMENTS(4),
 };
