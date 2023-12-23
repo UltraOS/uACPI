@@ -171,31 +171,24 @@ uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
 {
     struct uacpi_namespace_node *node;
     uacpi_object *obj;
-    uacpi_object_name name;
-    uacpi_size len;
 
-    if (!parent && !path)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    if (!path)
+    if (parent == UACPI_NULL && path == UACPI_NULL)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (path[0] == '\\')
-        path++;
+    if (path != UACPI_NULL) {
+        node = uacpi_namespace_node_find(parent, path);
+        if (node == UACPI_NULL)
+            return UACPI_STATUS_NOT_FOUND;
+    } else {
+        node = parent;
+    }
 
-    // TODO: Add support for path resolution
-    len = uacpi_strnlen(path, 4);
-    if (len < 4)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
-    uacpi_memcpy(&name, path, 4);
-    node = uacpi_namespace_node_find_sub_node(UACPI_NULL, name);
-
-    if (node == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
     obj = uacpi_namespace_node_get_object(node);
-
-    if (obj->type != UACPI_OBJECT_METHOD)
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    if (obj->type != UACPI_OBJECT_METHOD) {
+        *ret = obj;
+        uacpi_object_ref(obj);
+        return UACPI_STATUS_OK;
+    }
 
     return uacpi_execute_control_method(node, obj->method, args, ret);
 }
