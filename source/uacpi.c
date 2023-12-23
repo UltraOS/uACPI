@@ -166,15 +166,15 @@ uacpi_status uacpi_namespace_initialize(void)
 }
 
 uacpi_status
-uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path, uacpi_args *args,
-           uacpi_object **ret)
+uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
+           uacpi_args *args, uacpi_object **ret)
 {
     struct uacpi_namespace_node *node;
     uacpi_object *obj;
     uacpi_object_name name;
     uacpi_size len;
 
-    if (!root_handle && !path)
+    if (!parent && !path)
         return UACPI_STATUS_INVALID_ARGUMENT;
     if (!path)
         return UACPI_STATUS_INVALID_ARGUMENT;
