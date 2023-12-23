@@ -30,6 +30,11 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
 
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node);
 
+uacpi_namespace_node *uacpi_namespace_node_find(
+    uacpi_namespace_node *parent,
+    const uacpi_char *path
+);
+
 #ifdef __cplusplus
 }
 #endif

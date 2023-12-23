@@ -207,6 +207,89 @@ uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
     return UACPI_NULL;
 }
 
+uacpi_namespace_node *uacpi_namespace_node_find(
+    uacpi_namespace_node *parent,
+    const uacpi_char *path
+)
+{
+    uacpi_namespace_node *cur_node = parent;
+    const uacpi_char *cursor = path;
+    uacpi_size bytes_left;
+    uacpi_char prev_char = 0;
+
+    if (cur_node == UACPI_NULL)
+        cur_node = uacpi_namespace_root();
+
+    bytes_left = uacpi_strlen(path);
+
+    for (;;) {
+        if (bytes_left == 0)
+            return cur_node;
+
+        switch (*cursor) {
+        case '\\':
+            if (prev_char == '^')
+                goto out_invalid_path;
+
+            cur_node = uacpi_namespace_root();
+            break;
+        case '^':
+            // Tried to go behind root
+            if (uacpi_unlikely(cur_node == uacpi_namespace_root()))
+                goto out_invalid_path;
+
+            cur_node = cur_node->parent;
+            break;
+        default:
+            break;
+        }
+
+        prev_char = *cursor;
+
+        switch (prev_char) {
+        case '^':
+        case '\\':
+            cursor++;
+            bytes_left--;
+            break;
+        default:
+            break;
+        }
+
+        if (prev_char != '^')
+            break;
+    }
+
+    while (bytes_left != 0) {
+        uacpi_object_name nameseg;
+
+        if (*cursor == '.') {
+            cursor++;
+            bytes_left--;
+        }
+
+        if (uacpi_unlikely(bytes_left < 4))
+            goto out_invalid_path;
+
+        uacpi_memcpy(nameseg.text, cursor, sizeof(nameseg));
+        cursor += sizeof(nameseg);
+        bytes_left -= sizeof(nameseg);
+
+        cur_node = uacpi_namespace_node_find_sub_node(cur_node, nameseg);
+        if (cur_node == UACPI_NULL)
+            return cur_node;
+    }
+
+    return cur_node;
+
+out_invalid_path:
+    uacpi_kernel_log(
+        UACPI_LOG_WARN, "Invalid path '%s'\n",
+        path
+    );
+    return UACPI_NULL;
+}
+
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
 {
     return uacpi_unwrap_internal_reference(node->object);
