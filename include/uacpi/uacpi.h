@@ -55,9 +55,11 @@ uacpi_status uacpi_namespace_initialize(void);
 
 /*
  * Evaluate an object within the namespace and get back its value.
- * Either root_handle or path must be valid.
+ * Either root or path must be valid.
+ * A value of NULL for 'parent' implies uacpi_namespace_root() relative
+ * lookups, unless 'path' is already absolute.
  */
-uacpi_status uacpi_eval(uacpi_handle *root_handle, const uacpi_char *path,
+uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
                         uacpi_args *args, uacpi_object **ret);
 
 #ifdef __cplusplus
