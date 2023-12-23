@@ -2480,6 +2480,43 @@ static uacpi_status handle_timer(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_bcd(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_u64 src, dst = 0;
+    uacpi_size i;
+    uacpi_object *dst_obj;
+
+    src = item_array_at(&op_ctx->items, 0)->obj->integer;
+    dst_obj = item_array_at(&op_ctx->items, 2)->obj;
+    i = 64;
+
+    /*
+     * NOTE: ACPICA just errors out for invalid BCD, but NT allows it just fine.
+     *       FromBCD matches NT behavior 1:1 even for invalid BCD, but ToBCD
+     *       produces different results when the input is too large.
+     */
+    if (op_ctx->op->code == UACPI_AML_OP_FromBCDOp) {
+        do {
+            i -= 4;
+            dst *= 10;
+            dst += (src >> i) & 0b1111;
+        } while (i);
+    } else {
+        while (src != 0) {
+            dst >>= 4;
+            i -= 4;
+            dst |= (src % 10) << 60;
+            src /= 10;
+        }
+
+        dst >>= (i % 64);
+    }
+
+    dst_obj->integer = dst;
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_logical_not(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -3575,6 +3612,7 @@ enum op_handler {
     OP_HANDLER_MID,
     OP_HANDLER_MATCH,
     OP_HANDLER_CREATE_MUTEX,
+    OP_HANDLER_BCD,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -3616,6 +3654,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_TO_STRING] = handle_to_string,
     [OP_HANDLER_MID] = handle_mid,
     [OP_HANDLER_MATCH] = handle_match,
+    [OP_HANDLER_BCD] = handle_bcd,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3739,6 +3778,9 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_IndexFieldOp)] = OP_HANDLER_CREATE_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_BankFieldOp)] = OP_HANDLER_CREATE_FIELD,
+
+    [EXT_OP_IDX(UACPI_AML_OP_FromBCDOp)] = OP_HANDLER_BCD,
+    [EXT_OP_IDX(UACPI_AML_OP_ToBCDOp)] = OP_HANDLER_BCD,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)

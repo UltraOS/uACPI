@@ -1034,6 +1034,21 @@ UACPI_OP(                                                        \
     }                                                            \
 )
 
+#define UACPI_BUILD_TO_FROM_BCD(type, code)     \
+UACPI_OP(                                       \
+    type##BCDOp, UACPI_EXT_OP(code),            \
+    {                                           \
+        UACPI_PARSE_OP_OPERAND,                 \
+        UACPI_PARSE_OP_TARGET,                  \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,      \
+            UACPI_OBJECT_INTEGER,               \
+        UACPI_PARSE_OP_INVOKE_HANDLER,          \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,      \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV, \
+    },                                          \
+    UACPI_OP_PROPERTY_TERM_ARG                  \
+)
+
 #define UACPI_ENUMERATE_EXT_OPCODES                         \
 UACPI_OP(                                                   \
     ReservedExtOp, UACPI_EXT_OP(0x00),                      \
@@ -1137,20 +1152,8 @@ UACPI_OP(                                                   \
         UACPI_PARSE_OP_TODO,                                \
     }                                                       \
 )                                                           \
-UACPI_OP(                                                   \
-    FromBDCOp, UACPI_EXT_OP(0x28),                          \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    },                                                      \
-    UACPI_OP_PROPERTY_TERM_ARG                              \
-)                                                           \
-UACPI_OP(                                                   \
-    ToBCD, UACPI_EXT_OP(0x29),                              \
-    {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
-    },                                                      \
-    UACPI_OP_PROPERTY_TERM_ARG                              \
-)                                                           \
+UACPI_BUILD_TO_FROM_BCD(From, 0x28)                         \
+UACPI_BUILD_TO_FROM_BCD(To, 0x29)                           \
 UACPI_OP(                                                   \
     RevisionOp, UACPI_EXT_OP(0x30),                         \
     {                                                       \
