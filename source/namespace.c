@@ -157,7 +157,6 @@ uacpi_status uacpi_node_install(
                 "while installing node @p: previous node @p already has "
                 " a valid prev link @p\n", node, prev, prev->prev
             );
-
         }
 
         prev->prev = node;
