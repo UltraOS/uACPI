@@ -3,6 +3,7 @@
 #include <uacpi/types.h>
 #include <uacpi/status.h>
 #include <uacpi/kernel_api.h>
+#include <uacpi/namespace.h>
 
 #ifdef __cplusplus
 extern "C" {

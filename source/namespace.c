@@ -1,3 +1,4 @@
+#include <uacpi/namespace.h>
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/types.h>
 #include <uacpi/internal/stdlib.h>
