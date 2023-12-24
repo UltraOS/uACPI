@@ -1,12 +1,12 @@
 #include <uacpi/internal/tables.h>
 #include <uacpi/internal/utilities.h>
 
-static union uacpi_table_signature fadt_signature = {
-    .as_chars = { ACPI_FADT_SIGNATURE },
+static uacpi_object_name fadt_signature = {
+    .text = { ACPI_FADT_SIGNATURE },
 };
 
-static union uacpi_table_signature dsdt_signature = {
-    .as_chars = { ACPI_DSDT_SIGNATURE },
+static uacpi_object_name dsdt_signature = {
+    .text = { ACPI_DSDT_SIGNATURE },
 };
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
@@ -36,20 +36,20 @@ get_table_for_type(enum uacpi_table_type type)
 }
 
 static struct uacpi_table*
-get_table_for_signature(union uacpi_table_signature signature)
+get_table_for_signature(uacpi_object_name signature)
 {
     enum uacpi_table_type type = UACPI_TABLE_TYPE_OEM;
 
-    if (signature.as_u32 == fadt_signature.as_u32)
+    if (signature.id == fadt_signature.id)
         type = UACPI_TABLE_TYPE_FADT;
-    if (signature.as_u32 == dsdt_signature.as_u32)
+    if (signature.id == dsdt_signature.id)
         type = UACPI_TABLE_TYPE_DSDT;
 
     return get_table_for_type(type);
 }
 
 static uacpi_status
-table_alloc_slot_for_signature(union uacpi_table_signature signature,
+table_alloc_slot_for_signature(uacpi_object_name signature,
                                struct uacpi_table **out_table)
 {
     *out_table = get_table_for_signature(signature);
@@ -61,7 +61,7 @@ table_alloc_slot_for_signature(union uacpi_table_signature signature,
 
 static uacpi_status
 get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
-                                        union uacpi_table_signature *out_sign,
+                                        uacpi_object_name *out_sign,
                                         uacpi_u32 *out_len)
 {
     struct acpi_sdt_hdr *hdr;
@@ -100,7 +100,7 @@ static uacpi_status map_table(struct uacpi_table *table)
 uacpi_status
 uacpi_table_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
 {
-    union uacpi_table_signature signature;
+    uacpi_object_name signature;
     uacpi_u32 length;
     struct uacpi_table *table;
     uacpi_status ret;
@@ -128,13 +128,13 @@ uacpi_table_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
     if (uacpi_unlikely_error(ret))
         goto out_bad_table;
 
-    if (table->signature.as_u32 == fadt_signature.as_u32) {
+    if (table->signature.id == fadt_signature.id) {
         struct acpi_fadt *fadt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
         ret = uacpi_table_append(fadt->x_dsdt ? fadt->x_dsdt : fadt->dsdt,
                                  UACPI_NULL);
     }
 
-    if (table->signature.as_u32 == dsdt_signature.as_u32) {
+    if (table->signature.id == dsdt_signature.id) {
         struct acpi_dsdt *dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
         g_uacpi_rt_ctx.is_rev1 = dsdt->hdr.revision < 2;
     }
@@ -151,7 +151,7 @@ out_bad_table:
 uacpi_status
 uacpi_table_append_mapped(uacpi_virt_addr virt_addr, struct uacpi_table **out_table)
 {
-    union uacpi_table_signature signature;
+    uacpi_object_name signature;
     struct uacpi_table *table;
     struct acpi_sdt_hdr *hdr;
     uacpi_status ret;
@@ -182,7 +182,7 @@ uacpi_table_append_mapped(uacpi_virt_addr virt_addr, struct uacpi_table **out_ta
 }
 
 struct table_search_spec {
-    union uacpi_table_signature signature;
+    uacpi_object_name signature;
     bool has_signature;
 
     enum uacpi_table_type type;
@@ -209,7 +209,7 @@ static uacpi_status do_search(struct table_search_spec *spec,
             continue;
 
         if (spec->has_signature &&
-            spec->signature.as_u32 == table->signature.as_u32) {
+            spec->signature.id == table->signature.id) {
             found_table = table;
             break;
         }
@@ -247,8 +247,8 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
 }
 
 uacpi_status
-uacpi_table_find_by_signature(union uacpi_table_signature signature,
-                                 struct uacpi_table **out_table)
+uacpi_table_find_by_signature(uacpi_object_name signature,
+                              struct uacpi_table **out_table)
 {
     *out_table = get_table_for_signature(signature);
 
