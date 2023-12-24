@@ -9,24 +9,17 @@ static union uacpi_table_signature dsdt_signature = {
     .as_chars = { ACPI_DSDT_SIGNATURE },
 };
 
-#define UACPI_STATIC_TABLE_ARRAY_REAL_LEN \
-    (UACPI_STATIC_TABLE_ARRAY_LEN - UACPI_BASE_TABLE_COUNT)
-
 #define UACPI_TABLE_BUGGED_REFCOUNT 0xFFFF
+
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
 
 // TODO: thread safety/locking
 static uacpi_status table_do_alloc_slot(struct uacpi_table **out_table)
 {
-    uacpi_size next_tbl_idx = UACPI_BASE_TABLE_COUNT;
-
-    if (g_uacpi_rt_ctx.table_count >= UACPI_STATIC_TABLE_ARRAY_REAL_LEN) {
-        // TODO: dynamically reuse .extra_tables
+    *out_table = table_array_calloc(&g_uacpi_rt_ctx.tables);
+    if (*out_table == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
-    }
 
-    next_tbl_idx += g_uacpi_rt_ctx.table_count++;
-
-    *out_table = &g_uacpi_rt_ctx.tables[next_tbl_idx];
     return UACPI_STATUS_OK;
 }
 
@@ -36,7 +29,7 @@ get_table_for_type(enum uacpi_table_type type)
     switch (type) {
     case UACPI_TABLE_TYPE_FADT:
     case UACPI_TABLE_TYPE_DSDT:
-        return &g_uacpi_rt_ctx.tables[type];
+        return table_array_at(&g_uacpi_rt_ctx.tables, type);
     default:
         break;
     }
@@ -64,11 +57,6 @@ table_alloc_slot_for_signature(union uacpi_table_signature signature,
     *out_table = get_table_for_signature(signature);
     if (*out_table)
         return UACPI_STATUS_OK;
-
-    if (g_uacpi_rt_ctx.table_count >= UACPI_STATIC_TABLE_ARRAY_LEN) {
-        // TODO: dynamically reuse .extra_tables
-        return UACPI_STATUS_OUT_OF_MEMORY;
-    }
 
     return table_do_alloc_slot(out_table);
 }
@@ -273,9 +261,13 @@ static uacpi_status do_search_and_acquire(struct table_search_spec *spec,
     uacpi_status ret = UACPI_STATUS_NOT_FOUND;
     struct uacpi_table *found_table = UACPI_NULL;
 
-    for (idx = spec->base_idx; idx < g_uacpi_rt_ctx.table_count; ++idx) {
+    for (idx = spec->base_idx;
+        idx < table_array_size(&g_uacpi_rt_ctx.tables); ++idx
+    ) {
         uacpi_size real_idx = idx + UACPI_BASE_TABLE_COUNT;
-        struct uacpi_table *table = &g_uacpi_rt_ctx.tables[real_idx];
+        struct uacpi_table *table;
+
+        table = table_array_at(&g_uacpi_rt_ctx.tables, real_idx);
 
         if (spec->has_signature &&
             spec->signature.as_u32 == table->signature.as_u32) {
@@ -339,6 +331,25 @@ uacpi_table_acquire_by_signature(union uacpi_table_signature signature,
     return UACPI_STATUS_OK;
 }
 
+static uacpi_size table_array_index_of(
+    struct table_array *arr, struct uacpi_table *tbl
+)
+{
+    struct uacpi_table *end;
+    uacpi_size inline_cap;
+
+    inline_cap = table_array_inline_capacity(arr);
+    end = arr->inline_storage + inline_cap;
+    if (tbl < end)
+        return tbl - arr->inline_storage;
+
+    end = arr->dynamic_storage + (arr->size_including_inline - inline_cap);
+    if (tbl > end)
+        return 0;
+
+    return tbl - arr->dynamic_storage;
+}
+
 
 uacpi_status
 uacpi_table_acquire_next_with_same_signature(struct uacpi_table **in_out_table)
@@ -352,12 +363,11 @@ uacpi_table_acquire_next_with_same_signature(struct uacpi_table **in_out_table)
     if (get_table_for_signature(spec.signature))
         return UACPI_STATUS_NOT_FOUND;
 
-    spec.base_idx = *in_out_table - g_uacpi_rt_ctx.tables;
-    spec.base_idx -= UACPI_BASE_TABLE_COUNT;
-
-    if (uacpi_unlikely(spec.base_idx > g_uacpi_rt_ctx.table_count))
+    spec.base_idx = table_array_index_of(&g_uacpi_rt_ctx.tables, *in_out_table);
+    if (spec.base_idx == 0)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
+    spec.base_idx -= UACPI_BASE_TABLE_COUNT;
     return do_search_and_acquire(&spec, in_out_table);
 }
 
