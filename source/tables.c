@@ -9,8 +9,6 @@ static union uacpi_table_signature dsdt_signature = {
     .as_chars = { ACPI_DSDT_SIGNATURE },
 };
 
-#define UACPI_TABLE_BUGGED_REFCOUNT 0xFFFF
-
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
 
 // TODO: thread safety/locking
@@ -61,62 +59,6 @@ table_alloc_slot_for_signature(union uacpi_table_signature signature,
     return table_do_alloc_slot(out_table);
 }
 
-static uacpi_u16 table_incref(struct uacpi_table *table)
-{
-    if (uacpi_likely(table->refs != UACPI_TABLE_BUGGED_REFCOUNT))
-        table->refs++;
-
-    return table->refs;
-}
-
-static uacpi_u16 table_decref(struct uacpi_table *table)
-{
-    if (uacpi_unlikely(table->refs == 0)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
-            "BUG: table '%.4s' refcount underflow, keeping a permanent mapping",
-            table->signature.as_chars
-        );
-
-        table->flags |= UACPI_TABLE_NO_UNMAP;
-        table->refs = UACPI_TABLE_BUGGED_REFCOUNT;
-    }
-
-    if (uacpi_likely(table->refs != UACPI_TABLE_BUGGED_REFCOUNT))
-        table->refs--;
-
-    return table->refs;
-}
-
-static uacpi_status do_acquire_table(struct uacpi_table *table)
-{
-    if (!table->refs && !(table->flags & UACPI_TABLE_NO_UNMAP)) {
-        void *virt_table;
-
-        virt_table = uacpi_kernel_map(table->phys_addr, table->length);
-        if (!virt_table)
-            return UACPI_STATUS_MAPPING_FAILED;
-
-        table->virt_addr = UACPI_PTR_TO_VIRT_ADDR(virt_table);
-    }
-
-    table_incref(table);
-    return UACPI_STATUS_OK;
-}
-
-static uacpi_status do_release_table(struct uacpi_table *table)
-{
-    uacpi_size refs = table_decref(table);
-
-    if (refs == 0 && !(table->flags & UACPI_TABLE_NO_UNMAP)) {
-        uacpi_kernel_unmap(UACPI_VIRT_ADDR_TO_PTR(table->virt_addr),
-                           table->length);
-        table->virt_addr = 0;
-    }
-
-    return UACPI_STATUS_OK;
-}
-
 static uacpi_status
 get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
                                         union uacpi_table_signature *out_sign,
@@ -139,8 +81,24 @@ get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status
-uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
+static uacpi_status map_table(struct uacpi_table *table)
+{
+    void *virt_table;
+
+    if (table->flags & UACPI_TABLE_MAPPED)
+        return UACPI_STATUS_OK;
+
+    virt_table = uacpi_kernel_map(table->phys_addr, table->length);
+    if (!virt_table)
+        return UACPI_STATUS_MAPPING_FAILED;
+
+    table->flags |= UACPI_TABLE_MAPPED;
+    table->virt_addr = UACPI_PTR_TO_VIRT_ADDR(virt_table);
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status
+uacpi_table_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
 {
     union uacpi_table_signature signature;
     uacpi_u32 length;
@@ -156,13 +114,10 @@ uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
         return ret;
 
     table->phys_addr = addr;
-    table->virt_addr = 0;
-    table->refs = 0;
-    table->flags = 0;
     table->length = length;
     table->signature = signature;
 
-    ret = do_acquire_table(table);
+    ret = map_table(table);
     if (uacpi_unlikely_error(ret))
         goto out_bad_table;
 
@@ -175,7 +130,8 @@ uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
 
     if (table->signature.as_u32 == fadt_signature.as_u32) {
         struct acpi_fadt *fadt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
-        ret = uacpi_table_append(fadt->x_dsdt ? fadt->x_dsdt : fadt->dsdt);
+        ret = uacpi_table_append(fadt->x_dsdt ? fadt->x_dsdt : fadt->dsdt,
+                                 UACPI_NULL);
     }
 
     if (table->signature.as_u32 == dsdt_signature.as_u32) {
@@ -183,27 +139,13 @@ uacpi_table_do_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
         g_uacpi_rt_ctx.is_rev1 = dsdt->hdr.revision < 2;
     }
 
-    if (out_table == UACPI_NULL)
-        do_release_table(table);
-    else
+    if (out_table != UACPI_NULL)
         *out_table = table;
 
-    return ret;
+    table->flags |= UACPI_TABLE_VALID;
 
 out_bad_table:
-    table->flags |= UACPI_TABLE_INVALID;
     return ret;
-}
-
-uacpi_status uacpi_table_append(uacpi_phys_addr addr)
-{
-    return uacpi_table_do_append(addr, UACPI_NULL);
-}
-
-uacpi_status
-uacpi_table_append_acquire(uacpi_phys_addr addr, struct uacpi_table **out_table)
-{
-    return uacpi_table_do_append(addr, out_table);
 }
 
 uacpi_status
@@ -224,23 +166,18 @@ uacpi_table_append_mapped(uacpi_virt_addr virt_addr, struct uacpi_table **out_ta
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    table->phys_addr = 0;
     table->virt_addr = virt_addr;
-    table->refs = 0;
-    table->flags = UACPI_TABLE_NO_UNMAP;
+    table->flags = UACPI_TABLE_MAPPED;
     table->length = hdr->length;
 
     ret = uacpi_verify_table_checksum_with_warn(hdr, table->length);
-    if (uacpi_unlikely_error(ret)) {
-        table->flags |= UACPI_TABLE_INVALID;
+    if (uacpi_unlikely_error(ret))
         return ret;
-    }
 
-    if (out_table) {
+    if (out_table != UACPI_NULL)
         *out_table = table;
-        return do_acquire_table(table);
-    }
 
+    table->flags |= UACPI_TABLE_VALID;
     return UACPI_STATUS_OK;
 }
 
@@ -254,11 +191,10 @@ struct table_search_spec {
     uacpi_size base_idx;
 };
 
-static uacpi_status do_search_and_acquire(struct table_search_spec *spec,
-                                          struct uacpi_table **out_table)
+static uacpi_status do_search(struct table_search_spec *spec,
+                              struct uacpi_table **out_table)
 {
     uacpi_size idx;
-    uacpi_status ret = UACPI_STATUS_NOT_FOUND;
     struct uacpi_table *found_table = UACPI_NULL;
 
     for (idx = spec->base_idx;
@@ -268,6 +204,9 @@ static uacpi_status do_search_and_acquire(struct table_search_spec *spec,
         struct uacpi_table *table;
 
         table = table_array_at(&g_uacpi_rt_ctx.tables, real_idx);
+
+        if (!(table->flags & UACPI_TABLE_VALID))
+            continue;
 
         if (spec->has_signature &&
             spec->signature.as_u32 == table->signature.as_u32) {
@@ -282,18 +221,15 @@ static uacpi_status do_search_and_acquire(struct table_search_spec *spec,
     }
 
     if (found_table == UACPI_NULL)
-        return ret;
+        return UACPI_STATUS_NOT_FOUND;
 
-    ret = do_acquire_table(found_table);
-    if (uacpi_likely_success(ret))
-        *out_table = found_table;
-
-    return ret;
+    *out_table = found_table;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status
-uacpi_table_acquire_by_type(enum uacpi_table_type type,
-                            struct uacpi_table **out_table)
+uacpi_table_find_by_type(enum uacpi_table_type type,
+                           struct uacpi_table **out_table)
 {
     *out_table = get_table_for_type(type);
 
@@ -304,14 +240,14 @@ uacpi_table_acquire_by_type(enum uacpi_table_type type,
             .base_idx = 0
         };
 
-        return do_search_and_acquire(&spec, out_table);
+        return do_search(&spec, out_table);
     }
 
-    return do_acquire_table(*out_table);
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status
-uacpi_table_acquire_by_signature(union uacpi_table_signature signature,
+uacpi_table_find_by_signature(union uacpi_table_signature signature,
                                  struct uacpi_table **out_table)
 {
     *out_table = get_table_for_signature(signature);
@@ -323,9 +259,7 @@ uacpi_table_acquire_by_signature(union uacpi_table_signature signature,
             .base_idx = 0
         };
 
-        return do_search_and_acquire(&spec, out_table);
-    } else {
-        return do_acquire_table(*out_table);
+        return do_search(&spec, out_table);
     }
 
     return UACPI_STATUS_OK;
@@ -352,7 +286,7 @@ static uacpi_size table_array_index_of(
 
 
 uacpi_status
-uacpi_table_acquire_next_with_same_signature(struct uacpi_table **in_out_table)
+uacpi_table_next_with_same_signature(struct uacpi_table **in_out_table)
 {
     struct table_search_spec spec = {
         .signature = (*in_out_table)->signature,
@@ -368,11 +302,5 @@ uacpi_table_acquire_next_with_same_signature(struct uacpi_table **in_out_table)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     spec.base_idx -= UACPI_BASE_TABLE_COUNT;
-    return do_search_and_acquire(&spec, in_out_table);
-}
-
-uacpi_status
-uacpi_table_release(struct uacpi_table *table)
-{
-    return do_release_table(table);
+    return do_search(&spec, in_out_table);
 }

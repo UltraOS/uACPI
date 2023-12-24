@@ -88,7 +88,7 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
             continue;
 
         entry_addr = uacpi_truncate_phys_addr_with_warn(entry_phys_addr_large);
-        ret = uacpi_table_append(entry_addr);
+        ret = uacpi_table_append(entry_addr, UACPI_NULL);
         if (uacpi_unlikely_error(ret))
             return ret;
     }
@@ -147,7 +147,7 @@ uacpi_status uacpi_namespace_load(void)
     uacpi_status ret;
     struct uacpi_control_method method = { 0 };
 
-    ret = uacpi_table_acquire_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
+    ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
     if (uacpi_unlikely_error(ret))
         return ret;
 
