@@ -46,6 +46,9 @@ enum uacpi_parse_op {
     // Operand := TermArg => Integer
     UACPI_PARSE_OP_OPERAND,
 
+    // TermArg => String
+    UACPI_PARSE_OP_STRING,
+
     /*
      * ComputationalData := ByteConst | WordConst | DWordConst | QWordConst |
      *                      String | ConstObj | RevisionOp | DefBuffer
@@ -1239,12 +1242,9 @@ UACPI_OP(                                                   \
     DataRegionOp, UACPI_EXT_OP(0x88),                       \
     {                                                       \
         UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
+        UACPI_PARSE_OP_STRING,                              \
+        UACPI_PARSE_OP_STRING,                              \
+        UACPI_PARSE_OP_STRING,                              \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
             UACPI_OBJECT_OPERATION_REGION,                  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                      \
