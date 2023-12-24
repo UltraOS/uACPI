@@ -2898,7 +2898,8 @@ static void do_read_unit_field(uacpi_unit_field *field, uacpi_u8 *dst)
     for (i = 0; i < bytes; ++i)
         dst[i] = 0xFF;
 
-    dst[bytes - 1] &= (1ul << (field->bit_length & 7)) - 1;
+    if (field->bit_length & 7)
+        dst[bytes - 1] &= (1ul << (field->bit_length & 7)) - 1;
 }
 
 static uacpi_status handle_field_read(struct execution_context *ctx)
