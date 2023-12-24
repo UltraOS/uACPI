@@ -38,7 +38,7 @@ get_table_for_type(enum uacpi_table_type type)
 static struct uacpi_table*
 get_table_for_signature(uacpi_object_name signature)
 {
-    enum uacpi_table_type type = UACPI_TABLE_TYPE_OEM;
+    enum uacpi_table_type type = UACPI_TABLE_TYPE_INVALID;
 
     if (signature.id == fadt_signature.id)
         type = UACPI_TABLE_TYPE_FADT;
