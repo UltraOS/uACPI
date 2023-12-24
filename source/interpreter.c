@@ -2702,8 +2702,15 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
     case UACPI_AML_OP_LLessOp:
     case UACPI_AML_OP_LGreaterOp:
         // TODO: typecheck at parse time
-        if (lhs->type != rhs->type)
+        if (lhs->type != rhs->type) {
+            uacpi_kernel_log(
+                UACPI_LOG_ERROR,
+                "Don't know how to do a logical comparison of '%s' and '%s'\n",
+                uacpi_object_type_to_string(lhs->type),
+                uacpi_object_type_to_string(rhs->type)
+            );
             return UACPI_STATUS_BAD_BYTECODE;
+        }
 
         if (op == UACPI_AML_OP_LEqualOp)
             res = handle_logical_equality(lhs, rhs);
