@@ -193,10 +193,9 @@ static uacpi_status do_search(struct uacpi_table_identifiers *id,
     struct uacpi_table *found_table = UACPI_NULL;
 
     for (idx = base_idx; idx < table_array_size(&g_uacpi_rt_ctx.tables); ++idx) {
-        uacpi_size real_idx = idx + UACPI_BASE_TABLE_COUNT;
         struct uacpi_table *table;
 
-        table = table_array_at(&g_uacpi_rt_ctx.tables, real_idx);
+        table = table_array_at(&g_uacpi_rt_ctx.tables, idx);
 
         if (!(table->flags & UACPI_TABLE_VALID))
             continue;
@@ -204,11 +203,13 @@ static uacpi_status do_search(struct uacpi_table_identifiers *id,
         if (id->signature.id != table->signature.id)
             continue;
 
-        if (id->oemid[0] != '\0' && id->oemid != table->hdr->oemid)
+        if (id->oemid[0] != '\0' &&
+            uacpi_memcmp(id->oemid, table->hdr->oemid, sizeof(id->oemid)) != 0)
             continue;
 
         if (id->oem_table_id[0] != '\0' &&
-            id->oem_table_id != table->hdr->oem_table_id)
+            uacpi_memcmp(id->oem_table_id, table->hdr->oem_table_id,
+                         sizeof(id->oem_table_id)) != 0)
             continue;
 
         found_table = table;
