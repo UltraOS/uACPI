@@ -53,8 +53,12 @@ table_alloc_slot_for_signature(uacpi_object_name signature,
                                struct uacpi_table **out_table)
 {
     *out_table = get_table_for_signature(signature);
-    if (*out_table)
+    if (*out_table) {
+        if ((*out_table)->flags & UACPI_TABLE_VALID)
+            return UACPI_STATUS_ALREADY_EXISTS;
+
         return UACPI_STATUS_OK;
+    }
 
     return table_do_alloc_slot(out_table);
 }
