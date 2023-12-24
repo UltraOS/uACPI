@@ -108,6 +108,7 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     uacpi_size rxsdt_entry_size;
 
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
+    g_uacpi_rt_ctx.tables.size_including_inline = UACPI_BASE_TABLE_COUNT;
 
     uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
                  sizeof(params->rt_params));

@@ -3,6 +3,7 @@
 #include <uacpi/acpi.h>
 #include <uacpi/types.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/internal/dynamic_array.h>
 
  /*
   * Table is invalid and should be ignored
@@ -32,10 +33,12 @@ struct uacpi_table {
 
 #define UACPI_STATIC_TABLE_ARRAY_LEN 16
 
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
+    table_array, struct uacpi_table, UACPI_STATIC_TABLE_ARRAY_LEN
+)
+
 struct uacpi_runtime_context {
-    struct uacpi_table tables[UACPI_STATIC_TABLE_ARRAY_LEN];
-    struct uacpi_table *extra_tables;
-    uacpi_size table_count;
+    struct table_array tables;
 
     /*
      * This is a per-table value but we mimic the NT implementation:
