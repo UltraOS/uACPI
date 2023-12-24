@@ -26,7 +26,6 @@ struct uacpi_table {
     };
     uacpi_u32 length;
     uacpi_u8 flags;
-    uacpi_u8 type;
 };
 
 #define UACPI_STATIC_TABLE_ARRAY_LEN 16
