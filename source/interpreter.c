@@ -4465,6 +4465,15 @@ static void call_frame_clear(struct call_frame *frame)
         uacpi_object_unref(frame->locals[i]);
 }
 
+static void ctx_reload_post_ret(struct execution_context *ctx)
+{
+    call_frame_clear(ctx->cur_frame);
+    call_frame_array_pop(&ctx->call_stack);
+
+    ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
+    refresh_ctx_pointers(ctx);
+}
+
 static void execution_context_release(struct execution_context *ctx)
 {
     if (ctx->ret)
@@ -4474,21 +4483,11 @@ static void execution_context_release(struct execution_context *ctx)
         while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
             pop_op(ctx);
 
-        call_frame_clear(call_frame_array_last(&ctx->call_stack));
-        call_frame_array_pop(&ctx->call_stack);
+        ctx_reload_post_ret(ctx);
     }
 
     call_frame_array_clear(&ctx->call_stack);
     uacpi_kernel_free(ctx);
-}
-
-static void ctx_reload_post_ret(struct execution_context *ctx)
-{
-    call_frame_clear(ctx->cur_frame);
-    call_frame_array_pop(&ctx->call_stack);
-
-    ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
-    refresh_ctx_pointers(ctx);
 }
 
 uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
