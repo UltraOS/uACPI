@@ -20,7 +20,10 @@ struct uacpi_table {
     struct uacpi_shareable shareable;
     uacpi_object_name signature;
     uacpi_phys_addr phys_addr;
-    uacpi_virt_addr virt_addr;
+    union {
+        uacpi_virt_addr virt_addr;
+        struct acpi_sdt_hdr *hdr;
+    };
     uacpi_u32 length;
     uacpi_u8 flags;
     uacpi_u8 type;
