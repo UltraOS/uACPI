@@ -6,6 +6,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/shareable.h>
+#include <uacpi/internal/tables.h>
 #include <uacpi/kernel_api.h>
 
 enum item_type {
@@ -1030,6 +1031,107 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     op_region->space = item_array_at(&ctx->cur_op_ctx->items, 1)->immediate;
     op_region->offset = item_array_at(&ctx->cur_op_ctx->items, 2)->obj->integer;
     op_region->length = item_array_at(&ctx->cur_op_ctx->items, 3)->obj->integer;
+
+    node->object = uacpi_create_internal_reference(
+        UACPI_REFERENCE_KIND_NAMED, obj
+    );
+    if (uacpi_unlikely(node->object == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status table_id_error(
+    const uacpi_char *opcode, const uacpi_char *arg,
+    uacpi_buffer *str
+)
+{
+    uacpi_kernel_log(
+        UACPI_LOG_ERROR,
+        "%s: Invalid %s '%s'\n", opcode, arg, str->text
+    );
+    return UACPI_STATUS_BAD_BYTECODE;
+}
+
+static void report_table_id_find_error(
+    const uacpi_char *opcode, struct uacpi_table_identifiers *id,
+    uacpi_status ret
+)
+{
+    uacpi_kernel_log(
+        UACPI_LOG_ERROR,
+        "%s: Unable to find table '%.4s' (OEM ID '%.6s', "
+        "OEM Table ID '%.8s'): %s\n",
+        opcode, id->signature.text, id->oemid, id->oem_table_id,
+        uacpi_status_to_string(ret)
+    );
+}
+
+static uacpi_status build_table_id(
+    const uacpi_char *opcode,
+    struct uacpi_table_identifiers *out_id,
+    uacpi_buffer *signature, uacpi_buffer *oem_id,
+    uacpi_buffer *oem_table_id
+)
+{
+    if (uacpi_unlikely(signature->size > (sizeof(uacpi_object_name) + 1)))
+        return table_id_error(opcode, "SignatureString", signature);
+
+    uacpi_memcpy(out_id->signature.text, signature->text,
+                 sizeof(uacpi_object_name));
+
+    if (uacpi_unlikely(oem_id->size > (sizeof(out_id->oemid) + 1)))
+        return table_id_error(opcode, "OemIDString", oem_id);
+
+    uacpi_memcpy_zerout(
+        out_id->oemid, oem_id->text,
+        sizeof(out_id->oemid), oem_id->size ? oem_id->size  - 1 : 0
+    );
+
+    if (uacpi_unlikely(oem_table_id->size > (sizeof(out_id->oem_table_id) + 1)))
+        return table_id_error(opcode, "OemTableIDString", oem_table_id);
+
+    uacpi_memcpy_zerout(
+        out_id->oem_table_id, oem_table_id->text,
+        sizeof(out_id->oem_table_id),
+        oem_table_id->size ? oem_table_id->size - 1 : 0
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_create_data_region(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct item_array *items = &ctx->cur_op_ctx->items;
+    struct uacpi_table_identifiers table_id;
+    struct uacpi_table *table;
+    uacpi_namespace_node *node;
+    uacpi_object *obj;
+    uacpi_operation_region *op_region;
+
+    node = item_array_at(items, 0)->node;
+
+    ret = build_table_id(
+        "DataTableRegion", &table_id,
+        item_array_at(items, 1)->obj->buffer,
+        item_array_at(items, 2)->obj->buffer,
+        item_array_at(items, 3)->obj->buffer
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_table_find(&table_id, &table);
+    if (uacpi_unlikely_error(ret)) {
+        report_table_id_find_error("DataTableRegion", &table_id, ret);
+        return ret;
+    }
+
+    obj = item_array_at(items, 4)->obj;
+    op_region = obj->op_region;
+    op_region->space = UACPI_OP_REGION_SPACE_TABLE_DATA;
+    op_region->offset = table->virt_addr;
+    op_region->length = table->length;
 
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED, obj
@@ -3606,6 +3708,7 @@ enum op_handler {
     OP_HANDLER_INDEX,
     OP_HANDLER_OBJECT_TYPE,
     OP_HANDLER_CREATE_OP_REGION,
+    OP_HANDLER_CREATE_DATA_REGION,
     OP_HANDLER_CREATE_FIELD,
     OP_HANDLER_TO,
     OP_HANDLER_TO_STRING,
@@ -3650,6 +3753,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_INDEX] = handle_index,
     [OP_HANDLER_OBJECT_TYPE] = handle_object_type,
     [OP_HANDLER_CREATE_OP_REGION] = handle_create_op_region,
+    [OP_HANDLER_CREATE_DATA_REGION] = handle_create_data_region,
     [OP_HANDLER_CREATE_FIELD] = handle_create_field,
     [OP_HANDLER_TIMER] = handle_timer,
     [OP_HANDLER_TO_STRING] = handle_to_string,
@@ -3782,6 +3886,8 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
 
     [EXT_OP_IDX(UACPI_AML_OP_FromBCDOp)] = OP_HANDLER_BCD,
     [EXT_OP_IDX(UACPI_AML_OP_ToBCDOp)] = OP_HANDLER_BCD,
+
+    [EXT_OP_IDX(UACPI_AML_OP_DataRegionOp)] = OP_HANDLER_CREATE_DATA_REGION,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)

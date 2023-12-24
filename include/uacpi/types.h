@@ -90,6 +90,9 @@ enum uacpi_operation_region_space {
     UACPI_OP_REGION_SPACE_GENERAL_PURPOSE_IO = 8,
     UACPI_OP_REGION_SPACE_GENERIC_SERIAL_BUS = 9,
     UACPI_OP_REGION_SPACE_PCC = 0x0A,
+
+    // Internal type
+    UACPI_OP_REGION_SPACE_TABLE_DATA = 0xFE,
 };
 
 typedef struct uacpi_operation_region {
