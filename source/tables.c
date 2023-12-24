@@ -299,7 +299,6 @@ uacpi_table_next_with_same_signature(struct uacpi_table **in_out_table)
     if (base_idx == 0)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    base_idx -= UACPI_BASE_TABLE_COUNT;
     return do_search(&id, base_idx, in_out_table);
 }
 
