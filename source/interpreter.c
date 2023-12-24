@@ -4092,8 +4092,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
             expected_type = op_decode_byte(op_ctx);
 
             if (uacpi_unlikely(item->obj->type != expected_type)) {
-                EXEC_OP_WARN_2("bad object type: expected %d, got %d!",
-                               expected_type, item->obj->type);
+                EXEC_OP_WARN_2("bad object type: expected %s, got %s!",
+                               uacpi_object_type_to_string(expected_type),
+                               uacpi_object_type_to_string(item->obj->type));
                 ret = UACPI_STATUS_BAD_BYTECODE;
             }
 
