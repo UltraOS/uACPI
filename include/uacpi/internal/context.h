@@ -16,14 +16,9 @@
  */
 #define UACPI_TABLE_MAPPED (1 << 1)
 
-union uacpi_table_signature {
-    char as_chars[4];
-    uacpi_u32 as_u32;
-};
-
 struct uacpi_table {
     struct uacpi_shareable shareable;
-    union uacpi_table_signature signature;
+    uacpi_object_name signature;
     uacpi_phys_addr phys_addr;
     uacpi_virt_addr virt_addr;
     uacpi_u32 length;

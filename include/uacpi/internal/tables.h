@@ -27,7 +27,7 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
 
 
 uacpi_status
-uacpi_table_find_by_signature(union uacpi_table_signature signature,
+uacpi_table_find_by_signature(uacpi_object_name signature,
                               struct uacpi_table **out_table);
 
 uacpi_status
