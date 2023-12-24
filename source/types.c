@@ -18,6 +18,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Buffer";
     case UACPI_OBJECT_PACKAGE:
         return "Package";
+    case UACPI_OBJECT_UNIT_FIELD:
+        return "Unit Field";
     case UACPI_OBJECT_DEVICE:
         return "Device";
     case UACPI_OBJECT_REFERENCE:
@@ -26,6 +28,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Buffer Index";
     case UACPI_OBJECT_METHOD:
         return "Method";
+    case UACPI_OBJECT_MUTEX:
+        return "Mutex";
     case UACPI_OBJECT_OPERATION_REGION:
         return "Operation Region";
     case UACPI_OBJECT_POWER_RESOURCE:
