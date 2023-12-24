@@ -1238,7 +1238,17 @@ UACPI_OUT_OF_LINE_OP(                                       \
 UACPI_OP(                                                   \
     DataRegionOp, UACPI_EXT_OP(0x88),                       \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
+        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
+        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
+        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_STRING,      \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
+            UACPI_OBJECT_OPERATION_REGION,                  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,           \
     }                                                       \
 )
 
