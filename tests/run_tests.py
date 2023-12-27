@@ -38,12 +38,31 @@ def run_tests(
     bin_dir: str
 ) -> int:
     fail_count = 0
+    skipped_count = 0
 
     for case in cases:
         name, rtype, value = get_case_name_and_expected_result(case)
-        compiled_case = ASLSource.compile(case, compiler, bin_dir)
+        case_name = os.path.basename(case)
 
-        print(f"{os.path.basename(case)}:{name}...", end=" ", flush=True)
+        print(f"{case_name}:{name}...", end=" ", flush=True)
+
+        # Skip the table loading test for old iASL, it prints bogus error
+        # messages and refuses to compile the test case no matter what I try:
+        #
+        #                             If (!Load(TABL)) {
+        # Error    6126 -       syntax error ^
+        #
+        if case_name == "table-loading-0.asl":
+            out = subprocess.check_output([compiler, "-v"],
+                                          universal_newlines=True)
+            # I don't know which versions it's broken for specifically, this
+            # one comes with Ubuntu 22.04, so hardcode it.
+            if "20200925" in out:
+                skipped_count += 1
+                print("SKIPPED (bugged iASL)")
+                continue
+
+        compiled_case = ASLSource.compile(case, compiler, bin_dir)
         proc = subprocess.Popen([runner, compiled_case, rtype, value],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -81,9 +100,11 @@ def run_tests(
         else:
             print("NO OUTPUT FROM TEST")
 
+    skipped_str = f", {skipped_count} SKIPPED" if skipped_count else ""
+    pass_count = len(cases) - fail_count - skipped_count
     print(
-        f"SUMMARY: {len(cases) - fail_count}/{len(cases)} "
-        f"({fail_count} FAILED)"
+        f"SUMMARY: {pass_count}/{len(cases)} "
+        f"({fail_count} FAILED{skipped_str})"
     )
     return fail_count
 
