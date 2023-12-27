@@ -157,6 +157,12 @@ class ASLSource:
 
             # Not a control method, cannot invoke
             "-vw", "6086",
+
+            # Object is not referenced
+            "-vw", "2089",
+
+            # Creation of named objects within a method is highly inefficient
+            "-vw", "2173",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
