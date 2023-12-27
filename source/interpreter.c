@@ -1142,6 +1142,106 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+/*
+ * TODO:
+ * I don't like that we're loading this with an entirely new execution context,
+ * thus doubling the stack & memory usage. There's really no reason to do this
+ * recursively, and we could pretend that this is a simple method call with a
+ * few extra rules, like not propagating the return value, and not aborting on
+ * error, etc.
+ */
+static uacpi_status do_load_table(
+    uacpi_namespace_node *parent, struct uacpi_table *table
+)
+{
+    struct uacpi_control_method method = { 0 };
+    struct acpi_dsdt *dsdt;
+
+    uacpi_kernel_log(
+        UACPI_LOG_INFO,
+        "Dynamically loading '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
+        table->signature.text, table->hdr->oemid, table->hdr->oem_table_id
+    );
+
+    dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
+    method.code = dsdt->definition_block;
+    method.size = table->length - sizeof(dsdt->hdr);
+    method.named_objects_persist = UACPI_TRUE;
+
+    return uacpi_execute_control_method(parent, &method, NULL, NULL);
+}
+
+static uacpi_status handle_load_table(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct item_array *items = &ctx->cur_op_ctx->items;
+    struct uacpi_table_identifiers table_id;
+    struct uacpi_table *table;
+    uacpi_buffer *root_path, *param_path;
+    uacpi_namespace_node *root_node, *param_node = UACPI_NULL;
+    uacpi_object *param_value, *ret_obj;
+
+    ret = build_table_id(
+        "LoadTable", &table_id,
+        item_array_at(items, 1)->obj->buffer,
+        item_array_at(items, 2)->obj->buffer,
+        item_array_at(items, 3)->obj->buffer
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    root_path = item_array_at(items, 4)->obj->buffer;
+    param_path = item_array_at(items, 5)->obj->buffer;
+    param_value = item_array_at(items, 6)->obj;
+    ret_obj = item_array_at(items, 7)->obj;
+
+    if (root_path->size > 1) {
+        root_node = uacpi_namespace_node_find(ctx->cur_frame->cur_scope,
+                                              root_path->text);
+    } else {
+        root_node = uacpi_namespace_root();
+    }
+
+    if (uacpi_unlikely(root_node == UACPI_NULL)) {
+        table_id_error("LoadTable", "RootPathString", root_path);
+        goto return_false;
+    }
+
+    if (param_path->size > 1) {
+        param_node = uacpi_namespace_node_find(root_node, param_path->text);
+        if (uacpi_unlikely(param_node == UACPI_NULL)) {
+            table_id_error("LoadTable", "ParameterPathString", root_path);
+            goto return_false;
+        }
+    }
+
+    ret = uacpi_table_find(&table_id, &table);
+    if (uacpi_unlikely_error(ret)) {
+        report_table_id_find_error("LoadTable", &table_id, ret);
+        goto return_false;
+    }
+
+    ret = do_load_table(root_node, table);
+    if (uacpi_unlikely_error(ret))
+        goto return_false;
+
+    if (param_node != UACPI_NULL) {
+        ret = uacpi_object_assign(
+            uacpi_namespace_node_get_object(param_node),
+            param_value,
+            UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
+        );
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    return UACPI_STATUS_OK;
+
+return_false:
+    ret_obj->integer = 0;
+    return UACPI_STATUS_OK;
+}
+
 uacpi_u32 get_field_length(struct item *item)
 {
     struct package_length *pkg = &item->pkg;
@@ -3746,6 +3846,7 @@ enum op_handler {
     OP_HANDLER_MATCH,
     OP_HANDLER_CREATE_MUTEX,
     OP_HANDLER_BCD,
+    OP_HANDLER_LOAD_TABLE,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -3789,6 +3890,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_MID] = handle_mid,
     [OP_HANDLER_MATCH] = handle_match,
     [OP_HANDLER_BCD] = handle_bcd,
+    [OP_HANDLER_LOAD_TABLE] = handle_load_table,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -3917,6 +4019,8 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_ToBCDOp)] = OP_HANDLER_BCD,
 
     [EXT_OP_IDX(UACPI_AML_OP_DataRegionOp)] = OP_HANDLER_CREATE_DATA_REGION,
+
+    [EXT_OP_IDX(UACPI_AML_OP_LoadTableOp)] = OP_HANDLER_LOAD_TABLE,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
