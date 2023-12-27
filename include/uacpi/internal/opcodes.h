@@ -1115,7 +1115,12 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     LoadOp, UACPI_EXT_OP(0x20),                             \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
+        UACPI_PARSE_OP_TARGET,                              \
+        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                  \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
