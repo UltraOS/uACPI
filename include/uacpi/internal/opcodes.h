@@ -1100,7 +1100,15 @@ UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
 UACPI_OP(                                                   \
     LoadTableOp, UACPI_EXT_OP(0x1F),                        \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, 5,               \
+        UACPI_PARSE_OP_IF_NOT_NULL, 0, 5,                   \
+            UACPI_PARSE_OP_STRING,                          \
+            UACPI_PARSE_OP_IMM_DECREMENT, 0,                \
+            UACPI_PARSE_OP_JMP, 3,                          \
+        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
+        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
