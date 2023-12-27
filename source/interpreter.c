@@ -8,6 +8,7 @@
 #include <uacpi/internal/shareable.h>
 #include <uacpi/internal/tables.h>
 #include <uacpi/kernel_api.h>
+#include <uacpi/internal/utilities.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -1239,6 +1240,129 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
 
 return_false:
     ret_obj->integer = 0;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status handle_load(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct item_array *items = &ctx->cur_op_ctx->items;
+    struct uacpi_table *table;
+    uacpi_object *src;
+    uacpi_object *ret_obj;
+    struct acpi_sdt_hdr *src_table;
+    void *table_buffer;
+    uacpi_size declared_size;
+    uacpi_bool unmap_src = UACPI_FALSE;
+
+    src = item_array_at(items, 0)->obj;
+    ret_obj = item_array_at(items, 2)->obj;
+
+    switch (src->type) {
+    case UACPI_OBJECT_OPERATION_REGION: {
+        uacpi_operation_region *op_region;
+
+        op_region = src->op_region;
+        if (uacpi_unlikely(
+            op_region->space != UACPI_OP_REGION_SPACE_SYSTEM_MEMORY
+        )) {
+            uacpi_kernel_log(
+                UACPI_LOG_ERROR,
+                "Load: operation region is not SystemMemory\n"
+            );
+            goto return_false;
+        }
+
+        if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
+            uacpi_kernel_log(
+                UACPI_LOG_ERROR,
+                "Load: operation region is too small: %zu\n",
+                op_region->length
+            );
+            goto return_false;
+        }
+
+        src_table = uacpi_kernel_map(op_region->offset, op_region->length);
+        if (uacpi_unlikely(src_table == UACPI_NULL)) {
+            uacpi_kernel_log(
+                UACPI_LOG_ERROR,
+                "Load: failed to map operation region "
+                "0x%016"PRIX64" -> 0x%016"PRIX64"\n",
+                op_region->offset, op_region->offset + op_region->length
+            );
+            goto return_false;
+        }
+
+        unmap_src = UACPI_TRUE;
+        declared_size = op_region->length;
+        break;
+    }
+
+    case UACPI_OBJECT_BUFFER: {
+        uacpi_buffer *buffer;
+
+        buffer = src->buffer;
+        if (buffer->size < sizeof(struct acpi_sdt_hdr)) {
+            uacpi_kernel_log(
+                UACPI_LOG_ERROR,
+                "Load: buffer is too small: %zu\n",
+                buffer->size
+            );
+            goto return_false;
+        }
+
+        src_table = buffer->data;
+        declared_size = buffer->size;
+        break;
+    }
+
+    default:
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "Load: invalid argument '%s', expected "
+            "Buffer/Field/OperationRegion\n",
+            uacpi_object_type_to_string(src->type)
+        );
+        goto return_false;
+    }
+
+    if (uacpi_unlikely(src_table->length > declared_size)) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "Load: table size %u is larger than the declared size %zu",
+            src_table->length, declared_size
+        );
+        goto return_false;
+    }
+
+    table_buffer = uacpi_kernel_alloc(src_table->length);
+    if (uacpi_unlikely(table_buffer == UACPI_NULL))
+        goto return_false;
+
+    uacpi_memcpy(table_buffer, src_table, src_table->length);
+
+    if (unmap_src) {
+        uacpi_kernel_unmap(src_table, declared_size);
+        unmap_src = UACPI_FALSE;
+    }
+
+    ret = uacpi_table_append_mapped(UACPI_PTR_TO_VIRT_ADDR(table_buffer),
+                                    &table);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_kernel_free(table_buffer);
+        goto return_false;
+    }
+
+    ret = do_load_table(uacpi_namespace_root(), table);
+    if (uacpi_unlikely_error(ret))
+        goto return_false;
+
+    return UACPI_STATUS_OK;
+
+return_false:
+    ret_obj->integer = 0;
+    if (unmap_src && src_table)
+        uacpi_kernel_unmap(src_table, declared_size);
     return UACPI_STATUS_OK;
 }
 
@@ -3847,6 +3971,7 @@ enum op_handler {
     OP_HANDLER_CREATE_MUTEX,
     OP_HANDLER_BCD,
     OP_HANDLER_LOAD_TABLE,
+    OP_HANDLER_LOAD,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -3891,6 +4016,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_MATCH] = handle_match,
     [OP_HANDLER_BCD] = handle_bcd,
     [OP_HANDLER_LOAD_TABLE] = handle_load_table,
+    [OP_HANDLER_LOAD] = handle_load,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4021,6 +4147,7 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_DataRegionOp)] = OP_HANDLER_CREATE_DATA_REGION,
 
     [EXT_OP_IDX(UACPI_AML_OP_LoadTableOp)] = OP_HANDLER_LOAD_TABLE,
+    [EXT_OP_IDX(UACPI_AML_OP_LoadOp)] = OP_HANDLER_LOAD,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
