@@ -24,6 +24,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_PACKAGE = 4,
     UACPI_OBJECT_UNIT_FIELD = 5,
     UACPI_OBJECT_DEVICE = 6,
+    UACPI_OBJECT_EVENT = 7,
     UACPI_OBJECT_METHOD = 8,
     UACPI_OBJECT_MUTEX = 9,
     UACPI_OBJECT_OPERATION_REGION = 10,
@@ -77,6 +78,11 @@ typedef struct uacpi_mutex {
     uacpi_handle *owner;
     uacpi_u8 sync_level;
 } uacpi_mutex;
+
+typedef struct uacpi_event {
+    struct uacpi_shareable shareable;
+    uacpi_handle *handle;
+} uacpi_event;
 
 enum uacpi_operation_region_space {
     UACPI_OP_REGION_SPACE_SYSTEM_MEMORY = 0,
@@ -211,6 +217,7 @@ typedef struct uacpi_object {
         uacpi_control_method *method;
         uacpi_buffer *buffer;
         uacpi_mutex *mutex;
+        uacpi_event *event;
         uacpi_buffer_index buffer_index;
         uacpi_operation_region *op_region;
         uacpi_processor processor;
