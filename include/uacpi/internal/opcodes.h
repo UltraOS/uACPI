@@ -1127,7 +1127,8 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     StallOp, UACPI_EXT_OP(0x21),                            \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_OPERAND,                             \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \

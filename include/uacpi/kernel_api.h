@@ -30,6 +30,11 @@ void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
 uacpi_u64 uacpi_kernel_get_ticks(void);
 
 /*
+ * Spin for N microseconds.
+ */
+void uacpi_kernel_stall(uacpi_u8 usec);
+
+/*
  * Create/free an opaque non-recursive kernel mutex object.
  */
 uacpi_handle uacpi_kernel_create_mutex(void);
