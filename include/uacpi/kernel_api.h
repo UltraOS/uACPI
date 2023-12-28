@@ -35,6 +35,11 @@ uacpi_u64 uacpi_kernel_get_ticks(void);
 void uacpi_kernel_stall(uacpi_u8 usec);
 
 /*
+ * Sleep for N milliseconds.
+ */
+void uacpi_kernel_sleep(uacpi_u64 msec);
+
+/*
  * Create/free an opaque non-recursive kernel mutex object.
  */
 uacpi_handle uacpi_kernel_create_mutex(void);
