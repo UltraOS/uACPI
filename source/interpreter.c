@@ -2806,16 +2806,27 @@ static uacpi_status handle_timer(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status handle_stall(struct execution_context *ctx)
+static uacpi_status handle_stall_or_sleep(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_u64 time;
 
     time = item_array_at(&op_ctx->items, 0)->obj->integer;
 
-    // Spec says this must evaluate to a ByteData
-    time &= 0xFF;
-    uacpi_kernel_stall(time);
+    if (op_ctx->op->code == UACPI_AML_OP_SleepOp) {
+        /*
+         * ACPICA doesn't allow sleeps longer than 2 seconds,
+         * so we shouldn't either.
+         */
+        if (time > 2000)
+            time = 2000;
+
+        uacpi_kernel_sleep(time);
+    } else {
+        // Spec says this must evaluate to a ByteData
+        time &= 0xFF;
+        uacpi_kernel_stall(time);
+    }
 
     return UACPI_STATUS_OK;
 }
@@ -3986,7 +3997,7 @@ enum op_handler {
     OP_HANDLER_BCD,
     OP_HANDLER_LOAD_TABLE,
     OP_HANDLER_LOAD,
-    OP_HANDLER_STALL,
+    OP_HANDLER_STALL_OR_SLEEP,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -4032,7 +4043,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_BCD] = handle_bcd,
     [OP_HANDLER_LOAD_TABLE] = handle_load_table,
     [OP_HANDLER_LOAD] = handle_load,
-    [OP_HANDLER_STALL] = handle_stall,
+    [OP_HANDLER_STALL_OR_SLEEP] = handle_stall_or_sleep,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4165,7 +4176,8 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_LoadTableOp)] = OP_HANDLER_LOAD_TABLE,
     [EXT_OP_IDX(UACPI_AML_OP_LoadOp)] = OP_HANDLER_LOAD,
 
-    [EXT_OP_IDX(UACPI_AML_OP_StallOp)] = OP_HANDLER_STALL,
+    [EXT_OP_IDX(UACPI_AML_OP_StallOp)] = OP_HANDLER_STALL_OR_SLEEP,
+    [EXT_OP_IDX(UACPI_AML_OP_SleepOp)] = OP_HANDLER_STALL_OR_SLEEP,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
