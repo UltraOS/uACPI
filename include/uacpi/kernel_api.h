@@ -46,11 +46,37 @@ uacpi_handle uacpi_kernel_create_mutex(void);
 void uacpi_kernel_free_mutex(uacpi_handle);
 
 /*
+ * Create/free an opaque kernel (semaphore-like) event object.
+ */
+uacpi_handle uacpi_kernel_create_event(void);
+void uacpi_kernel_free_event(uacpi_handle);
+
+/*
  * Try to acquire the mutex with a millisecond timeout.
  * A timeout value of 0xFFFF implies infinite wait.
  */
 uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16);
 void uacpi_kernel_release_mutex(uacpi_handle);
+
+/*
+ * Try to wait for an event (counter > 0) with a millisecond timeout.
+ * A timeout value of 0xFFFF implies infinite wait.
+ *
+ * The internal counter is decremented by 1 if wait was successful.
+ *
+ * A successful wait is indicated by returning UACPI_TRUE.
+ */
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16);
+
+/*
+ * Signal the event object by incrementing its internal counter by 1.
+ */
+void uacpi_kernel_signal_event(uacpi_handle);
+
+/*
+ * Reset the event counter to 0.
+ */
+void uacpi_kernel_reset_event(uacpi_handle);
 
 #ifdef __cplusplus
 }
