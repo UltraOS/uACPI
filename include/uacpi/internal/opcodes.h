@@ -1152,20 +1152,26 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     SignalOp, UACPI_EXT_OP(0x24),                           \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_SUPERNAME,                           \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \
     WaitOp, UACPI_EXT_OP(0x25),                             \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_SUPERNAME,                           \
+        UACPI_PARSE_OP_OPERAND,                             \
+        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
 UACPI_OP(                                                   \
     ResetOp, UACPI_EXT_OP(0x26),                            \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_SUPERNAME,                           \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \
