@@ -22,6 +22,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Unit Field";
     case UACPI_OBJECT_DEVICE:
         return "Device";
+    case UACPI_OBJECT_EVENT:
+        return "Event";
     case UACPI_OBJECT_REFERENCE:
         return "Reference";
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -129,6 +131,26 @@ static uacpi_bool mutex_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+static uacpi_bool event_alloc(uacpi_object *obj)
+{
+    uacpi_event *event;
+
+    event = uacpi_kernel_calloc(1, sizeof(uacpi_event));
+    if (uacpi_unlikely(event == UACPI_NULL))
+        return UACPI_FALSE;
+
+    event->handle = uacpi_kernel_create_event();
+    if (event->handle == UACPI_NULL) {
+        uacpi_kernel_free(event);
+        return UACPI_FALSE;
+    }
+
+    uacpi_shareable_init(event);
+    obj->event = event;
+
+    return UACPI_TRUE;
+}
+
 static uacpi_bool method_alloc(uacpi_object *obj)
 {
     uacpi_control_method *method;
@@ -201,6 +223,11 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
         break;
     case UACPI_OBJECT_MUTEX:
         if (uacpi_unlikely(!mutex_alloc(ret)))
+            goto out_free_ret;
+
+        break;
+    case UACPI_OBJECT_EVENT:
+        if (uacpi_unlikely(!event_alloc(ret)))
             goto out_free_ret;
 
         break;
@@ -367,6 +394,14 @@ static void free_mutex(uacpi_handle handle)
     uacpi_kernel_free(mutex);
 }
 
+static void free_event(uacpi_handle handle)
+{
+    uacpi_event *event = handle;
+
+    uacpi_kernel_free_event(event->handle);
+    uacpi_kernel_free(event);
+}
+
 static void free_op_region(uacpi_handle handle)
 {
     uacpi_operation_region *op_region = handle;
@@ -433,6 +468,10 @@ static void free_object_storage(uacpi_object *obj)
     case UACPI_OBJECT_MUTEX:
         uacpi_shareable_unref_and_delete_if_last(obj->mutex,
                                                  free_mutex);
+        break;
+    case UACPI_OBJECT_EVENT:
+        uacpi_shareable_unref_and_delete_if_last(obj->event,
+                                                 free_event);
         break;
     case UACPI_OBJECT_OPERATION_REGION:
         uacpi_shareable_unref_and_delete_if_last(obj->op_region,
@@ -668,6 +707,22 @@ static uacpi_status assign_mutex(uacpi_object *dst, uacpi_object *src,
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status assign_event(uacpi_object *dst, uacpi_object *src,
+                                 enum uacpi_assign_behavior behavior)
+{
+    if (behavior == UACPI_ASSIGN_BEHAVIOR_DEEP_COPY) {
+        if (uacpi_likely(event_alloc(dst)))
+            return UACPI_STATUS_OK;
+
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    dst->event = src->event;
+    uacpi_shareable_ref(dst->event);
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status assign_package(uacpi_object *dst, uacpi_object *src,
                                    enum uacpi_assign_behavior behavior)
 {
@@ -729,6 +784,7 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_METHOD:
     case UACPI_OBJECT_PACKAGE:
     case UACPI_OBJECT_MUTEX:
+    case UACPI_OBJECT_EVENT:
         free_object_storage(dst);
         break;
     default:
@@ -761,6 +817,9 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_MUTEX:
         ret = assign_mutex(dst, src, behavior);
+        break;
+    case UACPI_OBJECT_EVENT:
+        ret = assign_event(dst, src, behavior);
         break;
     case UACPI_OBJECT_OPERATION_REGION:
         dst->op_region = src->op_region;
