@@ -3173,6 +3173,56 @@ static uacpi_status handle_create_mutex_or_event(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_event_ctl(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *obj;
+
+    obj = uacpi_unwrap_internal_reference(
+        item_array_at(&op_ctx->items, 0)->obj
+    );
+    if (uacpi_unlikely(obj->type != UACPI_OBJECT_EVENT)) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "%s: Invalid argument '%s', expected an Event object\n",
+            op_ctx->op->name, uacpi_object_type_to_string(obj->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    switch (op_ctx->op->code)
+    {
+    case UACPI_AML_OP_SignalOp:
+        uacpi_kernel_signal_event(obj->event->handle);
+        break;
+    case UACPI_AML_OP_ResetOp:
+        uacpi_kernel_reset_event(obj->event->handle);
+        break;
+    case UACPI_AML_OP_WaitOp: {
+        uacpi_u64 timeout;
+        uacpi_bool ret;
+
+        timeout = item_array_at(&op_ctx->items, 1)->obj->integer;
+        if (timeout > 0xFFFF)
+            timeout = 0xFFFF;
+
+        ret = uacpi_kernel_wait_for_event(obj->event->handle, timeout);
+
+        /*
+         * The return value here is inverted, we return 0 for success and Ones
+         * for timeout and everything else.
+         */
+        if (ret)
+            item_array_at(&op_ctx->items, 2)->obj->integer = 0;
+        break;
+    }
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_named(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4003,6 +4053,7 @@ enum op_handler {
     OP_HANDLER_LOAD_TABLE,
     OP_HANDLER_LOAD,
     OP_HANDLER_STALL_OR_SLEEP,
+    OP_HANDLER_EVENT_CTL,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -4049,6 +4100,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_LOAD_TABLE] = handle_load_table,
     [OP_HANDLER_LOAD] = handle_load,
     [OP_HANDLER_STALL_OR_SLEEP] = handle_stall_or_sleep,
+    [OP_HANDLER_EVENT_CTL] = handle_event_ctl,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4184,6 +4236,10 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
 
     [EXT_OP_IDX(UACPI_AML_OP_StallOp)] = OP_HANDLER_STALL_OR_SLEEP,
     [EXT_OP_IDX(UACPI_AML_OP_SleepOp)] = OP_HANDLER_STALL_OR_SLEEP,
+
+    [EXT_OP_IDX(UACPI_AML_OP_SignalOp)] = OP_HANDLER_EVENT_CTL,
+    [EXT_OP_IDX(UACPI_AML_OP_ResetOp)] = OP_HANDLER_EVENT_CTL,
+    [EXT_OP_IDX(UACPI_AML_OP_WaitOp)] = OP_HANDLER_EVENT_CTL,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
