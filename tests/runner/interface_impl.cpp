@@ -129,6 +129,11 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
 #endif
 }
 
+void uacpi_kernel_stall(uacpi_u8 usec)
+{
+    std::this_thread::sleep_for(std::chrono::microseconds(usec));
+}
+
 uacpi_handle uacpi_kernel_create_mutex(void)
 {
     return new std::timed_mutex();
