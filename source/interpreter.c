@@ -3145,18 +3145,23 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status handle_create_mutex(struct execution_context *ctx)
+static uacpi_status handle_create_mutex_or_event(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_namespace_node *node;
     uacpi_object *dst;
 
     node = item_array_at(&op_ctx->items, 0)->node;
-    dst = item_array_at(&op_ctx->items, 2)->obj;
 
-    // bits 0-3: SyncLevel (0x00-0x0f), bits 4-7: Reserved (must be 0)
-    dst->mutex->sync_level = item_array_at(&op_ctx->items, 1)->immediate;
-    dst->mutex->sync_level &= 0b1111;
+    if (op_ctx->op->code == UACPI_AML_OP_MutexOp) {
+        dst = item_array_at(&op_ctx->items, 2)->obj;
+
+        // bits 0-3: SyncLevel (0x00-0x0f), bits 4-7: Reserved (must be 0)
+        dst->mutex->sync_level = item_array_at(&op_ctx->items, 1)->immediate;
+        dst->mutex->sync_level &= 0b1111;
+    } else {
+        dst = item_array_at(&op_ctx->items, 1)->obj;
+    }
 
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED,
@@ -3993,7 +3998,7 @@ enum op_handler {
     OP_HANDLER_TIMER,
     OP_HANDLER_MID,
     OP_HANDLER_MATCH,
-    OP_HANDLER_CREATE_MUTEX,
+    OP_HANDLER_CREATE_MUTEX_OR_EVENT,
     OP_HANDLER_BCD,
     OP_HANDLER_LOAD_TABLE,
     OP_HANDLER_LOAD,
@@ -4015,7 +4020,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_CODE_BLOCK] = handle_code_block,
     [OP_HANDLER_RETURN] = handle_return,
     [OP_HANDLER_CREATE_METHOD] = handle_create_method,
-    [OP_HANDLER_CREATE_MUTEX] = handle_create_mutex,
+    [OP_HANDLER_CREATE_MUTEX_OR_EVENT] = handle_create_mutex_or_event,
     [OP_HANDLER_COPY_OBJECT_OR_STORE] = handle_copy_object_or_store,
     [OP_HANDLER_INC_DEC] = handle_inc_dec,
     [OP_HANDLER_REF_OR_DEREF_OF] = handle_ref_or_deref_of,
@@ -4162,7 +4167,8 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_PowerResOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_ThermalZoneOp)] = OP_HANDLER_CODE_BLOCK,
     [EXT_OP_IDX(UACPI_AML_OP_TimerOp)] = OP_HANDLER_TIMER,
-    [EXT_OP_IDX(UACPI_AML_OP_MutexOp)] = OP_HANDLER_CREATE_MUTEX,
+    [EXT_OP_IDX(UACPI_AML_OP_MutexOp)] = OP_HANDLER_CREATE_MUTEX_OR_EVENT,
+    [EXT_OP_IDX(UACPI_AML_OP_EventOp)] = OP_HANDLER_CREATE_MUTEX_OR_EVENT,
 
     [EXT_OP_IDX(UACPI_AML_OP_FieldOp)] = OP_HANDLER_CREATE_FIELD,
     [EXT_OP_IDX(UACPI_AML_OP_IndexFieldOp)] = OP_HANDLER_CREATE_FIELD,
