@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <mutex>
 #include <chrono>
+#include <thread>
+#include <condition_variable>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -170,4 +172,85 @@ void uacpi_kernel_release_mutex(uacpi_handle handle)
     auto *mutex = (std::timed_mutex*)handle;
 
     mutex->unlock();
+}
+
+class Event {
+public:
+    void signal()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        counter++;
+        cv.notify_one();
+    }
+
+    void reset()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        counter = 0;
+    }
+
+    uacpi_bool wait(uacpi_u16 timeout)
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+
+        if (counter) {
+            counter--;
+            return UACPI_TRUE;
+        }
+
+        if (timeout == 0)
+            return UACPI_FALSE;
+
+        if (timeout == 0xFFFF) {
+            cv.wait(lock, [this] {
+                return counter != 0;
+            });
+            counter--;
+            return UACPI_TRUE;
+        }
+
+        auto wait_res = cv.wait_for(
+            lock, std::chrono::milliseconds(timeout),
+            [this] { return counter != 0; }
+        );
+        if (!wait_res)
+            return UACPI_FALSE;
+
+        counter--;
+        return UACPI_TRUE;
+    }
+
+private:
+    std::mutex mutex;
+    std::condition_variable cv;
+    uacpi_size counter = 0;
+};
+
+uacpi_handle uacpi_kernel_create_event(void)
+{
+    return new Event;
+}
+
+void uacpi_kernel_free_event(uacpi_handle handle)
+{
+    auto *event = (Event*)handle;
+    delete event;
+}
+
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout)
+{
+    auto *event = (Event*)handle;
+    return event->wait(timeout);
+}
+
+void uacpi_kernel_signal_event(uacpi_handle handle)
+{
+    auto *event = (Event*)handle;
+    return event->signal();
+}
+
+void uacpi_kernel_reset_event(uacpi_handle handle)
+{
+    auto *event = (Event*)handle;
+    return event->reset();
 }
