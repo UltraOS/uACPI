@@ -91,6 +91,136 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
     code_block_array, struct code_block, static
 )
 
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(held_mutexes_array, uacpi_mutex*, 8)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
+    held_mutexes_array, uacpi_mutex*, static
+)
+
+static uacpi_status held_mutexes_array_push(
+    struct held_mutexes_array *arr, uacpi_mutex *mutex
+)
+{
+    uacpi_mutex **slot;
+
+    slot = held_mutexes_array_alloc(arr);
+    if (uacpi_unlikely(slot == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    *slot = mutex;
+    uacpi_shareable_ref(mutex);
+    return UACPI_STATUS_OK;
+}
+
+static void held_mutexes_array_remove_idx(
+    struct held_mutexes_array *arr, uacpi_size i
+)
+{
+    uacpi_size size;
+
+    size = held_mutexes_array_inline_capacity(arr);
+
+    // Only the dynamic array part is affected
+    if (i >= size) {
+        i -= size;
+        size = arr->size_including_inline - size;
+        size -= i + 1;
+
+        uacpi_memmove(
+            &arr->dynamic_storage[i], &arr->dynamic_storage[i + 1],
+            size * sizeof(arr->inline_storage[0])
+        );
+
+        held_mutexes_array_pop(arr);
+        return;
+    }
+
+    size = UACPI_MIN(held_mutexes_array_inline_capacity(arr),
+                     arr->size_including_inline);
+    size -= i + 1;
+    uacpi_memmove(
+        &arr->inline_storage[i], &arr->inline_storage[i + 1],
+        size * sizeof(arr->inline_storage[0])
+    );
+
+    size = held_mutexes_array_size(arr);
+    i = held_mutexes_array_inline_capacity(arr);
+
+    /*
+     * This array has dynamic storage as well, now we have to take the first
+     * dynamic item, move it to the top of inline storage, and then shift all
+     * dynamic items backward by 1 as well.
+     */
+    if (size > i) {
+        arr->inline_storage[i - 1] = arr->dynamic_storage[0];
+        size -= i + 1;
+
+        uacpi_memmove(
+            &arr->dynamic_storage[0], &arr->dynamic_storage[1],
+            size * sizeof(arr->inline_storage[0])
+        );
+    }
+
+    held_mutexes_array_pop(arr);
+}
+
+enum force_release {
+    FORCE_RELEASE_NO,
+    FORCE_RELEASE_YES,
+};
+
+static uacpi_status held_mutexes_array_remove_and_release(
+    struct held_mutexes_array *arr, uacpi_mutex *mutex,
+    enum force_release force
+)
+{
+    uacpi_mutex *item;
+    uacpi_size i;
+
+    if (uacpi_unlikely(held_mutexes_array_size(arr) == 0))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    item = *held_mutexes_array_last(arr);
+
+    // Fast path for well-behaved AML that releases mutexes in descending order
+    if (uacpi_likely(item == mutex)) {
+        held_mutexes_array_pop(arr);
+        uacpi_mutex_unref(mutex);
+        return UACPI_STATUS_OK;
+    }
+
+    if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
+                       force != FORCE_RELEASE_YES)) {
+        uacpi_kernel_log(
+            UACPI_LOG_WARN,
+            "Ignoring mutex @p release due to sync level mismatch: %d vs %d\n",
+            mutex, mutex->sync_level, item->sync_level
+        );
+
+        // We still return OK because we don't want to abort because of this
+        return UACPI_STATUS_OK;
+    }
+
+    /*
+     * The mutex being released is not the last one acquired, although we did
+     * verify that at least it has the same sync level. Anyway, now we have
+     * to search for it and then remove it from the array while shifting
+     * everything backwards.
+     */
+    i = held_mutexes_array_size(arr);
+    for (;;) {
+        item = *held_mutexes_array_at(arr, --i);
+        if (item == mutex)
+            break;
+
+        if (uacpi_unlikely(i == 0))
+            return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    held_mutexes_array_remove_idx(arr, i);
+    uacpi_mutex_unref(mutex);
+    return UACPI_STATUS_OK;
+}
+
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
     temp_namespace_node_array, uacpi_namespace_node*, 8)
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
@@ -150,6 +280,7 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
 struct execution_context {
     uacpi_object *ret;
     struct call_frame_array call_stack;
+    struct held_mutexes_array held_mutexes;
 
     struct call_frame *cur_frame;
     struct code_block *cur_block;
@@ -3223,6 +3354,106 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_u8 current_sync_level(struct execution_context *ctx)
+{
+    if (held_mutexes_array_size(&ctx->held_mutexes) == 0)
+        return 0;
+
+    return (*held_mutexes_array_last(&ctx->held_mutexes))->sync_level;
+}
+
+static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *obj;
+    uacpi_bool owned_by_us;
+
+    obj = uacpi_unwrap_internal_reference(
+        item_array_at(&op_ctx->items, 0)->obj
+    );
+    if (uacpi_unlikely(obj->type != UACPI_OBJECT_MUTEX)) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "%s: Invalid argument '%s', expected a Mutex object\n",
+            op_ctx->op->name, uacpi_object_type_to_string(obj->type)
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    // TODO: This should probably be a relaxed atomic load?
+    owned_by_us = obj->mutex->owner == ctx;
+
+    switch (op_ctx->op->code)
+    {
+    case UACPI_AML_OP_AcquireOp: {
+        uacpi_u64 timeout;
+        uacpi_u64 *return_value;
+        uacpi_bool success;
+
+        return_value = &item_array_at(&op_ctx->items, 2)->obj->integer;
+
+        if (owned_by_us) {
+            obj->mutex->depth++;
+            *return_value = 0;
+            break;
+        }
+
+        if (uacpi_unlikely(current_sync_level(ctx) > obj->mutex->sync_level)) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "Ignoring attempt to acquire mutex @%p with a lower sync level "
+                "(%d < %d)\n", obj->mutex->sync_level, current_sync_level(ctx)
+            );
+            break;
+        }
+
+        timeout = item_array_at(&op_ctx->items, 1)->immediate;
+        if (timeout > 0xFFFF)
+            timeout = 0xFFFF;
+
+        success = uacpi_kernel_acquire_mutex(obj->mutex->handle, timeout);
+        if (success) {
+            uacpi_status ret;
+
+            ret = held_mutexes_array_push(&ctx->held_mutexes, obj->mutex);
+            if (uacpi_unlikely_error(ret)) {
+                uacpi_kernel_release_mutex(obj->mutex->handle);
+                return ret;
+            }
+
+            // TODO: this should be a relaxed atomic store
+            obj->mutex->owner = ctx;
+            obj->mutex->depth = 1;
+            item_array_at(&op_ctx->items, 2)->obj->integer = 0;
+        }
+        break;
+    }
+
+    case UACPI_AML_OP_ReleaseOp:
+        if (!owned_by_us) {
+            uacpi_kernel_log(
+                UACPI_LOG_WARN,
+                "Attempted to release not-previously-acquired mutex object "
+                "@%p (%p)\n", obj->mutex, obj->mutex->handle
+            );
+            break;
+        }
+
+        if (obj->mutex->depth-- > 1)
+            break;
+
+        return held_mutexes_array_remove_and_release(
+            &ctx->held_mutexes, obj->mutex,
+            FORCE_RELEASE_NO
+        );
+
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_named(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4054,6 +4285,7 @@ enum op_handler {
     OP_HANDLER_LOAD,
     OP_HANDLER_STALL_OR_SLEEP,
     OP_HANDLER_EVENT_CTL,
+    OP_HANDLER_MUTEX_CTL,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -4101,6 +4333,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_LOAD] = handle_load,
     [OP_HANDLER_STALL_OR_SLEEP] = handle_stall_or_sleep,
     [OP_HANDLER_EVENT_CTL] = handle_event_ctl,
+    [OP_HANDLER_MUTEX_CTL] = handle_mutex_ctl,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4240,6 +4473,9 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_SignalOp)] = OP_HANDLER_EVENT_CTL,
     [EXT_OP_IDX(UACPI_AML_OP_ResetOp)] = OP_HANDLER_EVENT_CTL,
     [EXT_OP_IDX(UACPI_AML_OP_WaitOp)] = OP_HANDLER_EVENT_CTL,
+
+    [EXT_OP_IDX(UACPI_AML_OP_AcquireOp)] = OP_HANDLER_MUTEX_CTL,
+    [EXT_OP_IDX(UACPI_AML_OP_ReleaseOp)] = OP_HANDLER_MUTEX_CTL,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
@@ -4809,7 +5045,16 @@ static void execution_context_release(struct execution_context *ctx)
         ctx_reload_post_ret(ctx);
     }
 
+    while (held_mutexes_array_size(&ctx->held_mutexes) != 0) {
+        held_mutexes_array_remove_and_release(
+            &ctx->held_mutexes,
+            *held_mutexes_array_last(&ctx->held_mutexes),
+            FORCE_RELEASE_YES
+        );
+    }
+
     call_frame_array_clear(&ctx->call_stack);
+    held_mutexes_array_clear(&ctx->held_mutexes);
     uacpi_kernel_free(ctx);
 }
 
