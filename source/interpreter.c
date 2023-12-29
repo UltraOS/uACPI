@@ -4085,6 +4085,27 @@ static void pop_op(struct execution_context *ctx)
     refresh_ctx_pointers(ctx);
 }
 
+static void call_frame_clear(struct call_frame *frame)
+{
+    uacpi_size i;
+    op_context_array_clear(&frame->pending_ops);
+    code_block_array_clear(&frame->code_blocks);
+
+    while (temp_namespace_node_array_size(&frame->temp_nodes) != 0) {
+        uacpi_namespace_node *node;
+
+        node = *temp_namespace_node_array_last(&frame->temp_nodes);
+        uacpi_node_uninstall(node);
+        temp_namespace_node_array_pop(&frame->temp_nodes);
+    }
+    temp_namespace_node_array_clear(&frame->temp_nodes);
+
+    for (i = 0; i < 7; ++i)
+        uacpi_object_unref(frame->args[i]);
+    for (i = 0; i < 8; ++i)
+        uacpi_object_unref(frame->locals[i]);
+}
+
 static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_SIMPLE_NAME] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_SUPERNAME] = ITEM_EMPTY_OBJECT,
@@ -4987,21 +5008,26 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             ret = enter_method(ctx, frame, method);
             if (uacpi_unlikely_error(ret))
-                return ret;
+                goto method_dispatch_error;
 
             ret = frame_push_args(frame, ctx->cur_op_ctx);
             if (uacpi_unlikely_error(ret))
-                return ret;
+                goto method_dispatch_error;
 
             ret = frame_setup_base_scope(frame, node, method);
             if (uacpi_unlikely_error(ret))
-                return ret;
+                goto method_dispatch_error;
 
             ctx->cur_frame = frame;
             ctx->cur_op_ctx = UACPI_NULL;
             ctx->prev_op_ctx = UACPI_NULL;
             ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
             return UACPI_STATUS_OK;
+
+        method_dispatch_error:
+            call_frame_clear(frame);
+            call_frame_array_pop(&ctx->call_stack);
+            return ret;
         }
 
         case UACPI_PARSE_OP_CONVERT_NAMESTRING: {
@@ -5069,27 +5095,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
     }
-}
-
-static void call_frame_clear(struct call_frame *frame)
-{
-    uacpi_size i;
-    op_context_array_clear(&frame->pending_ops);
-    code_block_array_clear(&frame->code_blocks);
-
-    while (temp_namespace_node_array_size(&frame->temp_nodes) != 0) {
-        uacpi_namespace_node *node;
-
-        node = *temp_namespace_node_array_last(&frame->temp_nodes);
-        uacpi_node_uninstall(node);
-        temp_namespace_node_array_pop(&frame->temp_nodes);
-    }
-    temp_namespace_node_array_clear(&frame->temp_nodes);
-
-    for (i = 0; i < 7; ++i)
-        uacpi_object_unref(frame->args[i]);
-    for (i = 0; i < 8; ++i)
-        uacpi_object_unref(frame->locals[i]);
 }
 
 static void ctx_reload_post_ret(struct execution_context *ctx)
