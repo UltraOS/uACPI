@@ -1145,7 +1145,11 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     AcquireOp, UACPI_EXT_OP(0x23),                          \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_SUPERNAME,                           \
+        UACPI_PARSE_OP_LOAD_IMM, 2,                         \
+        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
     },                                                      \
     UACPI_OP_PROPERTY_TERM_ARG                              \
 )                                                           \
@@ -1177,7 +1181,8 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     ReleaseOp, UACPI_EXT_OP(0x27),                          \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_SUPERNAME,                           \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
     }                                                       \
 )                                                           \
 UACPI_BUILD_TO_FROM_BCD(From, 0x28)                         \
