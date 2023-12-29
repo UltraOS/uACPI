@@ -41,4 +41,5 @@ uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object);
 
 uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements);
 
+uacpi_mutex *uacpi_create_mutex(void);
 void uacpi_mutex_unref(uacpi_mutex*);
