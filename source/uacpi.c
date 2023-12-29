@@ -35,6 +35,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "unimplemented";
     case UACPI_STATUS_ALREADY_EXISTS:
         return "already exists";
+    case UACPI_STATUS_INTERNAL_ERROR:
+        return "internal error";
     default:
         return "<invalid status>";
     }
