@@ -629,8 +629,13 @@ static uacpi_status get_op(struct execution_context *ctx)
     }
 
     ctx->cur_op = uacpi_get_op_spec(op);
-    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED))
+    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR, "Invalid opcode '%s' encountered in bytestream\n",
+            ctx->cur_op->name
+        );
         return UACPI_STATUS_BAD_BYTECODE;
+    }
 
     return UACPI_STATUS_OK;
 }
