@@ -260,13 +260,6 @@ static void free_buffer(uacpi_handle handle)
     uacpi_kernel_free(buf);
 }
 
-static void free_method(uacpi_handle handle)
-{
-    uacpi_control_method *method = handle;
-
-    uacpi_kernel_free(method);
-}
-
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(free_queue, uacpi_package*, 4)
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(free_queue, uacpi_package*, static)
 
@@ -444,6 +437,17 @@ static void free_unit_field(uacpi_handle handle)
     }
 
     uacpi_kernel_free(unit_field);
+}
+
+static void free_method(uacpi_handle handle)
+{
+    uacpi_control_method *method = handle;
+
+    uacpi_shareable_unref_and_delete_if_last(
+        method->mutex, free_mutex
+    );
+
+    uacpi_kernel_free(method);
 }
 
 static void free_object_storage(uacpi_object *obj)
