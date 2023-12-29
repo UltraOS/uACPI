@@ -74,14 +74,14 @@ typedef struct uacpi_buffer_index {
 
 typedef struct uacpi_mutex {
     struct uacpi_shareable shareable;
-    uacpi_handle *handle;
-    uacpi_handle *owner;
+    uacpi_handle handle;
+    uacpi_handle owner;
     uacpi_u8 sync_level;
 } uacpi_mutex;
 
 typedef struct uacpi_event {
     struct uacpi_shareable shareable;
-    uacpi_handle *handle;
+    uacpi_handle handle;
 } uacpi_event;
 
 enum uacpi_operation_region_space {
