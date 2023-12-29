@@ -111,24 +111,28 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
-static uacpi_bool mutex_alloc(uacpi_object *obj)
+uacpi_mutex *uacpi_create_mutex(void)
 {
     uacpi_mutex *mutex;
 
     mutex = uacpi_kernel_calloc(1, sizeof(uacpi_mutex));
     if (uacpi_unlikely(mutex == UACPI_NULL))
-        return UACPI_FALSE;
+        return UACPI_NULL;
 
     mutex->handle = uacpi_kernel_create_mutex();
     if (mutex->handle == UACPI_NULL) {
         uacpi_kernel_free(mutex);
-        return UACPI_FALSE;
+        return UACPI_NULL;
     }
 
     uacpi_shareable_init(mutex);
-    obj->mutex = mutex;
+    return mutex;
+}
 
-    return UACPI_TRUE;
+static uacpi_bool mutex_alloc(uacpi_object *obj)
+{
+    obj->mutex = uacpi_create_mutex();
+    return obj->mutex != UACPI_NULL;
 }
 
 static uacpi_bool event_alloc(uacpi_object *obj)
