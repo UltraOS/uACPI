@@ -181,13 +181,6 @@ static uacpi_status held_mutexes_array_remove_and_release(
 
     item = *held_mutexes_array_last(arr);
 
-    // Fast path for well-behaved AML that releases mutexes in descending order
-    if (uacpi_likely(item == mutex)) {
-        held_mutexes_array_pop(arr);
-        uacpi_mutex_unref(mutex);
-        return UACPI_STATUS_OK;
-    }
-
     if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
                        force != FORCE_RELEASE_YES)) {
         uacpi_kernel_log(
@@ -197,6 +190,13 @@ static uacpi_status held_mutexes_array_remove_and_release(
         );
 
         // We still return OK because we don't want to abort because of this
+        return UACPI_STATUS_OK;
+    }
+
+    // Fast path for well-behaved AML that releases mutexes in descending order
+    if (uacpi_likely(item == mutex)) {
+        held_mutexes_array_pop(arr);
+        uacpi_mutex_unref(mutex);
         return UACPI_STATUS_OK;
     }
 
@@ -254,6 +254,9 @@ struct call_frame {
     struct uacpi_namespace_node *cur_scope;
 
     uacpi_u32 code_offset;
+
+    // Only used if the method is serialized
+    uacpi_u8 prev_sync_level;
 };
 
 static void *call_frame_cursor(struct call_frame *frame)
@@ -290,6 +293,7 @@ struct execution_context {
     struct op_context *cur_op_ctx;
 
     uacpi_bool skip_else;
+    uacpi_u8 sync_level;
 };
 
 #define AML_READ(ptr, offset) (*(((uacpi_u8*)(code)) + offset))
@@ -3354,14 +3358,6 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_u8 current_sync_level(struct execution_context *ctx)
-{
-    if (held_mutexes_array_size(&ctx->held_mutexes) == 0)
-        return 0;
-
-    return (*held_mutexes_array_last(&ctx->held_mutexes))->sync_level;
-}
-
 static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -3392,18 +3388,18 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 
         return_value = &item_array_at(&op_ctx->items, 2)->obj->integer;
 
-        if (owned_by_us) {
-            obj->mutex->depth++;
-            *return_value = 0;
-            break;
-        }
-
-        if (uacpi_unlikely(current_sync_level(ctx) > obj->mutex->sync_level)) {
+        if (uacpi_unlikely(ctx->sync_level > obj->mutex->sync_level)) {
             uacpi_kernel_log(
                 UACPI_LOG_WARN,
                 "Ignoring attempt to acquire mutex @%p with a lower sync level "
-                "(%d < %d)\n", obj->mutex->sync_level, current_sync_level(ctx)
+                "(%d < %d)\n", obj->mutex->sync_level, ctx->sync_level
             );
+            break;
+        }
+
+        if (owned_by_us) {
+            obj->mutex->depth++;
+            *return_value = 0;
             break;
         }
 
@@ -3424,12 +3420,15 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
             // TODO: this should be a relaxed atomic store
             obj->mutex->owner = ctx;
             obj->mutex->depth = 1;
+            ctx->sync_level = obj->mutex->sync_level;
             item_array_at(&op_ctx->items, 2)->obj->integer = 0;
         }
         break;
     }
 
-    case UACPI_AML_OP_ReleaseOp:
+    case UACPI_AML_OP_ReleaseOp: {
+        uacpi_status ret;
+
         if (!owned_by_us) {
             uacpi_kernel_log(
                 UACPI_LOG_WARN,
@@ -3442,10 +3441,23 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
         if (obj->mutex->depth-- > 1)
             break;
 
-        return held_mutexes_array_remove_and_release(
+        ret = held_mutexes_array_remove_and_release(
             &ctx->held_mutexes, obj->mutex,
             FORCE_RELEASE_NO
         );
+        if (uacpi_likely_success(ret)) {
+            uacpi_mutex **last_mutex;
+
+            last_mutex = held_mutexes_array_last(&ctx->held_mutexes);
+            if (last_mutex == UACPI_NULL) {
+                ctx->sync_level = 0;
+                break;
+            }
+
+            ctx->sync_level = (*last_mutex)->sync_level;
+        }
+        break;
+    }
 
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -3975,6 +3987,58 @@ static uacpi_status handle_copy_object_or_store(struct execution_context *ctx)
         return UACPI_STATUS_BAD_BYTECODE;
 
     return copy_object_to_reference(dst, src);
+}
+
+static uacpi_status enter_method(
+    struct execution_context *ctx, struct call_frame *new_frame,
+    uacpi_control_method *method
+)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_bool owned_by_us = UACPI_FALSE;
+
+    if (!method->is_serialized)
+        return ret;
+
+    if (uacpi_unlikely(ctx->sync_level > method->sync_level)) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "Cannot invoke method @%p, sync level %d is too low "
+            "(current is %d)\n",
+            method, method->sync_level, ctx->sync_level
+        );
+        return UACPI_STATUS_BAD_BYTECODE;
+    }
+
+    if (method->mutex == UACPI_NULL) {
+        method->mutex = uacpi_create_mutex();
+        if (uacpi_unlikely(method->mutex == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+        method->mutex->sync_level = method->sync_level;
+    } else {
+        // TODO: relaxed atomic load
+        owned_by_us = method->mutex->owner == ctx;
+    }
+
+    if (!owned_by_us) {
+        if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(
+            method->mutex->handle, 0xFFFF))) {
+            return UACPI_STATUS_INTERNAL_ERROR;
+        }
+
+        ret = held_mutexes_array_push(&ctx->held_mutexes, method->mutex);
+        if (uacpi_unlikely_error(ret)) {
+            uacpi_kernel_release_mutex(method->mutex->handle);
+            return ret;
+        }
+
+        method->mutex->owner = ctx;
+        method->mutex->depth = 1;
+    }
+
+    new_frame->prev_sync_level = ctx->sync_level;
+    ctx->sync_level = method->sync_level;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status push_op(struct execution_context *ctx)
@@ -4921,6 +4985,10 @@ static uacpi_status exec_op(struct execution_context *ctx)
             if (uacpi_unlikely_error(ret))
                 return ret;
 
+            ret = enter_method(ctx, frame, method);
+            if (uacpi_unlikely_error(ret))
+                return ret;
+
             ret = frame_push_args(frame, ctx->cur_op_ctx);
             if (uacpi_unlikely_error(ret))
                 return ret;
@@ -5027,6 +5095,16 @@ static void call_frame_clear(struct call_frame *frame)
 static void ctx_reload_post_ret(struct execution_context *ctx)
 {
     call_frame_clear(ctx->cur_frame);
+
+    if (ctx->cur_frame->method->is_serialized) {
+        held_mutexes_array_remove_and_release(
+            &ctx->held_mutexes,
+            ctx->cur_frame->method->mutex,
+            FORCE_RELEASE_YES
+        );
+        ctx->sync_level = ctx->cur_frame->prev_sync_level;
+    }
+
     call_frame_array_pop(&ctx->call_stack);
 
     ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
@@ -5084,6 +5162,10 @@ uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
         st = UACPI_STATUS_OUT_OF_MEMORY;
         goto out;
     }
+
+    st = enter_method(ctx, ctx->cur_frame, method);
+    if (uacpi_unlikely_error(st))
+        goto out;
 
     if (args != UACPI_NULL) {
         uacpi_u8 i;
