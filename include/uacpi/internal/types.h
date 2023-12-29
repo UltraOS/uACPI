@@ -40,3 +40,5 @@ struct uacpi_object *uacpi_create_internal_reference(
 uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object);
 
 uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements);
+
+void uacpi_mutex_unref(uacpi_mutex*);

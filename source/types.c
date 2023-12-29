@@ -394,6 +394,14 @@ static void free_mutex(uacpi_handle handle)
     uacpi_kernel_free(mutex);
 }
 
+void uacpi_mutex_unref(uacpi_mutex *mutex)
+{
+    if (mutex == UACPI_NULL)
+        return;
+
+    uacpi_shareable_unref_and_delete_if_last(mutex, free_mutex);
+}
+
 static void free_event(uacpi_handle handle)
 {
     uacpi_event *event = handle;
@@ -466,8 +474,7 @@ static void free_object_storage(uacpi_object *obj)
                                                  free_unit_field);
         break;
     case UACPI_OBJECT_MUTEX:
-        uacpi_shareable_unref_and_delete_if_last(obj->mutex,
-                                                 free_mutex);
+        uacpi_mutex_unref(obj->mutex);
         break;
     case UACPI_OBJECT_EVENT:
         uacpi_shareable_unref_and_delete_if_last(obj->event,
