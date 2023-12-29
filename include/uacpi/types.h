@@ -123,6 +123,7 @@ typedef struct uacpi_power_resource {
 typedef struct uacpi_control_method {
     struct uacpi_shareable shareable;
     uacpi_u8 *code;
+    uacpi_mutex *mutex;
     uacpi_u32 size;
     uacpi_u8 sync_level : 4;
     uacpi_u8 args : 3;
