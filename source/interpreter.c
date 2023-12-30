@@ -287,7 +287,6 @@ struct execution_context {
 
     struct call_frame *cur_frame;
     struct code_block *cur_block;
-    struct uacpi_control_method *cur_method;
     const struct uacpi_op_spec *cur_op;
     struct op_context *prev_op_ctx;
     struct op_context *cur_op_ctx;
@@ -5164,8 +5163,6 @@ uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
             goto out;
         }
     }
-
-    ctx->cur_method = method;
 
     ctx->cur_frame = call_frame_array_calloc(&ctx->call_stack);
     if (uacpi_unlikely(ctx->cur_frame == UACPI_NULL)) {
