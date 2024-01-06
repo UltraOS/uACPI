@@ -151,7 +151,27 @@ uacpi_status uacpi_namespace_load(void)
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    return uacpi_load_table(tbl);
+    ret = uacpi_load_table(tbl);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_SSDT, &tbl);
+    if (ret != UACPI_STATUS_OK)
+        goto out;
+
+    do {
+        ret = uacpi_load_table(tbl);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        ret = uacpi_table_find_next_with_same_signature(&tbl);
+    } while (ret == UACPI_STATUS_OK);
+
+out:
+    if (ret == UACPI_STATUS_NOT_FOUND)
+        ret = UACPI_STATUS_OK;
+
+    return ret;
 }
 
 uacpi_status uacpi_namespace_initialize(void)
