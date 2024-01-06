@@ -145,22 +145,13 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 uacpi_status uacpi_namespace_load(void)
 {
     struct uacpi_table *tbl;
-    struct acpi_dsdt *dsdt;
     uacpi_status ret;
-    struct uacpi_control_method method = { 0 };
 
     ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    dsdt = UACPI_VIRT_ADDR_TO_PTR(tbl->virt_addr);
-    method.code = dsdt->definition_block;
-    method.size = tbl->length - sizeof(dsdt->hdr);
-    method.named_objects_persist = UACPI_TRUE;
-
-    return uacpi_execute_control_method(
-        uacpi_namespace_root(), &method, NULL, NULL
-    );
+    return uacpi_load_table(tbl);
 }
 
 uacpi_status uacpi_namespace_initialize(void)
