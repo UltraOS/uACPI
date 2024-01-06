@@ -1282,6 +1282,12 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+enum table_load_cause {
+    TABLE_LOAD_CAUSE_LOAD_OP,
+    TABLE_LOAD_CAUSE_LOAD_TABLE_OP,
+    TABLE_LOAD_CAUSE_API
+};
+
 /*
  * TODO:
  * I don't like that we're loading this with an entirely new execution context,
@@ -1291,19 +1297,29 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
  * error, etc.
  */
 static uacpi_status do_load_table(
-    uacpi_namespace_node *parent, struct uacpi_table *table
+    uacpi_namespace_node *parent, struct uacpi_table *table,
+    enum table_load_cause cause
 )
 {
     struct uacpi_control_method method = { 0 };
     struct acpi_dsdt *dsdt;
+    enum uacpi_log_level log_level = UACPI_LOG_TRACE;
+    const uacpi_char *log_prefix = "Load of";
 
-    uacpi_kernel_log(
-        UACPI_LOG_INFO,
-        "Dynamically loading '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
-        table->signature.text, table->hdr->oemid, table->hdr->oem_table_id
-    );
     if (table->flags & UACPI_TABLE_LOADED)
         return UACPI_STATUS_OK;
+
+    if (cause != TABLE_LOAD_CAUSE_API) {
+        log_prefix = "Dynamic load of";
+        log_level = UACPI_LOG_INFO;
+    }
+
+    uacpi_kernel_log(
+        log_level,
+        "%s '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
+        log_prefix, table->signature.text, table->hdr->oemid,
+        table->hdr->oem_table_id
+    );
 
     dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
     method.code = dsdt->definition_block;
@@ -1365,7 +1381,7 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
         goto return_false;
     }
 
-    ret = do_load_table(root_node, table);
+    ret = do_load_table(root_node, table, TABLE_LOAD_CAUSE_LOAD_TABLE_OP);
     if (uacpi_unlikely_error(ret))
         goto return_false;
 
@@ -1496,7 +1512,10 @@ static uacpi_status handle_load(struct execution_context *ctx)
         goto return_false;
     }
 
-    ret = do_load_table(uacpi_namespace_root(), table);
+    ret = do_load_table(
+        uacpi_namespace_root(), table,
+        TABLE_LOAD_CAUSE_LOAD_OP
+    );
     if (uacpi_unlikely_error(ret))
         goto return_false;
 
@@ -1507,6 +1526,14 @@ return_false:
     if (unmap_src && src_table)
         uacpi_kernel_unmap(src_table, declared_size);
     return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_load_table(struct uacpi_table *table)
+{
+    return do_load_table(
+        uacpi_namespace_root(), table,
+        TABLE_LOAD_CAUSE_API
+    );
 }
 
 uacpi_u32 get_field_length(struct item *item)
