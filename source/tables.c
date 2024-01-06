@@ -283,16 +283,15 @@ static uacpi_size table_array_index_of(
 
     inline_cap = table_array_inline_capacity(arr);
     end = arr->inline_storage + inline_cap;
-    if (tbl < end)
+    if (tbl >= arr->inline_storage && tbl < end)
         return tbl - arr->inline_storage;
 
     end = arr->dynamic_storage + (arr->size_including_inline - inline_cap);
-    if (tbl > end)
-        return 0;
+    if (tbl >= arr->dynamic_storage && tbl < end)
+        return inline_cap + (tbl - arr->dynamic_storage);
 
-    return tbl - arr->dynamic_storage;
+    return 0;
 }
-
 
 uacpi_status
 uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
@@ -310,7 +309,7 @@ uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
     if (base_idx == 0)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return do_search(&id, base_idx, in_out_table);
+    return do_search(&id, base_idx + 1, in_out_table);
 }
 
 uacpi_status
