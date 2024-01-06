@@ -185,6 +185,11 @@ uacpi_table_append_mapped(uacpi_virt_addr virt_addr, struct uacpi_table **out_ta
     return UACPI_STATUS_OK;
 }
 
+static uacpi_bool is_valid_table(struct uacpi_table *table)
+{
+    return table->flags & UACPI_TABLE_VALID;
+}
+
 static uacpi_status do_search(struct uacpi_table_identifiers *id,
                               uacpi_u32 base_idx,
                               struct uacpi_table **out_table)
@@ -197,7 +202,7 @@ static uacpi_status do_search(struct uacpi_table_identifiers *id,
 
         table = table_array_at(&g_uacpi_rt_ctx.tables, idx);
 
-        if (!(table->flags & UACPI_TABLE_VALID))
+        if (!is_valid_table(table))
             continue;
 
         if (id->signature.id != table->signature.id)
@@ -243,7 +248,10 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
         return do_search(&id, 0, out_table);
     }
 
-    return UACPI_STATUS_OK;
+    if (is_valid_table(*out_table))
+        return UACPI_STATUS_OK;
+
+    return UACPI_STATUS_NOT_FOUND;
 }
 
 uacpi_status
@@ -260,7 +268,10 @@ uacpi_table_find_by_signature(uacpi_object_name signature,
         return do_search(&id, 0, out_table);
     }
 
-    return UACPI_STATUS_OK;
+    if (is_valid_table(*out_table))
+        return UACPI_STATUS_OK;
+
+    return UACPI_STATUS_NOT_FOUND;
 }
 
 static uacpi_size table_array_index_of(
