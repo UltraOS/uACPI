@@ -1302,11 +1302,15 @@ static uacpi_status do_load_table(
         "Dynamically loading '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
         table->signature.text, table->hdr->oemid, table->hdr->oem_table_id
     );
+    if (table->flags & UACPI_TABLE_LOADED)
+        return UACPI_STATUS_OK;
 
     dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
     method.code = dsdt->definition_block;
     method.size = table->length - sizeof(dsdt->hdr);
     method.named_objects_persist = UACPI_TRUE;
+
+    table->flags |= UACPI_TABLE_LOADED;
 
     return uacpi_execute_control_method(parent, &method, NULL, NULL);
 }

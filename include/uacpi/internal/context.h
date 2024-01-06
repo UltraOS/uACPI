@@ -16,6 +16,12 @@
  */
 #define UACPI_TABLE_MAPPED (1 << 1)
 
+/*
+ * (Only relevant for definition blocks)
+ * The table has already been executed by the interpreter.
+ */
+#define UACPI_TABLE_LOADED (1 << 2)
+
 struct uacpi_table {
     struct uacpi_shareable shareable;
     uacpi_object_name signature;
