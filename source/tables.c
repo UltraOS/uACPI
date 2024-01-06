@@ -295,7 +295,7 @@ static uacpi_size table_array_index_of(
 
 
 uacpi_status
-uacpi_table_next_with_same_signature(struct uacpi_table **in_out_table)
+uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
 {
     struct uacpi_table_identifiers id = {
         .signature = (*in_out_table)->signature,
