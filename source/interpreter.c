@@ -1153,6 +1153,7 @@ static uacpi_status handle_create_alias(struct execution_context *ctx)
     dst = item_array_at(&ctx->cur_op_ctx->items, 1)->node;
 
     dst->object = src->object;
+    dst->flags = UACPI_NAMESPACE_NODE_FLAG_ALIAS;
     uacpi_object_ref(dst->object);
 
     return UACPI_STATUS_OK;
