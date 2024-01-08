@@ -213,3 +213,18 @@ UACPI_PACKED(struct acpi_ssdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u8 definition_block[];
 })
+
+/*
+ * ACPI 6.5 specification:
+ * Bit [0] - Set if the device is present.
+ * Bit [1] - Set if the device is enabled and decoding its resources.
+ * Bit [2] - Set if the device should be shown in the UI.
+ * Bit [3] - Set if the device is functioning properly (cleared if device
+ *           failed its diagnostics).
+ * Bit [4] - Set if the battery is present.
+ */
+#define ACPI_STA_RESULT_DEVICE_PRESENT (1 << 0)
+#define ACPI_STA_RESULT_DEVICE_ENABLED (1 << 1)
+#define ACPI_STA_RESULT_DEVICE_SHOWN_IN_UI (1 << 2)
+#define ACPI_STA_RESULT_DEVICE_FUNCTIONING (1 << 3)
+#define ACPI_STA_RESULT_DEVICE_BATTERY_PRESENT (1 << 4)
