@@ -62,6 +62,15 @@ uacpi_status uacpi_namespace_initialize(void);
 uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
                         uacpi_args *args, uacpi_object **ret);
 
+/*
+ * Same as uacpi_eval, but the return value type is validated against
+ * the 'ret_mask'. UACPI_STATUS_TYPE_MISMATCH is returned on error.
+ */
+uacpi_status uacpi_eval_typed(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
+);
+
 #ifdef __cplusplus
 }
 #endif
