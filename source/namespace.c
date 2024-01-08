@@ -338,3 +338,57 @@ void uacpi_namespace_for_each_node_depth_first(
         }
     }
 }
+
+static uacpi_size node_depth(uacpi_namespace_node *node)
+{
+    uacpi_size depth = 0;
+
+    while (node) {
+        depth++;
+        node = node->parent;
+    }
+
+    return depth;
+}
+
+const uacpi_char *uacpi_namespace_node_generate_absolute_path(
+    uacpi_namespace_node *node
+)
+{
+    uacpi_size depth, offset;
+    uacpi_size bytes_needed;
+    uacpi_char *path;
+
+    depth = node_depth(node);
+    if (depth == 0)
+        return UACPI_NULL;
+
+    // \ only needs 1 byte, the rest is 4 bytes
+    bytes_needed = 1 + (depth - 1) * sizeof(uacpi_object_name);
+
+    // \ and the first NAME don't need a '.', every other segment does
+    bytes_needed += depth > 2 ? depth - 2 : 0;
+
+    // Null terminator
+    bytes_needed += 1;
+
+    path = uacpi_kernel_alloc(bytes_needed);
+    if (uacpi_unlikely(path == UACPI_NULL))
+        return path;
+
+    path[0] = '\\';
+
+    offset = bytes_needed - 1;
+    path[offset] = '\0';
+
+    while (node != uacpi_namespace_root()) {
+        offset -= sizeof(uacpi_object_name);
+        uacpi_memcpy(&path[offset], node->name.text, sizeof(uacpi_object_name));
+
+        node = node->parent;
+        if (node != uacpi_namespace_root())
+            path[--offset] = '.';
+    }
+
+    return path;
+}
