@@ -58,6 +58,11 @@ void uacpi_namespace_for_each_node_depth_first(
     void *user
 );
 
+// The path must be uacpi_kernel_free'd by the caller when no longer needed
+const uacpi_char *uacpi_namespace_node_generate_absolute_path(
+    uacpi_namespace_node *node
+);
+
 #ifdef __cplusplus
 }
 #endif
