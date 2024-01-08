@@ -4356,6 +4356,78 @@ static uacpi_status typecheck_computational_data(
     }
 }
 
+static void trace_named_object_lookup_or_creation_failure(
+    struct call_frame *frame, uacpi_size offset, enum uacpi_parse_op op,
+    uacpi_status ret
+)
+{
+    static const uacpi_char *oom_prefix = "<...>";
+    static const uacpi_char *empty_string = "";
+    static const uacpi_char *unknown_path = "<unknown-path>";
+    static const uacpi_char *invalid_path = "<invalid-path>";
+
+    uacpi_status conv_ret;
+    const uacpi_char *action;
+    const uacpi_char *requested_path_to_print;
+    const uacpi_char *middle_part = UACPI_NULL;
+    const uacpi_char *prefix_path = UACPI_NULL;
+    uacpi_char *requested_path = UACPI_NULL;
+    uacpi_size length;
+
+    if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
+        action = "create";
+    else
+        action = "lookup";
+
+    conv_ret = name_string_to_path(
+        frame, offset, &requested_path, &length
+    );
+    if (uacpi_unlikely_error(conv_ret)) {
+        if (conv_ret == UACPI_STATUS_OUT_OF_MEMORY)
+            requested_path_to_print = unknown_path;
+        else
+            requested_path_to_print = invalid_path;
+    } else {
+        requested_path_to_print = requested_path;
+    }
+
+    if (requested_path && requested_path[0] != '\\') {
+        prefix_path = uacpi_namespace_node_generate_absolute_path(
+            frame->cur_scope
+        );
+        if (uacpi_unlikely(prefix_path == UACPI_NULL))
+            prefix_path = oom_prefix;
+
+        if (prefix_path[1] != '\0')
+            middle_part = ".";
+    } else {
+        prefix_path = empty_string;
+    }
+
+    if (middle_part == UACPI_NULL)
+        middle_part = empty_string;
+
+    if (length == 5 && op != UACPI_PARSE_OP_CREATE_NAMESTRING) {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "Unable to %s named object '%s' within (or above) "
+            "scope '%s': %s\n", action, requested_path_to_print,
+            prefix_path, uacpi_status_to_string(ret)
+        );
+    } else {
+        uacpi_kernel_log(
+            UACPI_LOG_ERROR,
+            "Unable to %s named object '%s%s%s': %s\n",
+            action, prefix_path, middle_part,
+            requested_path_to_print, uacpi_status_to_string(ret)
+        );
+    }
+
+    uacpi_kernel_free(requested_path);
+    if (prefix_path != oom_prefix && prefix_path != empty_string)
+        uacpi_kernel_free((void*)prefix_path);
+}
+
 static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4855,16 +4927,12 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_EXISTING_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL: {
             uacpi_size offset = frame->code_offset;
-            const uacpi_char *action;
             enum resolve_behavior behavior;
 
-            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING) {
-                action = "create";
+            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
                 behavior = RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS;
-            } else {
-                action = "resolve";
+            else
                 behavior = RESOLVE_FAIL_IF_DOESNT_EXIST;
-            }
 
             ret = resolve_name_string(frame, behavior, &item->node);
 
@@ -4884,16 +4952,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
             }
 
             if (uacpi_unlikely_error(ret)) {
-                uacpi_char *path = UACPI_NULL;
-                uacpi_size length;
-
-                name_string_to_path(frame, offset, &path, &length);
-                uacpi_kernel_log(
-                    UACPI_LOG_ERROR, "Failed to %s named object '%s': %s\n",
-                    action, path ? path : "<unknown>",
-                    uacpi_status_to_string(ret)
+                trace_named_object_lookup_or_creation_failure(
+                    frame, offset, op, ret
                 );
-                uacpi_kernel_free(path);
             }
 
             break;
