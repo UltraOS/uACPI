@@ -176,8 +176,194 @@ out:
     return ret;
 }
 
+struct ns_init_context {
+    uacpi_size ini_executed;
+    uacpi_size ini_errors;
+    uacpi_size sta_executed;
+    uacpi_size sta_errors;
+    uacpi_size devices;
+    uacpi_size thermal_zones;
+    uacpi_size processors;
+};
+
+static void do_account_sta_ini(
+    const uacpi_char *method, uacpi_size *counter, uacpi_size *err_counter,
+    uacpi_namespace_node *node, uacpi_status ret
+)
+{
+    const uacpi_char *absolute_path;
+    uacpi_char oom_absolute_path[10] = "<...>";
+
+    if (ret == UACPI_STATUS_NOT_FOUND)
+        return;
+
+    (*counter)++;
+
+    if (ret == UACPI_STATUS_OK)
+        return;
+
+    (*err_counter)++;
+
+    absolute_path = uacpi_namespace_node_generate_absolute_path(node);
+    if (absolute_path == UACPI_NULL) {
+        absolute_path = oom_absolute_path;
+        uacpi_memcpy(oom_absolute_path + 4, node->name.text, 4);
+    }
+
+    uacpi_kernel_log(
+        UACPI_LOG_WARN,
+        "Aborted execution of '%s.%s' due to an error: %s\n",
+        absolute_path, method, uacpi_status_to_string(ret)
+    );
+
+    if (uacpi_likely(absolute_path != oom_absolute_path))
+        uacpi_kernel_free((void*)absolute_path);
+}
+
+static void ini_eval(struct ns_init_context *ctx, uacpi_namespace_node *node)
+{
+    uacpi_status ret;
+
+    ret = uacpi_eval(node, "_INI", NULL, NULL);
+    do_account_sta_ini("_INI", &ctx->ini_executed, &ctx->ini_errors, node, ret);
+}
+
+static uacpi_status sta_eval(
+    struct ns_init_context *ctx, uacpi_namespace_node *node,
+    uacpi_u32 *value
+)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+
+    ret = uacpi_eval_typed(node, "_STA", NULL, UACPI_OBJECT_INTEGER_BIT, &obj);
+    do_account_sta_ini("_STA", &ctx->sta_executed, &ctx->sta_errors, node, ret);
+
+    /*
+     * ACPI 6.5 specification:
+     * If a device object (including the processor object) does not have
+     * an _STA object, then OSPM assumes that all of the above bits are
+     * set (i.e., the device is present, enabled, shown in the UI,
+     * and functioning).
+     */
+    if (ret == UACPI_STATUS_NOT_FOUND) {
+        *value = 0xFFFFFFFF;
+        return UACPI_STATUS_OK;
+    }
+
+    if (ret == UACPI_STATUS_OK) {
+        *value = obj->integer;
+        uacpi_object_unref(obj);
+        return ret;
+    }
+
+    return ret;
+}
+
+static enum uacpi_ns_iteration_decision do_sta_ini(
+    void *opaque, uacpi_namespace_node *node
+)
+{
+    struct ns_init_context *ctx = opaque;
+    uacpi_status ret;
+    uacpi_u32 sta_ret;
+    uacpi_bool is_sb;
+    uacpi_object *obj;
+
+    // We don't care about aliases
+    if (node->flags & UACPI_NAMESPACE_NODE_FLAG_ALIAS)
+        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+
+    is_sb = node == uacpi_namespace_get_predefined(
+        UACPI_PREDEFINED_NAMESPACE_SB
+    );
+
+    obj = uacpi_namespace_node_get_object(node);
+    if (node != uacpi_namespace_root() && !is_sb) {
+        switch (obj->type) {
+        case UACPI_OBJECT_DEVICE:
+            ctx->devices++;
+            break;
+        case UACPI_OBJECT_THERMAL_ZONE:
+            ctx->thermal_zones++;
+            break;
+        case UACPI_OBJECT_PROCESSOR:
+            ctx->processors++;
+            break;
+        default:
+            return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        }
+    }
+
+    ret = sta_eval(ctx, node, &sta_ret);
+    if (uacpi_unlikely_error(ret))
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+
+    if (!(sta_ret & ACPI_STA_RESULT_DEVICE_PRESENT)) {
+        if (!(sta_ret & ACPI_STA_RESULT_DEVICE_FUNCTIONING))
+            return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+
+        /*
+         * ACPI 6.5 specification:
+         * _STA may return bit 0 clear (not present) with bit [3] set (device
+         * is functional). This case is used to indicate a valid device for
+         * which no device driver should be loaded (for example, a bridge
+         * device.) Children of this device may be present and valid. OSPM
+         * should continue enumeration below a device whose _STA returns this
+         * bit combination.
+         */
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    }
+
+    if (node != uacpi_namespace_root() && !is_sb)
+        ini_eval(ctx, node);
+
+    return UACPI_NS_ITERATION_DECISION_CONTINUE;
+}
+
 uacpi_status uacpi_namespace_initialize(void)
 {
+    struct ns_init_context ctx = { 0 };
+
+    /*
+     * Initialization order here is identical to ACPICA because ACPI
+     * specification doesn't really have any detailed steps that explain
+     * how to do it.
+     */
+
+    // Step 1 - Execute \_INI
+    ini_eval(&ctx, uacpi_namespace_root());
+
+    // Step 2 - Execute \_SB._INI
+    ini_eval(
+        &ctx, uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SB)
+    );
+
+    /*
+     * Step 3 - This is where we would run _REG methods,
+     *          but we don't support that machinery yet.
+     * TODO: implement once we have proper support for operation region
+     *       override and other similar stuff.
+     */
+
+    // Step 4 - Run all other _STA and _INI methods
+    uacpi_namespace_for_each_node_depth_first(
+        uacpi_namespace_root(), do_sta_ini, &ctx
+    );
+
+    uacpi_kernel_log(
+        UACPI_LOG_INFO, "Namespace initialization done: "
+        "%zu devices, %zu thermal zones, %zu processors\n",
+        ctx.devices, ctx.thermal_zones, ctx.processors
+    );
+
+    uacpi_kernel_log(
+        UACPI_LOG_TRACE,
+        "_STA calls: %zu (%zu errors), _INI calls: %zu (%zu errors)\n",
+        ctx.sta_executed, ctx.sta_errors, ctx.ini_executed,
+        ctx.ini_errors
+    );
+
     return UACPI_STATUS_OK;
 }
 
