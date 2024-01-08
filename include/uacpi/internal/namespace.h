@@ -3,8 +3,11 @@
 #include <uacpi/types.h>
 #include <uacpi/status.h>
 
+#define UACPI_NAMESPACE_NODE_FLAG_ALIAS (1 << 0)
+
 typedef struct uacpi_namespace_node {
     uacpi_object_name name;
+    uacpi_u32 flags;
     uacpi_object *object;
     struct uacpi_namespace_node *parent;
     struct uacpi_namespace_node *child;
