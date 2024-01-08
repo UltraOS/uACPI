@@ -9,7 +9,7 @@
 
 uacpi_namespace_node
 predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_MAX + 1] = {
-    [UACPI_PREDEFINED_NAMESPACE_ROOT] = { .name.text = "\\   " },
+    [UACPI_PREDEFINED_NAMESPACE_ROOT] = { .name.text = "\\" },
     [UACPI_PREDEFINED_NAMESPACE_GPE] = { .name.text = "_GPE" },
     [UACPI_PREDEFINED_NAMESPACE_PR] = { .name.text = "_PR_" },
     [UACPI_PREDEFINED_NAMESPACE_SB] = { .name.text = "_SB_" },
