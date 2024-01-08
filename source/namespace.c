@@ -294,3 +294,47 @@ uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
 {
     return uacpi_unwrap_internal_reference(node->object);
 }
+
+void uacpi_namespace_for_each_node_depth_first(
+    uacpi_namespace_node *node,
+    uacpi_iteration_callback callback,
+    void *user
+)
+{
+    uacpi_bool walking_up = UACPI_FALSE;
+    uacpi_u32 depth = 1;
+
+    if (node == UACPI_NULL)
+        return;
+
+    while (depth) {
+        if (walking_up) {
+            if (node->next) {
+                node = node->next;
+                walking_up = UACPI_FALSE;
+                continue;
+            }
+
+            depth--;
+            node = node->parent;
+            continue;
+        }
+
+        switch (callback(user, node)) {
+        case UACPI_NS_ITERATION_DECISION_CONTINUE:
+            if (node->child) {
+                node = node->child;
+                depth++;
+                continue;
+            }
+            // FALLTHROUGH intended
+        case UACPI_NS_ITERATION_DECISION_NEXT_PEER:
+            walking_up = UACPI_TRUE;
+            continue;
+
+        case UACPI_NS_ITERATION_DECISION_BREAK:
+        default:
+            return;
+        }
+    }
+}

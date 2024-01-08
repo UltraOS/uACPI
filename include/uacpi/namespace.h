@@ -35,6 +35,29 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     const uacpi_char *path
 );
 
+enum uacpi_ns_iteration_decision {
+    // Continue to the next child of this node
+    UACPI_NS_ITERATION_DECISION_CONTINUE,
+
+    /*
+     * Don't go any deeper, instead continue to the next peer of the
+     * parent node currently being iterated.
+     */
+    UACPI_NS_ITERATION_DECISION_NEXT_PEER,
+
+    // Abort iteration
+    UACPI_NS_ITERATION_DECISION_BREAK,
+};
+
+typedef enum uacpi_ns_iteration_decision
+    (*uacpi_iteration_callback)(void *user, uacpi_namespace_node* node);
+
+void uacpi_namespace_for_each_node_depth_first(
+    uacpi_namespace_node *parent,
+    uacpi_iteration_callback callback,
+    void *user
+);
+
 #ifdef __cplusplus
 }
 #endif
