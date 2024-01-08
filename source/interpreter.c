@@ -196,8 +196,7 @@ static uacpi_status held_mutexes_array_remove_and_release(
     // Fast path for well-behaved AML that releases mutexes in descending order
     if (uacpi_likely(item == mutex)) {
         held_mutexes_array_pop(arr);
-        uacpi_mutex_unref(mutex);
-        return UACPI_STATUS_OK;
+        goto do_release;
     }
 
     /*
@@ -217,6 +216,10 @@ static uacpi_status held_mutexes_array_remove_and_release(
     }
 
     held_mutexes_array_remove_idx(arr, i);
+
+do_release:
+    mutex->owner = UACPI_NULL;
+    uacpi_kernel_release_mutex(mutex->handle);
     uacpi_mutex_unref(mutex);
     return UACPI_STATUS_OK;
 }
