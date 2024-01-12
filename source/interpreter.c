@@ -5074,6 +5074,17 @@ static uacpi_status exec_op(struct execution_context *ctx)
             ctx->cur_op_ctx = UACPI_NULL;
             ctx->prev_op_ctx = UACPI_NULL;
             ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
+
+            if (method->native_call) {
+                uacpi_object *retval;
+
+                ret = method_get_ret_object(ctx, &retval);
+                if (uacpi_unlikely_error(ret))
+                    goto method_dispatch_error;
+
+                return method->handler(ctx, retval);
+            }
+
             return UACPI_STATUS_OK;
 
         method_dispatch_error:
