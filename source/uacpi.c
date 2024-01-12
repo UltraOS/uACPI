@@ -210,8 +210,7 @@ static void do_account_sta_ini(
         uacpi_memcpy(oom_absolute_path + 4, node->name.text, 4);
     }
 
-    uacpi_kernel_log(
-        UACPI_LOG_WARN,
+    uacpi_warn(
         "Aborted execution of '%s.%s' due to an error: %s\n",
         absolute_path, method, uacpi_status_to_string(ret)
     );
@@ -351,14 +350,13 @@ uacpi_status uacpi_namespace_initialize(void)
         uacpi_namespace_root(), do_sta_ini, &ctx
     );
 
-    uacpi_kernel_log(
-        UACPI_LOG_INFO, "Namespace initialization done: "
+    uacpi_info(
+        "Namespace initialization done: "
         "%zu devices, %zu thermal zones, %zu processors\n",
         ctx.devices, ctx.thermal_zones, ctx.processors
     );
 
-    uacpi_kernel_log(
-        UACPI_LOG_TRACE,
+    uacpi_trace(
         "_STA calls: %zu (%zu errors), _INI calls: %zu (%zu errors)\n",
         ctx.sta_executed, ctx.sta_errors, ctx.ini_executed,
         ctx.ini_errors
