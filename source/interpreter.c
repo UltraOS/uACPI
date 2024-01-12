@@ -7,6 +7,7 @@
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/shareable.h>
 #include <uacpi/internal/tables.h>
+#include <uacpi/internal/helpers.h>
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/utilities.h>
 
@@ -5287,4 +5288,66 @@ out:
     }
     execution_context_release(ctx);
     return st;
+}
+
+// TODO: make this dynamically configurable
+static uacpi_char *supported_osi_strings[] = {
+    "Windows 2000",
+    "Windows 2001",
+    "Windows 2001 SP1",
+    "Windows 2001.1",
+    "Windows 2001 SP2",
+    "Windows 2001.1 SP1",
+    "Windows 2006",
+    "Windows 2006.1",
+    "Windows 2006 SP1",
+    "Windows 2006 SP2",
+    "Windows 2009",
+    "Windows 2012",
+    "Windows 2013",
+    "Windows 2015",
+    "Windows 2016",
+    "Windows 2017",
+    "Windows 2017.2",
+    "Windows 2018",
+    "Windows 2018.2",
+    "Windows 2019",
+    "Windows 2020",
+    "Windows 2021",
+};
+
+uacpi_status uacpi_osi(uacpi_handle handle, uacpi_object *retval)
+{
+    struct execution_context *ctx = handle;
+    uacpi_object *arg;
+    uacpi_size i;
+
+    arg = uacpi_unwrap_internal_reference(ctx->cur_frame->args[0]);
+    if (arg->type != UACPI_OBJECT_STRING) {
+        uacpi_warn("_OSI: Invalid argument type %s, expected a String",
+                   uacpi_object_type_to_string(arg->type));
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (retval == UACPI_NULL)
+        return UACPI_STATUS_OK;
+
+    retval->type = UACPI_OBJECT_INTEGER;
+
+    for (i = 0; i < UACPI_ARRAY_SIZE(supported_osi_strings); ++i) {
+        uacpi_char *str = supported_osi_strings[i];
+
+        if (uacpi_strncmp(str, arg->buffer->text, arg->buffer->size) != 0)
+            continue;
+
+        retval->integer = ones();
+        goto out;
+    }
+
+    retval->integer = 0;
+
+out:
+    uacpi_trace("_OSI(%s) => reporting as %ssupported\n",
+                arg->buffer->text, retval->integer ? "" : "un");
+    return UACPI_STATUS_OK;
 }

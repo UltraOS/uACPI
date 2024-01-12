@@ -2,6 +2,7 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/types.h>
 #include <uacpi/internal/stdlib.h>
+#include <uacpi/internal/interpreter.h>
 #include <uacpi/kernel_api.h>
 
 #define UACPI_REV_VALUE 2
@@ -56,7 +57,15 @@ static uacpi_object *make_object_for_predefined(
         break;
 
     case UACPI_PREDEFINED_NAMESPACE_OSI:
-        // TODO: once we have builtin method support
+        obj = uacpi_create_object(UACPI_OBJECT_METHOD);
+        if (uacpi_unlikely(obj == UACPI_NULL))
+            return obj;
+
+        obj->method->native_call = UACPI_TRUE;
+        obj->method->handler = uacpi_osi;
+        obj->method->args = 1;
+        break;
+
     default:
         obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
         break;
