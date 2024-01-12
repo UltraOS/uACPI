@@ -183,8 +183,7 @@ static uacpi_status held_mutexes_array_remove_and_release(
 
     if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
                        force != FORCE_RELEASE_YES)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_warn(
             "Ignoring mutex @p release due to sync level mismatch: %d vs %d\n",
             mutex, mutex->sync_level, item->sync_level
         );
@@ -632,8 +631,8 @@ static uacpi_status get_op(struct execution_context *ctx)
 
     ctx->cur_op = uacpi_get_op_spec(op);
     if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR, "Invalid opcode '%s' encountered in bytestream\n",
+        uacpi_error(
+            "Invalid opcode '%s' encountered in bytestream\n",
             ctx->cur_op->name
         );
         return UACPI_STATUS_BAD_BYTECODE;
@@ -664,8 +663,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
     declared_size = item_array_at(&op_ctx->items, 1)->obj;
 
     if (uacpi_unlikely(declared_size->integer > 0xE0000000)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "buffer is too large (%llu), assuming corrupted bytestream\n",
             declared_size->integer
         );
@@ -673,16 +671,13 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
     }
 
     if (uacpi_unlikely(declared_size->integer == 0)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN, "attempted to create an empty buffer\n"
-        );
+        uacpi_error("attempted to create an empty buffer\n");
         return UACPI_STATUS_BAD_BYTECODE;
     }
 
     buffer_size = declared_size->integer;
     if (uacpi_unlikely(init_size > buffer_size)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "too many buffer initializers: %u (size is %u)\n",
             init_size, buffer_size
         );
@@ -747,8 +742,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
 
         var_num_elements = item_array_at(&op_ctx->items, 1)->obj;
         if (uacpi_unlikely(var_num_elements->integer > 0xE0000000)) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
+            uacpi_error(
                 "package is too large (%llu), assuming corrupted bytestream\n",
                 var_num_elements->integer
             );
@@ -761,8 +755,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
 
     num_defined_elements = (item_array_size(&op_ctx->items) - 3) / 2;
     if (uacpi_unlikely(num_defined_elements > num_elements)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_warn(
             "too many package initializers: %u, truncating to %u\n",
             num_defined_elements, num_elements
         );
@@ -1190,10 +1183,7 @@ static uacpi_status table_id_error(
     uacpi_buffer *str
 )
 {
-    uacpi_kernel_log(
-        UACPI_LOG_ERROR,
-        "%s: Invalid %s '%s'\n", opcode, arg, str->text
-    );
+    uacpi_error("%s: Invalid %s '%s'\n", opcode, arg, str->text);
     return UACPI_STATUS_BAD_BYTECODE;
 }
 
@@ -1202,8 +1192,7 @@ static void report_table_id_find_error(
     uacpi_status ret
 )
 {
-    uacpi_kernel_log(
-        UACPI_LOG_ERROR,
+    uacpi_error(
         "%s: Unable to find table '%.4s' (OEM ID '%.6s', "
         "OEM Table ID '%.8s'): %s\n",
         opcode, id->signature.text, id->oemid, id->oem_table_id,
@@ -1318,7 +1307,7 @@ static uacpi_status do_load_table(
         log_level = UACPI_LOG_INFO;
     }
 
-    uacpi_kernel_log(
+    uacpi_log_lvl(
         log_level,
         "%s '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
         log_prefix, table->signature.text, table->hdr->oemid,
@@ -1429,16 +1418,12 @@ static uacpi_status handle_load(struct execution_context *ctx)
         if (uacpi_unlikely(
             op_region->space != UACPI_OP_REGION_SPACE_SYSTEM_MEMORY
         )) {
-            uacpi_kernel_log(
-                UACPI_LOG_ERROR,
-                "Load: operation region is not SystemMemory\n"
-            );
+            uacpi_error("Load: operation region is not SystemMemory\n");
             goto return_false;
         }
 
         if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
-            uacpi_kernel_log(
-                UACPI_LOG_ERROR,
+            uacpi_error(
                 "Load: operation region is too small: %zu\n",
                 op_region->length
             );
@@ -1447,8 +1432,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
         src_table = uacpi_kernel_map(op_region->offset, op_region->length);
         if (uacpi_unlikely(src_table == UACPI_NULL)) {
-            uacpi_kernel_log(
-                UACPI_LOG_ERROR,
+            uacpi_error(
                 "Load: failed to map operation region "
                 "0x%016"PRIX64" -> 0x%016"PRIX64"\n",
                 op_region->offset, op_region->offset + op_region->length
@@ -1466,8 +1450,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
         buffer = src->buffer;
         if (buffer->size < sizeof(struct acpi_sdt_hdr)) {
-            uacpi_kernel_log(
-                UACPI_LOG_ERROR,
+            uacpi_error(
                 "Load: buffer is too small: %zu\n",
                 buffer->size
             );
@@ -1480,8 +1463,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
     }
 
     default:
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "Load: invalid argument '%s', expected "
             "Buffer/Field/OperationRegion\n",
             uacpi_object_type_to_string(src->type)
@@ -1490,8 +1472,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
     }
 
     if (uacpi_unlikely(src_table->length > declared_size)) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "Load: table size %u is larger than the declared size %zu",
             src_table->length, declared_size
         );
@@ -1560,8 +1541,7 @@ static uacpi_status ensure_is_a_unit_field(uacpi_namespace_node *node,
 
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_UNIT_FIELD) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid argument: '%.4s' is not a unit field (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
@@ -1579,8 +1559,7 @@ static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
 
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid argument: '%.4s' is not an operation region (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
@@ -1952,84 +1931,74 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
 {
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
-        uacpi_kernel_log(UACPI_LOG_INFO, "%s Uninitialized\n", prefix);
+        uacpi_info("%s Uninitialized\n", prefix);
         break;
     case UACPI_OBJECT_STRING:
-        uacpi_kernel_log(UACPI_LOG_INFO, "%s String => \"%s\"\n",
-                         prefix, src->buffer->text);
+        uacpi_info("%s String => \"%s\"\n", prefix, src->buffer->text);
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
-            uacpi_kernel_log(UACPI_LOG_INFO, "%s Integer => 0x%08llX\n",
-                             prefix, src->integer);
+            uacpi_info("%s Integer => 0x%08llX\n", prefix, src->integer);
         } else {
-            uacpi_kernel_log(UACPI_LOG_INFO, "%s Integer => 0x%016llX\n",
-                             prefix, src->integer);
+            uacpi_info("%s Integer => 0x%016llX\n", prefix, src->integer);
         }
         break;
     case UACPI_OBJECT_REFERENCE:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Reference @%p => %p\n",
-            prefix, src, src->inner_object
-        );
+        uacpi_info("%s Reference @%p => %p\n", prefix, src, src->inner_object);
         break;
     case UACPI_OBJECT_PACKAGE:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Package @%p (%p) (%zu elements)\n",
+        uacpi_info(
+            "%s Package @%p (%p) (%zu elements)\n",
             prefix, src, src->package, src->package->count
         );
         break;
     case UACPI_OBJECT_BUFFER:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Buffer @%p (%p) (%zu bytes)\n",
+        uacpi_info(
+            "%s Buffer @%p (%p) (%zu bytes)\n",
             prefix, src, src->buffer, src->buffer->size
         );
         break;
     case UACPI_OBJECT_OPERATION_REGION:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO,
+        uacpi_info(
             "%s OperationRegion (ASID %d) 0x%016llX -> 0x%016llX\n",
             prefix, src->op_region->space, src->op_region->offset,
             src->op_region->offset + src->op_region->length
         );
         break;
     case UACPI_OBJECT_POWER_RESOURCE:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Power Resource %d %d\n",
+        uacpi_info(
+            "%s Power Resource %d %d\n",
             prefix, src->power_resource.system_level,
             src->power_resource.resource_order
         );
         break;
     case UACPI_OBJECT_PROCESSOR:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Processor[%d] 0x%08X (%d)\n",
+        uacpi_info(
+            "%s Processor[%d] 0x%08X (%d)\n",
             prefix, src->processor.id, src->processor.block_address,
             src->processor.block_length
         );
         break;
     case UACPI_OBJECT_BUFFER_INDEX:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Buffer Index %p[%zu] => 0x%02X\n",
+        uacpi_info(
+            "%s Buffer Index %p[%zu] => 0x%02X\n",
             prefix, src->buffer_index.buffer->data, src->buffer_index.idx,
             *buffer_index_cursor(&src->buffer_index)
         );
         break;
     case UACPI_OBJECT_MUTEX:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO,
+        uacpi_info(
             "%s Mutex @%p (%p => %p) sync level %d (owned by %p)\n",
             prefix, src, src->mutex, src->mutex->handle,
             src->mutex->sync_level, src->mutex->owner
         );
         break;
     case UACPI_OBJECT_METHOD:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s Method @%p (%p)\n", prefix, src, src->method
-        );
+        uacpi_info("%s Method @%p (%p)\n", prefix, src, src->method);
         break;
     default:
-        uacpi_kernel_log(
-            UACPI_LOG_INFO, "%s %s @%p\n",
+        uacpi_info(
+            "%s %s @%p\n",
             prefix, uacpi_object_type_to_string(src->type), src
         );
     }
@@ -2282,8 +2251,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
         }
 
         if (!was_a_reference) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
+            uacpi_error(
                 "Invalid DerefOf argument: %s, expected a reference\n",
                 uacpi_object_type_to_string(src->type)
             );
@@ -2349,7 +2317,7 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
         if (uacpi_likely(rhs > 0)) {
             tgt1->integer = lhs / rhs;
         } else {
-            uacpi_kernel_log(UACPI_LOG_WARN, "Attempted division by zero!\n");
+            uacpi_warn("Attempted division by zero!\n");
             tgt1->integer = 0;
         }
         // FALLTHROUGH intended here
@@ -2414,15 +2382,15 @@ static uacpi_status handle_unary_math(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status ensure_valid_idx(uacpi_size idx, uacpi_size src_size)
+static uacpi_status ensure_valid_idx(uacpi_object *obj, uacpi_size idx,
+                                     uacpi_size src_size)
 {
     if (uacpi_likely(idx < src_size))
         return UACPI_STATUS_OK;
 
-    uacpi_kernel_log(
-        UACPI_LOG_WARN,
-        "Invalid index %zu, object has %zu elements\n",
-        idx, src_size
+    uacpi_error(
+        "Invalid index %zu, %s@%p has %zu elements\n",
+        idx, uacpi_object_type_to_string(obj->type), obj, src_size
     );
     return UACPI_STATUS_BAD_BYTECODE;
 }
@@ -2446,7 +2414,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
         struct object_storage_as_buffer buf;
         get_object_storage(src, &buf, UACPI_FALSE);
 
-        ret = ensure_valid_idx(idx, buf.len);
+        ret = ensure_valid_idx(src, idx, buf.len);
         if (uacpi_unlikely_error(ret))
             return ret;
 
@@ -2466,7 +2434,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
         uacpi_package *pkg = src->package;
         uacpi_object *obj;
 
-        ret = ensure_valid_idx(idx, pkg->count);
+        ret = ensure_valid_idx(src, idx, pkg->count);
         if (uacpi_unlikely_error(ret))
             return ret;
 
@@ -2501,8 +2469,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
         break;
     }
     default:
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid argument for Index: %s, "
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
@@ -2759,8 +2726,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     src = item_array_at(&op_ctx->items, 0)->obj;
     if (uacpi_unlikely(src->type != UACPI_OBJECT_STRING &&
                        src->type != UACPI_OBJECT_BUFFER)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid argument for Mid: %s, expected String/Buffer\n",
             uacpi_object_type_to_string(src->type)
         );
@@ -2939,8 +2905,7 @@ static uacpi_status handle_sizeof(struct execution_context *ctx)
         break;
 
     default:
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid argument for Sizeof: %s, "
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
@@ -3126,8 +3091,7 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
     case UACPI_AML_OP_LGreaterOp:
         // TODO: typecheck at parse time
         if (lhs->type != rhs->type) {
-            uacpi_kernel_log(
-                UACPI_LOG_ERROR,
+            uacpi_error(
                 "Don't know how to do a logical comparison of '%s' and '%s'\n",
                 uacpi_object_type_to_string(lhs->type),
                 uacpi_object_type_to_string(rhs->type)
@@ -3356,8 +3320,7 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
         item_array_at(&op_ctx->items, 0)->obj
     );
     if (uacpi_unlikely(obj->type != UACPI_OBJECT_EVENT)) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "%s: Invalid argument '%s', expected an Event object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
@@ -3407,8 +3370,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
         item_array_at(&op_ctx->items, 0)->obj
     );
     if (uacpi_unlikely(obj->type != UACPI_OBJECT_MUTEX)) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "%s: Invalid argument '%s', expected a Mutex object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
@@ -3428,8 +3390,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
         return_value = &item_array_at(&op_ctx->items, 2)->obj->integer;
 
         if (uacpi_unlikely(ctx->sync_level > obj->mutex->sync_level)) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
+            uacpi_warn(
                 "Ignoring attempt to acquire mutex @%p with a lower sync level "
                 "(%d < %d)\n", obj->mutex->sync_level, ctx->sync_level
             );
@@ -3469,8 +3430,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
         uacpi_status ret;
 
         if (!owned_by_us) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
+            uacpi_warn(
                 "Attempted to release not-previously-acquired mutex object "
                 "@%p (%p)\n", obj->mutex, obj->mutex->handle
             );
@@ -3664,10 +3624,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
 
         if (uacpi_unlikely(!len_obj->integer ||
                             len_obj->integer > 0xFFFFFFFF)) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN, "invalid bit field length (%llu)\n",
-                field->bit_length
-            );
+            uacpi_error("invalid bit field length (%llu)\n", field->bit_length);
             return UACPI_STATUS_BAD_BYTECODE;
         }
 
@@ -3708,8 +3665,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
 
     if (uacpi_unlikely((field->bit_index + field->bit_length) >
                        src_buf->size * 8)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_error(
             "Invalid buffer field: bits [%zu..%zu], buffer size is %zu bytes\n",
             field->bit_index, field->bit_index + field->bit_length,
             src_buf->size
@@ -3883,8 +3839,7 @@ static bool ctx_has_non_preempted_op(struct execution_context *ctx)
 static void trace_op(const struct uacpi_op_spec *op)
 {
 #ifdef UACPI_OP_TRACING
-    uacpi_kernel_log(UACPI_LOG_TRACE, "Processing Op '%s' (0x%04X)\n",
-                     op->name, op->code);
+    uacpi_trace("Processing Op '%s' (0x%04X)\n", op->name, op->code);
 #endif
 }
 
@@ -4040,8 +3995,7 @@ static uacpi_status enter_method(
         return ret;
 
     if (uacpi_unlikely(ctx->sync_level > method->sync_level)) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "Cannot invoke method @%p, sync level %d is too low "
             "(current is %d)\n",
             method, method->sync_level, ctx->sync_level
@@ -4199,8 +4153,8 @@ static uacpi_u8 op_decode_byte(struct op_context *ctx)
 
 // MSVC doesn't support __VA_OPT__ so we do this weirdness
 #define EXEC_OP_DO_WARN(reason, ...)                                 \
-    uacpi_kernel_log(UACPI_LOG_WARN, "Op 0x%04X ('%s'): "reason"\n", \
-                     op_ctx->op->code, op_ctx->op->name __VA_ARGS__)
+    uacpi_warn("Op 0x%04X ('%s'): "reason"\n",                       \
+               op_ctx->op->code, op_ctx->op->name __VA_ARGS__)
 
 #define EXEC_OP_WARN_2(reason, arg0, arg1) EXEC_OP_DO_WARN(reason, ,arg0, arg1)
 #define EXEC_OP_WARN_1(reason, arg0) EXEC_OP_DO_WARN(reason, ,arg0)
@@ -4412,15 +4366,13 @@ static void trace_named_object_lookup_or_creation_failure(
         middle_part = empty_string;
 
     if (length == 5 && op != UACPI_PARSE_OP_CREATE_NAMESTRING) {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "Unable to %s named object '%s' within (or above) "
             "scope '%s': %s\n", action, requested_path_to_print,
             prefix_path, uacpi_status_to_string(ret)
         );
     } else {
-        uacpi_kernel_log(
-            UACPI_LOG_ERROR,
+        uacpi_error(
             "Unable to %s named object '%s%s%s': %s\n",
             action, prefix_path, middle_part,
             requested_path_to_print, uacpi_status_to_string(ret)
