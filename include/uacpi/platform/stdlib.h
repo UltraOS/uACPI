@@ -17,6 +17,7 @@
 #define uacpi_memcpy memcpy
 #define uacpi_memset memset
 #define uacpi_memcmp memcmp
+#define uacpi_strncmp strncmp
 #define uacpi_memmove memmove
 #define uacpi_strnlen strnlen
 #define uacpi_strlen strlen
