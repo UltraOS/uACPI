@@ -5180,16 +5180,54 @@ static void ctx_reload_post_ret(struct execution_context *ctx)
     refresh_ctx_pointers(ctx);
 }
 
+static void trace_method_abort(struct code_block *block, uacpi_size depth)
+{
+    static const uacpi_char *unknown_path = "<unknown>";
+    uacpi_char oom_absolute_path[9] = "<?>.";
+
+    const uacpi_char *absolute_path;
+
+    if (block != UACPI_NULL && block->type == CODE_BLOCK_SCOPE) {
+        absolute_path = uacpi_namespace_node_generate_absolute_path(block->node);
+        if (uacpi_unlikely(absolute_path == UACPI_NULL))
+            uacpi_memcpy(oom_absolute_path + 4, block->node->name.text, 4);
+    } else {
+        absolute_path = unknown_path;
+    }
+
+    uacpi_error("    #%zu in %s()\n", depth, absolute_path);
+
+    if (absolute_path != oom_absolute_path && absolute_path != unknown_path)
+        uacpi_kernel_free((void*)absolute_path);
+}
+
 static void execution_context_release(struct execution_context *ctx)
 {
+    uacpi_size depth;
+
     if (ctx->ret)
         uacpi_object_unref(ctx->ret);
 
-    while (call_frame_array_size(&ctx->call_stack) != 0) {
-        while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
-            pop_op(ctx);
+    depth = call_frame_array_size(&ctx->call_stack);
 
-        ctx_reload_post_ret(ctx);
+    /*
+     * Non-empty call stack here means the execution was aborted at some point,
+     * probably due to a bytecode error.
+     */
+    if (depth != 0) {
+        uacpi_size idx = 0;
+        uacpi_error("Aborting execution due to previous errors:\n");
+
+        do {
+            while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
+                pop_op(ctx);
+
+            trace_method_abort(
+                code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx++
+            );
+
+            ctx_reload_post_ret(ctx);
+        } while (--depth);
     }
 
     while (held_mutexes_array_size(&ctx->held_mutexes) != 0) {
