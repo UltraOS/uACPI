@@ -1,6 +1,7 @@
 #pragma once
 #include <uacpi/platform/types.h>
 #include <uacpi/platform/compiler.h>
+#include <uacpi/status.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -139,15 +140,23 @@ typedef struct uacpi_power_resource {
     uacpi_u16 resource_order;
 } uacpi_power_resource;
 
+typedef uacpi_status (*uacpi_native_call_handler)(
+    uacpi_handle ctx, uacpi_object *retval
+);
+
 typedef struct uacpi_control_method {
     struct uacpi_shareable shareable;
-    uacpi_u8 *code;
+    union {
+        uacpi_u8 *code;
+        uacpi_native_call_handler handler;
+    };
     uacpi_mutex *mutex;
     uacpi_u32 size;
     uacpi_u8 sync_level : 4;
     uacpi_u8 args : 3;
     uacpi_u8 is_serialized : 1;
     uacpi_u8 named_objects_persist: 1;
+    uacpi_u8 native_call : 1;
 } uacpi_control_method;
 
 typedef enum uacpi_access_type {
