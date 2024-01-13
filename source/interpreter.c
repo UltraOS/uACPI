@@ -4695,7 +4695,11 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         switch (op) {
-        case UACPI_PARSE_OP_END: {
+        case UACPI_PARSE_OP_END:
+        case UACPI_PARSE_OP_SKIP_WITH_WARN: {
+            if (op == UACPI_PARSE_OP_SKIP_WITH_WARN)
+                EXEC_OP_WARN("skipping due to previous errors");
+
             if (op_ctx->tracked_pkg_idx) {
                 item = item_array_at(&op_ctx->items, op_ctx->tracked_pkg_idx - 1);
                 frame->code_offset = item->pkg.end;
