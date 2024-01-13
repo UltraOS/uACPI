@@ -25,6 +25,7 @@ typedef enum uacpi_status {
     // All errors that have bytecode-related origin should go here
     UACPI_STATUS_AML_UNDEFINED_REFERENCE = 0xEFFF0000,
     UACPI_STATUS_AML_INVALID_NAMESTRING = 0xEFFF0001,
+    UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS = 0xEFFF0002,
 } uacpi_status;
 
 const char *uacpi_status_to_string(uacpi_status);
