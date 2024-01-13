@@ -256,6 +256,7 @@ static uacpi_status sta_eval(
         return ret;
     }
 
+    *value = 0;
     return ret;
 }
 
