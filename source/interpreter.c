@@ -619,12 +619,12 @@ static uacpi_status get_op(struct execution_context *ctx)
     uacpi_size size = frame->method->size;
 
     if (uacpi_unlikely(frame->code_offset >= size))
-        return UACPI_STATUS_OUT_OF_BOUNDS;
+        return UACPI_STATUS_AML_BAD_ENCODING;
 
     op = AML_READ(code, frame->code_offset++);
     if (op == UACPI_EXT_PREFIX) {
         if (uacpi_unlikely(frame->code_offset >= size))
-            return UACPI_STATUS_OUT_OF_BOUNDS;
+            return UACPI_STATUS_AML_BAD_ENCODING;
 
         op <<= 8;
         op |= AML_READ(code, frame->code_offset++);
@@ -659,7 +659,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
 
     // TODO: do package bounds checking at parse time
     if (uacpi_unlikely(pkg->end > ctx->cur_frame->method->size))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
 
     declared_size = item_array_at(&op_ctx->items, 1)->obj;
 
@@ -668,12 +668,12 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
             "buffer is too large (%llu), assuming corrupted bytestream\n",
             declared_size->integer
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
     if (uacpi_unlikely(declared_size->integer == 0)) {
         uacpi_error("attempted to create an empty buffer\n");
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
     buffer_size = declared_size->integer;
@@ -682,7 +682,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
             "too many buffer initializers: %u (size is %u)\n",
             init_size, buffer_size
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
     dst = item_array_at(&op_ctx->items, 3)->obj;
@@ -710,7 +710,7 @@ uacpi_status handle_string(struct execution_context *ctx)
     length = uacpi_strnlen(string, call_frame_code_bytes_left(frame));
 
     if (string[length++] != 0x00)
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
 
     obj->buffer->text = uacpi_kernel_alloc(length);
     if (uacpi_unlikely(obj->buffer->text == UACPI_NULL))
@@ -747,7 +747,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
                 "package is too large (%llu), assuming corrupted bytestream\n",
                 var_num_elements->integer
             );
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_BAD_ENCODING;
         }
         num_elements = var_num_elements->integer;
     } else {
@@ -1185,7 +1185,7 @@ static uacpi_status table_id_error(
 )
 {
     uacpi_error("%s: Invalid %s '%s'\n", opcode, arg, str->text);
-    return UACPI_STATUS_BAD_BYTECODE;
+    return UACPI_STATUS_AML_BAD_ENCODING;
 }
 
 static void report_table_id_find_error(
@@ -3212,13 +3212,13 @@ static uacpi_status parse_package_length(struct call_frame *frame,
 
     left = call_frame_code_bytes_left(frame);
     if (uacpi_unlikely(left < 1))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
 
     data = call_frame_cursor(frame);
     marker_length += *data >> 6;
 
     if (uacpi_unlikely(left < marker_length))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_BAD_ENCODING;
 
     switch (marker_length) {
     case 1:
@@ -3629,7 +3629,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
         if (uacpi_unlikely(!len_obj->integer ||
                             len_obj->integer > 0xFFFFFFFF)) {
             uacpi_error("invalid bit field length (%llu)\n", field->bit_length);
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_BAD_ENCODING;
         }
 
         field->bit_length = len_obj->integer;
@@ -4772,7 +4772,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
             width = op_decode_byte(op_ctx);
             if (uacpi_unlikely(call_frame_code_bytes_left(frame) < width))
-                return UACPI_STATUS_BAD_BYTECODE;
+                return UACPI_STATUS_AML_BAD_ENCODING;
 
             if (op == UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT) {
                 item->obj->type = UACPI_OBJECT_INTEGER;
