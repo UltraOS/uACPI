@@ -43,6 +43,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "AML referenced an undefined object";
     case UACPI_STATUS_AML_INVALID_NAMESTRING:
         return "invalid AML name string";
+    case UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS:
+        return "object already exists";
     default:
         return "<invalid status>";
     }
