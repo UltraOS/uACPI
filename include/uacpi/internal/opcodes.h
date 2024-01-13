@@ -86,6 +86,12 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,
 
+    /*
+     * Same as UACPI_PARSE_OP_EXISTING_NAMESTRING, but undefined references
+     * are not fatal if currently loading a table.
+     */
+    UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD,
+
     // Invoke a handler at op_handlers[spec->code]
     UACPI_PARSE_OP_INVOKE_HANDLER,
 
