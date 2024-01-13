@@ -323,7 +323,7 @@ static uacpi_status parse_nameseg(uacpi_u8 *cursor,
         if (data >= 'A' && data <= 'Z')
             continue;
 
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_NAMESTRING;
     }
 
     uacpi_memcpy(&out_name->id, cursor, 4);
@@ -363,7 +363,7 @@ static uacpi_status name_string_to_path(
     prefix_bytes = 0;
     for (;;) {
         if (uacpi_unlikely(bytes_left == 0))
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
         prev_char = *cursor;
 
@@ -384,7 +384,7 @@ static uacpi_status name_string_to_path(
 
     // At least a NullName byte is expected here
     if (uacpi_unlikely(bytes_left == 0))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
     namesegs = 0;
     bytes_left--;
@@ -395,7 +395,7 @@ static uacpi_status name_string_to_path(
         break;
     case UACPI_MULTI_NAME_PREFIX:
         if (uacpi_unlikely(bytes_left == 0))
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
         namesegs = *(uacpi_u8*)cursor;
         cursor++;
         bytes_left--;
@@ -414,7 +414,7 @@ static uacpi_status name_string_to_path(
     }
 
     if (uacpi_unlikely((namesegs * 4) > bytes_left))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
     // 4 chars per nameseg
     nameseg_bytes = namesegs * 4;
@@ -469,19 +469,19 @@ static uacpi_status resolve_name_string(
 
     for (;;) {
         if (uacpi_unlikely(bytes_left == 0))
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
         switch (*cursor) {
         case '\\':
             if (prev_char == '^')
-                return UACPI_STATUS_BAD_BYTECODE;
+                return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
             cur_node = uacpi_namespace_root();
             break;
         case '^':
             // Tried to go behind root
             if (uacpi_unlikely(cur_node == uacpi_namespace_root()))
-                return UACPI_STATUS_BAD_BYTECODE;
+                return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
             cur_node = cur_node->parent;
             break;
@@ -508,7 +508,7 @@ static uacpi_status resolve_name_string(
 
     // At least a NullName byte is expected here
     if (uacpi_unlikely(bytes_left == 0))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
     bytes_left--;
     switch (*cursor++)
@@ -519,7 +519,7 @@ static uacpi_status resolve_name_string(
         break;
     case UACPI_MULTI_NAME_PREFIX:
         if (uacpi_unlikely(bytes_left == 0))
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
         namesegs = *cursor;
         cursor++;
         bytes_left--;
@@ -528,7 +528,7 @@ static uacpi_status resolve_name_string(
     case UACPI_NULL_NAME:
         if (behavior == RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS ||
             just_one_nameseg)
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
         goto out;
     default:
@@ -543,7 +543,7 @@ static uacpi_status resolve_name_string(
     }
 
     if (uacpi_unlikely((namesegs * 4) > bytes_left))
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
     for (; namesegs; cursor += 4, namesegs--) {
         uacpi_object_name name;

@@ -41,6 +41,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "object type mismatch";
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";
+    case UACPI_STATUS_AML_INVALID_NAMESTRING:
+        return "invalid AML name string";
     default:
         return "<invalid status>";
     }
