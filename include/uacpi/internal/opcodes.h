@@ -18,6 +18,9 @@ typedef uacpi_u16 uacpi_aml_op;
 enum uacpi_parse_op {
     UACPI_PARSE_OP_END = 0,
 
+    // End the execution of the current instruction with a warning
+    UACPI_PARSE_OP_SKIP_WITH_WARN,
+
     // SimpleName := NameString | ArgObj | LocalObj
     UACPI_PARSE_OP_SIMPLE_NAME,
 
