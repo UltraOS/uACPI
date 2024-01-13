@@ -4933,6 +4933,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 trace_named_object_lookup_or_creation_failure(
                     frame, offset, op, trace_ret, lvl
                 );
+
+                if (ret == UACPI_STATUS_NOT_FOUND)
+                    ret = UACPI_STATUS_AML_UNDEFINED_REFERENCE;
             }
 
             break;
