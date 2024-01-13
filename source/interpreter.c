@@ -636,7 +636,7 @@ static uacpi_status get_op(struct execution_context *ctx)
             "Invalid opcode '%s' encountered in bytestream\n",
             ctx->cur_op->name
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INVALID_OPCODE;
     }
 
     return UACPI_STATUS_OK;
@@ -4827,7 +4827,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_BAD_OPCODE:
         case UACPI_PARSE_OP_UNREACHABLE:
             EXEC_OP_WARN("invalid/unexpected opcode");
-            ret = UACPI_STATUS_BAD_BYTECODE;
+            ret = UACPI_STATUS_AML_INVALID_OPCODE;
             break;
 
         case UACPI_PARSE_OP_AML_PC_DECREMENT:
