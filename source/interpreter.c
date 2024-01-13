@@ -1889,6 +1889,9 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         block->type = CODE_BLOCK_WHILE;
         break;
     case UACPI_AML_OP_ScopeOp:
+        // Disarm the tracked package so that we don't skip the Scope
+        op_ctx->tracked_pkg_idx = 0;
+        // FALLTHROUGH intended here
     case UACPI_AML_OP_DeviceOp:
     case UACPI_AML_OP_ProcessorOp:
     case UACPI_AML_OP_PowerResOp:
