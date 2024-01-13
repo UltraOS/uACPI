@@ -27,8 +27,6 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "not found";
     case UACPI_STATUS_INVALID_ARGUMENT:
         return "invalid argument";
-    case UACPI_STATUS_BAD_BYTECODE:
-        return "bad bytecode";
     case UACPI_STATUS_UNIMPLEMENTED:
         return "unimplemented";
     case UACPI_STATUS_ALREADY_EXISTS:
