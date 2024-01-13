@@ -4118,6 +4118,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE_METHOD_LOCAL,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
+    [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
@@ -4317,7 +4318,7 @@ static uacpi_status typecheck_computational_data(
 
 static void trace_named_object_lookup_or_creation_failure(
     struct call_frame *frame, uacpi_size offset, enum uacpi_parse_op op,
-    uacpi_status ret
+    uacpi_status ret, enum uacpi_log_level level
 )
 {
     static const uacpi_char *oom_prefix = "<...>";
@@ -4367,13 +4368,15 @@ static void trace_named_object_lookup_or_creation_failure(
         middle_part = empty_string;
 
     if (length == 5 && op != UACPI_PARSE_OP_CREATE_NAMESTRING) {
-        uacpi_error(
+        uacpi_log_lvl(
+            level,
             "Unable to %s named object '%s' within (or above) "
             "scope '%s': %s\n", action, requested_path_to_print,
             prefix_path, uacpi_status_to_string(ret)
         );
     } else {
-        uacpi_error(
+        uacpi_log_lvl(
+            level,
             "Unable to %s named object '%s%s%s': %s\n",
             action, prefix_path, middle_part,
             requested_path_to_print, uacpi_status_to_string(ret)
@@ -4882,7 +4885,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_CREATE_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING:
-        case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL: {
+        case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL:
+        case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD: {
             uacpi_size offset = frame->code_offset;
             enum resolve_behavior behavior;
 
@@ -4909,8 +4913,18 @@ static uacpi_status exec_op(struct execution_context *ctx)
             }
 
             if (uacpi_unlikely_error(ret)) {
+                enum uacpi_log_level lvl = UACPI_LOG_ERROR;
+                uacpi_status trace_ret = ret;
+
+                if (op == UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD &&
+                    ctx->cur_frame->method->named_objects_persist &&
+                    ret == UACPI_STATUS_NOT_FOUND) {
+                    lvl = UACPI_LOG_WARN;
+                    ret = UACPI_STATUS_OK;
+                }
+
                 trace_named_object_lookup_or_creation_failure(
-                    frame, offset, op, ret
+                    frame, offset, op, trace_ret, lvl
                 );
             }
 
