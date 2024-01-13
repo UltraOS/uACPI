@@ -4004,7 +4004,7 @@ static uacpi_status enter_method(
             "(current is %d)\n",
             method, method->sync_level, ctx->sync_level
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH;
     }
 
     if (method->mutex == UACPI_NULL) {

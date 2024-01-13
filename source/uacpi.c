@@ -51,6 +51,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "bad AML instruction encoding";
     case UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX:
         return "out of bounds AML index";
+    case UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH:
+        return "AML attempted to acquire a mutex with a lower sync level";
     default:
         return "<invalid status>";
     }
