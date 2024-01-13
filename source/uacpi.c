@@ -49,6 +49,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "incompatible AML object type";
     case UACPI_STATUS_AML_BAD_ENCODING:
         return "bad AML instruction encoding";
+    case UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX:
+        return "out of bounds AML index";
     default:
         return "<invalid status>";
     }

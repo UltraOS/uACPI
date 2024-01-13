@@ -2396,7 +2396,7 @@ static uacpi_status ensure_valid_idx(uacpi_object *obj, uacpi_size idx,
         "Invalid index %zu, %s@%p has %zu elements\n",
         idx, uacpi_object_type_to_string(obj->type), obj, src_size
     );
-    return UACPI_STATUS_BAD_BYTECODE;
+    return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
 }
 
 static uacpi_status handle_index(struct execution_context *ctx)
@@ -3674,7 +3674,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
             field->bit_index, field->bit_index + field->bit_length,
             src_buf->size
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
     }
 
     field->backing = src_buf;
