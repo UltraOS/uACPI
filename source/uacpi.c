@@ -27,8 +27,6 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "not found";
     case UACPI_STATUS_INVALID_ARGUMENT:
         return "invalid argument";
-    case UACPI_STATUS_OUT_OF_BOUNDS:
-        return "out of bounds";
     case UACPI_STATUS_BAD_BYTECODE:
         return "bad bytecode";
     case UACPI_STATUS_UNIMPLEMENTED:
@@ -49,6 +47,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "invalid AML opcode";
     case UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE:
         return "incompatible AML object type";
+    case UACPI_STATUS_AML_BAD_ENCODING:
+        return "bad AML instruction encoding";
     default:
         return "<invalid status>";
     }
