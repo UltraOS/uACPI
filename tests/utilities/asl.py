@@ -163,6 +163,9 @@ class ASLSource:
 
             # Creation of named objects within a method is highly inefficient
             "-vw", "2173",
+
+            # Existing object has invalid type for Scope operator
+            "-vw", "6117",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
