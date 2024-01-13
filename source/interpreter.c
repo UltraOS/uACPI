@@ -885,7 +885,7 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     case UACPI_OBJECT_REFERENCE:
         return UACPI_STATUS_INVALID_ARGUMENT;
     default:
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     return UACPI_STATUS_OK;
@@ -1058,7 +1058,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
         break;
 
     default:
-        ret = UACPI_STATUS_BAD_BYTECODE;
+        ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
         break;
     }
 
@@ -1546,7 +1546,7 @@ static uacpi_status ensure_is_a_unit_field(uacpi_namespace_node *node,
             "Invalid argument: '%.4s' is not a unit field (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     *out_field = obj->unit_field;
@@ -1564,7 +1564,7 @@ static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
             "Invalid argument: '%.4s' is not an operation region (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     *out_region = obj->op_region;
@@ -2259,7 +2259,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
                 "Invalid DerefOf argument: %s, expected a reference\n",
                 uacpi_object_type_to_string(src->type)
             );
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
         }
 
         return uacpi_object_assign(dst, src,
@@ -2478,7 +2478,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     return UACPI_STATUS_OK;
@@ -2734,7 +2734,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
             "Invalid argument for Mid: %s, expected String/Buffer\n",
             uacpi_object_type_to_string(src->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     idx = item_array_at(&op_ctx->items, 1)->obj->integer;
@@ -2914,7 +2914,7 @@ static uacpi_status handle_sizeof(struct execution_context *ctx)
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     return UACPI_STATUS_OK;
@@ -3100,7 +3100,7 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
                 uacpi_object_type_to_string(lhs->type),
                 uacpi_object_type_to_string(rhs->type)
             );
-            return UACPI_STATUS_BAD_BYTECODE;
+            return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
         }
 
         if (op == UACPI_AML_OP_LEqualOp)
@@ -3328,7 +3328,7 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
             "%s: Invalid argument '%s', expected an Event object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     switch (op_ctx->op->code)
@@ -3378,7 +3378,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
             "%s: Invalid argument '%s', expected a Mutex object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     // TODO: This should probably be a relaxed atomic load?
@@ -3964,7 +3964,7 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
             break;
         }
     default:
-        ret = UACPI_STATUS_BAD_BYTECODE;
+        ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     return ret;
@@ -3982,7 +3982,7 @@ static uacpi_status handle_copy_object_or_store(struct execution_context *ctx)
         return store_to_target(dst, src);
 
     if (dst->type != UACPI_OBJECT_REFERENCE)
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
 
     return copy_object_to_reference(dst, src);
 }
@@ -4262,7 +4262,7 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     if (!(props & ok_mask)) {
         EXEC_OP_WARN_2("invalid argument: '%s', expected a %s",
                        cur_op_ctx->op->name, expected_type_str);
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
     return UACPI_STATUS_OK;
@@ -4280,7 +4280,7 @@ static uacpi_status typecheck_obj(
 
     EXEC_OP_WARN_2("invalid argument type: %s, expected a %s",
                    uacpi_object_type_to_string(obj->type), spec_desc);
-    return UACPI_STATUS_BAD_BYTECODE;
+    return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
 }
 
 static uacpi_status typecheck_operand(
@@ -4315,7 +4315,7 @@ static uacpi_status typecheck_computational_data(
             uacpi_object_type_to_string(obj->type),
             SPEC_COMPUTATIONAL_DATA
         );
-        return UACPI_STATUS_BAD_BYTECODE;
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 }
 
@@ -4813,7 +4813,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 EXEC_OP_WARN_2("bad object type: expected %s, got %s!",
                                uacpi_object_type_to_string(expected_type),
                                uacpi_object_type_to_string(item->obj->type));
-                ret = UACPI_STATUS_BAD_BYTECODE;
+                ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
             }
 
             break;

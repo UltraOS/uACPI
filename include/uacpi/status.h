@@ -27,6 +27,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_AML_INVALID_NAMESTRING = 0xEFFF0001,
     UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS = 0xEFFF0002,
     UACPI_STATUS_AML_INVALID_OPCODE = 0xEFFF0003,
+    UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE = 0xEFFF0004,
 } uacpi_status;
 
 const char *uacpi_status_to_string(uacpi_status);

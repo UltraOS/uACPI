@@ -47,6 +47,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "object already exists";
     case UACPI_STATUS_AML_INVALID_OPCODE:
         return "invalid AML opcode";
+    case UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE:
+        return "incompatible AML object type";
     default:
         return "<invalid status>";
     }
