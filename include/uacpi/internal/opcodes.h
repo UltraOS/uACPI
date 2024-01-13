@@ -489,8 +489,10 @@ UACPI_BAD_OPCODE(0x0F)                                           \
 UACPI_OP(                                                        \
     ScopeOp, 0x10,                                               \
     {                                                            \
-        UACPI_PARSE_OP_PKGLEN,                                   \
-        UACPI_PARSE_OP_EXISTING_NAMESTRING,                      \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD,      \
+        UACPI_PARSE_OP_IF_NULL, 1, 1,                            \
+            UACPI_PARSE_OP_SKIP_WITH_WARN,                       \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
