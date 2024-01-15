@@ -71,6 +71,11 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
+static uacpi_bool empty_buffer_or_string_alloc(uacpi_object *object)
+{
+    return buffer_alloc(object, 0);
+}
+
 uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements)
 {
     uacpi_size i;
@@ -109,6 +114,11 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
 
     obj->package = pkg;
     return UACPI_TRUE;
+}
+
+static uacpi_bool empty_package_alloc(uacpi_object *object)
+{
+    return package_alloc(object, 0);
 }
 
 uacpi_mutex *uacpi_create_mutex(void)
@@ -197,9 +207,23 @@ static uacpi_bool unit_field_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+typedef uacpi_bool (*object_ctor)(uacpi_object *obj);
+
+static object_ctor object_constructor_table[UACPI_OBJECT_MAX_TYPE_VALUE + 1] = {
+    [UACPI_OBJECT_STRING] = empty_buffer_or_string_alloc,
+    [UACPI_OBJECT_BUFFER] = empty_buffer_or_string_alloc,
+    [UACPI_OBJECT_PACKAGE] = empty_package_alloc,
+    [UACPI_OBJECT_UNIT_FIELD] = unit_field_alloc,
+    [UACPI_OBJECT_MUTEX] = mutex_alloc,
+    [UACPI_OBJECT_EVENT] = event_alloc,
+    [UACPI_OBJECT_OPERATION_REGION] = op_region_alloc,
+    [UACPI_OBJECT_METHOD] = method_alloc,
+};
+
 uacpi_object *uacpi_create_object(uacpi_object_type type)
 {
     uacpi_object *ret;
+    object_ctor ctor;
 
     ret = uacpi_kernel_calloc(1, sizeof(*ret));
     if (uacpi_unlikely(ret == UACPI_NULL))
@@ -208,52 +232,16 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     uacpi_shareable_init(ret);
     ret->type = type;
 
-    switch (type) {
-    case UACPI_OBJECT_STRING:
-    case UACPI_OBJECT_BUFFER:
-        if (uacpi_unlikely(!buffer_alloc(ret, 0)))
-            goto out_free_ret;
+    ctor = object_constructor_table[type];
+    if (ctor == UACPI_NULL)
+        return ret;
 
-        break;
-    case UACPI_OBJECT_PACKAGE:
-        if (uacpi_unlikely(!package_alloc(ret, 0)))
-            goto out_free_ret;
-
-        break;
-    case UACPI_OBJECT_UNIT_FIELD:
-        if (uacpi_unlikely(!unit_field_alloc(ret)))
-            goto out_free_ret;
-
-        break;
-    case UACPI_OBJECT_MUTEX:
-        if (uacpi_unlikely(!mutex_alloc(ret)))
-            goto out_free_ret;
-
-        break;
-    case UACPI_OBJECT_EVENT:
-        if (uacpi_unlikely(!event_alloc(ret)))
-            goto out_free_ret;
-
-        break;
-    case UACPI_OBJECT_OPERATION_REGION:
-        if (uacpi_unlikely(!op_region_alloc(ret)))
-            goto out_free_ret;
-
-        break;
-    case UACPI_OBJECT_METHOD:
-        if (uacpi_unlikely(!method_alloc(ret)))
-            goto out_free_ret;
-
-        break;
-    default:
-        break;
+    if (uacpi_unlikely(!ctor(ret))) {
+        uacpi_kernel_free(ret);
+        return UACPI_NULL;
     }
 
     return ret;
-
-out_free_ret:
-    uacpi_kernel_free(ret);
-    return UACPI_NULL;
 }
 
 static void free_buffer(uacpi_handle handle)

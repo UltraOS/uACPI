@@ -37,6 +37,7 @@ typedef enum uacpi_object_type {
 
     UACPI_OBJECT_REFERENCE = 20,
     UACPI_OBJECT_BUFFER_INDEX = 21,
+    UACPI_OBJECT_MAX_TYPE_VALUE = UACPI_OBJECT_BUFFER_INDEX
 } uacpi_object_type;
 
 // Type bits for API requiring a bit mask, e.g. uacpi_eval_typed
