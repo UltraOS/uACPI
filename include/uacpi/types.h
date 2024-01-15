@@ -16,6 +16,7 @@ typedef uacpi_u64 uacpi_io_addr;
 #endif
 
 typedef void *uacpi_handle;
+typedef struct uacpi_namespace_node uacpi_namespace_node;
 
 typedef enum uacpi_object_type {
     UACPI_OBJECT_UNINITIALIZED = 0,
@@ -105,6 +106,48 @@ typedef struct uacpi_event {
     struct uacpi_shareable shareable;
     uacpi_handle handle;
 } uacpi_event;
+
+typedef enum uacpi_region_op {
+    UACPI_REGION_OP_ATTACH = 1,
+    UACPI_REGION_OP_READ = 2,
+    UACPI_REGION_OP_WRITE = 3,
+    UACPI_REGION_OP_DETACH = 4,
+} uacpi_region_op;
+
+typedef struct uacpi_region_attach_data {
+    void *handler_context;
+    uacpi_namespace_node *region_node;
+    void *out_region_context;
+} uacpi_region_attach_data;
+
+typedef struct uacpi_region_rw_data {
+    void *handler_context;
+    void *region_context;
+    union {
+        uacpi_phys_addr address;
+        uacpi_u64 offset;
+    };
+    uacpi_u64 value;
+    uacpi_u8 byte_width;
+} uacpi_memory_region_rw_data;
+
+typedef struct uacpi_region_detach_data {
+    void *handler_context;
+    void *region_context;
+    uacpi_namespace_node *region_node;
+} uacpi_region_detach_data;
+
+typedef uacpi_status (*uacpi_region_handler)
+    (uacpi_region_op op, uacpi_handle op_data);
+
+typedef struct uacpi_address_space_handler {
+    struct uacpi_shareable shareable;
+    uacpi_region_handler callback;
+    uacpi_handle user_context;
+    struct uacpi_address_space_handler *next;
+    struct uacpi_operation_region *regions;
+    uacpi_u8 space;
+} uacpi_address_space_handler;
 
 enum uacpi_operation_region_space {
     UACPI_OP_REGION_SPACE_SYSTEM_MEMORY = 0,
