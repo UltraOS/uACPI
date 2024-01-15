@@ -35,6 +35,9 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "internal error";
     case UACPI_STATUS_TYPE_MISMATCH:
         return "object type mismatch";
+    case UACPI_STATUS_INIT_LEVEL_MISMATCH:
+        return "init level too low/high for this action";
+
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";
     case UACPI_STATUS_AML_INVALID_NAMESTRING:
@@ -123,6 +126,11 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
 
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
+                       UACPI_INIT_LEVEL_EARLY))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_TABLES_LOADED;
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
     g_uacpi_rt_ctx.tables.size_including_inline = UACPI_BASE_TABLE_COUNT;
 
@@ -161,6 +169,10 @@ uacpi_status uacpi_namespace_load(void)
     struct uacpi_table *tbl;
     uacpi_status ret;
 
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
+                       UACPI_INIT_LEVEL_TABLES_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
     ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
     if (uacpi_unlikely_error(ret))
         return ret;
@@ -184,6 +196,9 @@ uacpi_status uacpi_namespace_load(void)
 out:
     if (ret == UACPI_STATUS_NOT_FOUND)
         ret = UACPI_STATUS_OK;
+
+    if (uacpi_likely_success(ret))
+        g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_LOADED;
 
     return ret;
 }
@@ -337,6 +352,10 @@ uacpi_status uacpi_namespace_initialize(void)
 {
     struct ns_init_context ctx = { 0 };
 
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
+                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
     /*
      * Initialization order here is identical to ACPICA because ACPI
      * specification doesn't really have any detailed steps that explain
@@ -375,6 +394,7 @@ uacpi_status uacpi_namespace_initialize(void)
         ctx.ini_errors
     );
 
+    g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED;
     return UACPI_STATUS_OK;
 }
 

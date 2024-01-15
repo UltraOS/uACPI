@@ -50,6 +50,12 @@ struct uacpi_runtime_context {
      */
     uacpi_bool is_rev1;
 
+#define UACPI_INIT_LEVEL_EARLY 0
+#define UACPI_INIT_LEVEL_TABLES_LOADED 1
+#define UACPI_INIT_LEVEL_NAMESPACE_LOADED 2
+#define UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED 3
+    uacpi_u8 init_level;
+
     struct uacpi_params params;
 };
 
