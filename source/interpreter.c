@@ -1979,8 +1979,8 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
     case UACPI_OBJECT_PROCESSOR:
         uacpi_info(
             "%s Processor[%d] 0x%08X (%d)\n",
-            prefix, src->processor.id, src->processor.block_address,
-            src->processor.block_length
+            prefix, src->processor->id, src->processor->block_address,
+            src->processor->block_length
         );
         break;
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -3719,7 +3719,7 @@ static uacpi_status create_named_scope(struct op_context *op_ctx)
 
     switch (op_ctx->op->code) {
     case UACPI_AML_OP_ProcessorOp: {
-        uacpi_processor *proc = &obj->processor;
+        uacpi_processor *proc = obj->processor;
         proc->id = item_array_at(&op_ctx->items, 2)->immediate;
         proc->block_address = item_array_at(&op_ctx->items, 3)->immediate;
         proc->block_length = item_array_at(&op_ctx->items, 4)->immediate;
