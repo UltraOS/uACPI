@@ -207,6 +207,48 @@ static uacpi_bool unit_field_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
+static uacpi_bool processor_alloc(uacpi_object *obj)
+{
+    uacpi_processor *processor;
+
+    processor = uacpi_kernel_calloc(1, sizeof(*processor));
+    if (uacpi_unlikely(processor == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(processor);
+    obj->processor = processor;
+
+    return UACPI_TRUE;
+}
+
+static uacpi_bool device_alloc(uacpi_object *obj)
+{
+    uacpi_device *device;
+
+    device = uacpi_kernel_calloc(1, sizeof(*device));
+    if (uacpi_unlikely(device == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(device);
+    obj->device = device;
+
+    return UACPI_TRUE;
+}
+
+static uacpi_bool thermal_zone_alloc(uacpi_object *obj)
+{
+    uacpi_thermal_zone *thermal_zone;
+
+    thermal_zone = uacpi_kernel_calloc(1, sizeof(*thermal_zone));
+    if (uacpi_unlikely(thermal_zone == UACPI_NULL))
+        return UACPI_FALSE;
+
+    uacpi_shareable_init(thermal_zone);
+    obj->thermal_zone = thermal_zone;
+
+    return UACPI_TRUE;
+}
+
 typedef uacpi_bool (*object_ctor)(uacpi_object *obj);
 
 static object_ctor object_constructor_table[UACPI_OBJECT_MAX_TYPE_VALUE + 1] = {
@@ -218,6 +260,9 @@ static object_ctor object_constructor_table[UACPI_OBJECT_MAX_TYPE_VALUE + 1] = {
     [UACPI_OBJECT_EVENT] = event_alloc,
     [UACPI_OBJECT_OPERATION_REGION] = op_region_alloc,
     [UACPI_OBJECT_METHOD] = method_alloc,
+    [UACPI_OBJECT_PROCESSOR] = processor_alloc,
+    [UACPI_OBJECT_DEVICE] = device_alloc,
+    [UACPI_OBJECT_THERMAL_ZONE] = thermal_zone_alloc,
 };
 
 uacpi_object *uacpi_create_object(uacpi_object_type type)
@@ -401,6 +446,50 @@ static void free_op_region(uacpi_handle handle)
     uacpi_kernel_free(op_region);
 }
 
+static void free_handler(uacpi_handle handle)
+{
+    uacpi_address_space_handler *handler = handle;
+    uacpi_kernel_free(handler);
+}
+
+static void free_handlers(uacpi_handle handle)
+{
+    uacpi_handlers *handlers = handle;
+    uacpi_address_space_handler *next_handler, *handler = handlers->head;
+
+    while (handler) {
+        next_handler = handler->next;
+        uacpi_shareable_unref_and_delete_if_last(handler, free_handler);
+        handler = next_handler;
+    }
+}
+
+void uacpi_address_space_handler_unref(uacpi_address_space_handler *handler)
+{
+    uacpi_shareable_unref_and_delete_if_last(handler, free_handler);
+}
+
+static void free_device(uacpi_handle handle)
+{
+    uacpi_device *device = handle;
+    free_handlers(device);
+    uacpi_kernel_free(device);
+}
+
+static void free_processor(uacpi_handle handle)
+{
+    uacpi_processor *processor = handle;
+    free_handlers(processor);
+    uacpi_kernel_free(processor);
+}
+
+static void free_thermal_zone(uacpi_handle handle)
+{
+    uacpi_thermal_zone *thermal_zone = handle;
+    free_handlers(thermal_zone);
+    uacpi_kernel_free(thermal_zone);
+}
+
 static void free_unit_field(uacpi_handle handle)
 {
     uacpi_unit_field *unit_field = handle;
@@ -479,6 +568,19 @@ static void free_object_storage(uacpi_object *obj)
     case UACPI_OBJECT_OPERATION_REGION:
         uacpi_shareable_unref_and_delete_if_last(obj->op_region,
                                                  free_op_region);
+        break;
+    case UACPI_OBJECT_PROCESSOR:
+        uacpi_shareable_unref_and_delete_if_last(obj->processor,
+                                                 free_processor);
+        break;
+    case UACPI_OBJECT_DEVICE:
+        uacpi_shareable_unref_and_delete_if_last(obj->device,
+                                                 free_device);
+        break;
+    case UACPI_OBJECT_THERMAL_ZONE:
+        uacpi_shareable_unref_and_delete_if_last(obj->thermal_zone,
+                                                 free_thermal_zone);
+        break;
     default:
         break;
     }
@@ -788,6 +890,9 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_PACKAGE:
     case UACPI_OBJECT_MUTEX:
     case UACPI_OBJECT_EVENT:
+    case UACPI_OBJECT_PROCESSOR:
+    case UACPI_OBJECT_DEVICE:
+    case UACPI_OBJECT_THERMAL_ZONE:
         free_object_storage(dst);
         break;
     default:
@@ -837,6 +942,18 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         break;
     case UACPI_OBJECT_REFERENCE:
         uacpi_object_attach_child(dst, src->inner_object);
+        break;
+    case UACPI_OBJECT_PROCESSOR:
+        dst->processor = src->processor;
+        uacpi_shareable_ref(dst->processor);
+        break;
+    case UACPI_OBJECT_DEVICE:
+        dst->device = src->device;
+        uacpi_shareable_ref(dst->device);
+        break;
+    case UACPI_OBJECT_THERMAL_ZONE:
+        dst->thermal_zone = src->thermal_zone;
+        uacpi_shareable_ref(dst->thermal_zone);
         break;
     default:
         ret = UACPI_STATUS_UNIMPLEMENTED;

@@ -149,6 +149,18 @@ typedef struct uacpi_address_space_handler {
     uacpi_u8 space;
 } uacpi_address_space_handler;
 
+/*
+ * NOTE: This is the common header for all of the following:
+ * - UACPI_OBJECT_PROCESSOR
+ * - UACPI_OBJECT_DEVICE
+ * - UACPI_OBJECT_THERMAL_ZONE
+ * Any changes to this struct must be propagated to all objects.
+ */
+typedef struct uacpi_handlers {
+    struct uacpi_shareable shareable;
+    uacpi_address_space_handler *head;
+} uacpi_handlers;
+
 enum uacpi_operation_region_space {
     UACPI_OP_REGION_SPACE_SYSTEM_MEMORY = 0,
     UACPI_OP_REGION_SPACE_SYSTEM_IO = 1,
@@ -173,11 +185,23 @@ typedef struct uacpi_operation_region {
     uacpi_u64 length;
 } uacpi_operation_region;
 
+typedef struct uacpi_device {
+    struct uacpi_shareable shareable;
+    uacpi_address_space_handler *handlers;
+} uacpi_device;
+
 typedef struct uacpi_processor {
+    struct uacpi_shareable shareable;
+    uacpi_address_space_handler *handlers;
     uacpi_u8 id;
     uacpi_u32 block_address;
     uacpi_u8 block_length;
 } uacpi_processor;
+
+typedef struct uacpi_thermal_zone {
+    struct uacpi_shareable shareable;
+    uacpi_address_space_handler *handlers;
+} uacpi_thermal_zone;
 
 typedef struct uacpi_power_resource {
     uacpi_u8 system_level;
@@ -294,7 +318,10 @@ typedef struct uacpi_object {
         uacpi_event *event;
         uacpi_buffer_index buffer_index;
         uacpi_operation_region *op_region;
-        uacpi_processor processor;
+        uacpi_device *device;
+        uacpi_processor *processor;
+        uacpi_thermal_zone *thermal_zone;
+        uacpi_handlers *handlers;
         uacpi_power_resource power_resource;
         uacpi_unit_field *unit_field;
     };
