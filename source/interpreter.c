@@ -1263,7 +1263,7 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
 
     obj = item_array_at(items, 4)->obj;
     op_region = obj->op_region;
-    op_region->space = UACPI_OP_REGION_SPACE_TABLE_DATA;
+    op_region->space = UACPI_ADDRESS_SPACE_TABLE_DATA;
     op_region->offset = table->virt_addr;
     op_region->length = table->length;
 
@@ -1417,7 +1417,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
         op_region = src->op_region;
         if (uacpi_unlikely(
-            op_region->space != UACPI_OP_REGION_SPACE_SYSTEM_MEMORY
+            op_region->space != UACPI_ADDRESS_SPACE_SYSTEM_MEMORY
         )) {
             uacpi_error("Load: operation region is not SystemMemory\n");
             goto return_false;
