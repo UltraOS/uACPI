@@ -129,7 +129,7 @@ typedef struct uacpi_region_rw_data {
     };
     uacpi_u64 value;
     uacpi_u8 byte_width;
-} uacpi_memory_region_rw_data;
+} uacpi_region_rw_data;
 
 typedef struct uacpi_region_detach_data {
     void *handler_context;
@@ -151,6 +151,7 @@ typedef struct uacpi_address_space_handler {
 
 /*
  * NOTE: This is the common header for all of the following:
+ * - UACPI_OBJECT_OPERATION_REGION
  * - UACPI_OBJECT_PROCESSOR
  * - UACPI_OBJECT_DEVICE
  * - UACPI_OBJECT_THERMAL_ZONE
@@ -181,11 +182,23 @@ const uacpi_char *uacpi_address_space_to_string(
     enum uacpi_address_space space
 );
 
+// This region has a corresponding _REG method that was succesfully executed
+#define UACPI_OP_REGION_STATE_REG_EXECUTED (1 << 0)
+
+// This region was successfully attached to a handler
+#define UACPI_OP_REGION_STATE_ATTACHED (1 << 1)
+
 typedef struct uacpi_operation_region {
     struct uacpi_shareable shareable;
+    uacpi_address_space_handler *handler;
+    uacpi_handle user_context;
     uacpi_u8 space;
+    uacpi_u8 state_flags;
     uacpi_u64 offset;
     uacpi_u64 length;
+
+    // Used to link regions sharing the same handler
+    struct uacpi_operation_region *next;
 } uacpi_operation_region;
 
 typedef struct uacpi_device {

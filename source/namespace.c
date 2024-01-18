@@ -3,6 +3,7 @@
 #include <uacpi/internal/types.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/interpreter.h>
+#include <uacpi/internal/opregion.h>
 #include <uacpi/kernel_api.h>
 
 #define UACPI_REV_VALUE 2
@@ -190,6 +191,32 @@ uacpi_status uacpi_node_install(
 
 void uacpi_node_uninstall(uacpi_namespace_node *node)
 {
+    uacpi_object *object;
+
+    object = uacpi_namespace_node_get_object(node);
+    if (object != UACPI_NULL && object->type == UACPI_OBJECT_OPERATION_REGION) {
+        /*
+         * Detach this region from its handler while the node object
+         * that it belongs to is still alive.
+         *
+         * Bad AML could do something along the lines of:
+         *     Method(BAD) {
+         *         OperationRegion(REGN, ...)
+         *         Return (REGN)
+         *     }
+         *     Local0 = BAD()
+         *
+         * In this case, the object stored at Local0 is this same region, which
+         * doesn't really make sense. We can't properly remove the region from
+         * its handler in this case, as there is simply no namespace node
+         * controlling it that we could give to the handler.
+         *
+         * Unconditionally disconnect the region from its handler when
+         * uninstalling a namespace node to combat this.
+         */
+        uacpi_opregion_uninstall_handler(node);
+    }
+
     if (node->parent && node->parent->child == node)
         node->parent->child = node->next;
 
