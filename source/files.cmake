@@ -8,4 +8,5 @@ uacpi_add_sources(
     namespace.c
     stdlib.c
     shareable.c
+    opregion.c
 )

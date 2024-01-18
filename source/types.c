@@ -3,6 +3,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/shareable.h>
 #include <uacpi/internal/dynamic_array.h>
+#include <uacpi/internal/log.h>
 #include <uacpi/kernel_api.h>
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
@@ -474,12 +475,6 @@ static void free_event(uacpi_handle handle)
     uacpi_kernel_free(event);
 }
 
-static void free_op_region(uacpi_handle handle)
-{
-    uacpi_operation_region *op_region = handle;
-    uacpi_kernel_free(op_region);
-}
-
 static void free_handler(uacpi_handle handle)
 {
     uacpi_address_space_handler *handler = handle;
@@ -501,6 +496,20 @@ static void free_handlers(uacpi_handle handle)
 void uacpi_address_space_handler_unref(uacpi_address_space_handler *handler)
 {
     uacpi_shareable_unref_and_delete_if_last(handler, free_handler);
+}
+
+static void free_op_region(uacpi_handle handle)
+{
+    uacpi_operation_region *op_region = handle;
+
+    if (uacpi_unlikely(op_region->handler != UACPI_NULL)) {
+        uacpi_warn(
+            "BUG: attempting to free an opregion@%p with a handler attached\n",
+            op_region, op_region->handler
+        );
+    }
+
+    uacpi_kernel_free(op_region);
 }
 
 static void free_device(uacpi_handle handle)
