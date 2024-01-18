@@ -9,4 +9,5 @@ uacpi_add_sources(
     stdlib.c
     shareable.c
     opregion.c
+    default_handlers.c
 )

@@ -19,3 +19,5 @@ uacpi_status uacpi_opregion_find_and_install_handler(
 
 void uacpi_opregion_reg(uacpi_namespace_node *node);
 uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node);
+
+void uacpi_install_default_address_space_handlers(void);
