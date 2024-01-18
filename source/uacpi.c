@@ -7,6 +7,7 @@
 #include <uacpi/internal/tables.h>
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/namespace.h>
+#include <uacpi/internal/opregion.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -160,6 +161,8 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     ret = uacpi_namespace_initialize_predefined();
     if (uacpi_unlikely_error(ret))
         return ret;
+
+    uacpi_install_default_address_space_handlers();
 
     return UACPI_STATUS_OK;
 }
