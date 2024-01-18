@@ -301,6 +301,9 @@ out_invalid_path:
 
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
 {
+    if (node == UACPI_NULL || node->object == UACPI_NULL)
+        return UACPI_NULL;
+
     return uacpi_unwrap_internal_reference(node->object);
 }
 
