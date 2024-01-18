@@ -29,6 +29,19 @@ static uacpi_object *make_object_for_predefined(
     uacpi_object *obj;
 
     switch (ns) {
+    case UACPI_PREDEFINED_NAMESPACE_ROOT:
+        obj = uacpi_create_object(UACPI_OBJECT_DEVICE);
+        if (uacpi_unlikely(obj == UACPI_NULL))
+            return obj;
+
+        /*
+         * Erase the type here so that code like ObjectType(\) returns
+         * the spec-compliant result of 0. We still create it as device
+         * so that it is able to store global address space & notify handlers.
+         */
+        obj->type = UACPI_OBJECT_UNINITIALIZED;
+        break;
+
     case UACPI_PREDEFINED_NAMESPACE_OS:
         obj = uacpi_create_object(UACPI_OBJECT_STRING);
         if (uacpi_unlikely(obj == UACPI_NULL))
