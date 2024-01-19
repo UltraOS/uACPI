@@ -18,6 +18,52 @@
 
 #include <uacpi/kernel_api.h>
 
+uacpi_status uacpi_kernel_io_map(uacpi_io_addr, uacpi_size,
+                                 uacpi_handle *out_handle)
+{
+    *out_handle = nullptr;
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_io_unmap(uacpi_handle) {}
+
+uacpi_status uacpi_kernel_io_read(
+    uacpi_handle, uacpi_size,
+    uacpi_u8 byte_width, uacpi_u64 *value
+)
+{
+    switch (byte_width)
+    {
+    case 1:
+        *value = 0xFF;
+        break;
+    case 2:
+        *value = 0xFFFF;
+        break;
+    case 4:
+        *value = 0xFFFFFFFF;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_write(
+    uacpi_handle, uacpi_size,
+    uacpi_u8 byte_width, uacpi_u64
+)
+{
+    switch (byte_width) {
+    case 1:
+    case 2:
+    case 4:
+        return UACPI_STATUS_OK;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+}
+
 void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size)
 {
     return reinterpret_cast<void*>(addr);
