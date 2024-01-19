@@ -49,6 +49,14 @@ uacpi_status uacpi_kernel_io_read(
     return UACPI_STATUS_OK;
 }
 
+uacpi_status uacpi_kernel_pci_read(
+    uacpi_pci_address*, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 *value
+)
+{
+    return uacpi_kernel_io_read(nullptr, offset, byte_width, value);
+}
+
 uacpi_status uacpi_kernel_io_write(
     uacpi_handle, uacpi_size,
     uacpi_u8 byte_width, uacpi_u64
@@ -62,6 +70,13 @@ uacpi_status uacpi_kernel_io_write(
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
+}
+
+uacpi_status uacpi_kernel_pci_write(
+    uacpi_pci_address*, uacpi_size, uacpi_u8, uacpi_u64
+)
+{
+    return UACPI_STATUS_OK;
 }
 
 void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size)

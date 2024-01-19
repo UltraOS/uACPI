@@ -15,6 +15,13 @@ typedef uacpi_u64 uacpi_phys_addr;
 typedef uacpi_u64 uacpi_io_addr;
 #endif
 
+typedef struct uacpi_pci_address {
+    uacpi_u16 segment;
+    uacpi_u8 bus;
+    uacpi_u8 device;
+    uacpi_u8 function;
+} uacpi_pci_address;
+
 typedef void *uacpi_handle;
 typedef struct uacpi_namespace_node uacpi_namespace_node;
 
