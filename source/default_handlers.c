@@ -45,6 +45,46 @@ static uacpi_status memory_region_detach(uacpi_region_detach_data *data)
     return UACPI_STATUS_OK;
 }
 
+struct io_region_ctx {
+    uacpi_io_addr base;
+    uacpi_handle handle;
+};
+
+static uacpi_status io_region_attach(uacpi_region_attach_data *data)
+{
+    struct io_region_ctx *ctx;
+    uacpi_operation_region *op_region;
+    uacpi_status ret;
+
+    ctx = uacpi_kernel_alloc(sizeof(*ctx));
+    if (ctx == UACPI_NULL)
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    op_region = uacpi_namespace_node_get_object(data->region_node)->op_region;
+    ctx->base = op_region->offset;
+
+    ret = uacpi_kernel_io_map(ctx->base, op_region->length, &ctx->handle);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_trace_region_error(
+            data->region_node, "unable to map an IO", ret
+        );
+        uacpi_kernel_free(ctx);
+        return ret;
+    }
+
+    data->out_region_context = ctx;
+    return ret;
+}
+
+static uacpi_status io_region_detach(uacpi_region_detach_data *data)
+{
+    struct io_region_ctx *ctx = data->region_context;
+
+    uacpi_kernel_io_unmap(ctx->handle);
+    uacpi_kernel_free(ctx);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status memory_read(void *ptr, uacpi_u8 width, uacpi_u64 *out)
 {
     switch (width) {
@@ -118,6 +158,37 @@ static uacpi_status handle_memory_region(uacpi_region_op op, uacpi_handle op_dat
     }
 }
 
+static uacpi_status io_region_do_rw(
+    uacpi_region_op op, uacpi_region_rw_data *data
+)
+{
+    struct io_region_ctx *ctx = data->region_context;
+    uacpi_u8 width;
+    uacpi_size offset;
+
+    offset = data->offset - ctx->base;
+    width = data->byte_width;
+
+    return op == UACPI_REGION_OP_READ ?
+        uacpi_kernel_io_read(ctx->handle, offset, width, &data->value) :
+        uacpi_kernel_io_write(ctx->handle, offset, width, data->value);
+}
+
+static uacpi_status handle_io_region(uacpi_region_op op, uacpi_handle op_data)
+{
+    switch (op) {
+    case UACPI_REGION_OP_ATTACH:
+        return io_region_attach(op_data);
+    case UACPI_REGION_OP_DETACH:
+        return io_region_detach(op_data);
+    case UACPI_REGION_OP_READ:
+    case UACPI_REGION_OP_WRITE:
+        return io_region_do_rw(op, op_data);
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+}
+
 void uacpi_install_default_address_space_handlers(void)
 {
     uacpi_namespace_node *root;
@@ -127,5 +198,10 @@ void uacpi_install_default_address_space_handlers(void)
     uacpi_install_address_space_handler(
         root, UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
         handle_memory_region, UACPI_NULL
+    );
+
+    uacpi_install_address_space_handler(
+        root, UACPI_ADDRESS_SPACE_SYSTEM_IO,
+        handle_io_region, UACPI_NULL
     );
 }
