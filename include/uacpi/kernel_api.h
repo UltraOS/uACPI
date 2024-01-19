@@ -6,6 +6,28 @@
 extern "C" {
 #endif
 
+/*
+ * Map a SystemIO address at [base, base + len) and return a kernel-implemented
+ * handle that can be used for reading and writing the IO range.
+ */
+uacpi_status uacpi_kernel_io_map(
+    uacpi_io_addr base, uacpi_size len, uacpi_handle *out_handle
+);
+void uacpi_kernel_io_unmap(uacpi_handle handle);
+
+/*
+ * Read/Write the IO range mapped via uacpi_kernel_io_map
+ * at a 0-based 'offset' within the range.
+ */
+uacpi_status uacpi_kernel_io_read(
+    uacpi_handle, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 *value
+);
+uacpi_status uacpi_kernel_io_write(
+    uacpi_handle, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 value
+);
+
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len);
 void uacpi_kernel_unmap(void *addr, uacpi_size len);
 
