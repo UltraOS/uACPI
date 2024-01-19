@@ -18,31 +18,19 @@
 
 #include <uacpi/kernel_api.h>
 
-void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
+void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size)
 {
-    (void)len;
     return reinterpret_cast<void*>(addr);
 }
 
-void uacpi_kernel_unmap(void* addr, uacpi_size len)
-{
-    (void)addr;
-    (void)len;
-}
+void uacpi_kernel_unmap(void*, uacpi_size) {}
 
-void* uacpi_kernel_alloc(uacpi_size size)
-{
-    return malloc(size);
-}
+void* uacpi_kernel_alloc(uacpi_size size) { return malloc(size); }
+void uacpi_kernel_free(void* mem) { free(mem); }
 
 void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
 {
     return calloc(count, size);
-}
-
-void uacpi_kernel_free(void* mem)
-{
-    free(mem);
 }
 
 void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list vlist)
