@@ -6,6 +6,15 @@
 extern "C" {
 #endif
 
+uacpi_status uacpi_kernel_pci_read(
+    uacpi_pci_address *address, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 *value
+);
+uacpi_status uacpi_kernel_pci_write(
+    uacpi_pci_address *address, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 value
+);
+
 /*
  * Map a SystemIO address at [base, base + len) and return a kernel-implemented
  * handle that can be used for reading and writing the IO range.
