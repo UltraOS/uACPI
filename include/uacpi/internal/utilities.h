@@ -28,3 +28,4 @@ uacpi_status uacpi_check_tbl_signature_with_warn(void*, const char *expect);
 void uacpi_eisa_id_to_string(uacpi_u32, uacpi_char *out_string);
 
 uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_char **out_hid);
+uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list *out_list);
