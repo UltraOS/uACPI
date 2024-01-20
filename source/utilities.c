@@ -4,6 +4,7 @@
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/uacpi.h>
 
 static uacpi_u8 uacpi_table_checksum(void *table, uacpi_size size)
 {
@@ -99,4 +100,61 @@ void uacpi_eisa_id_to_string(uacpi_u32 id, uacpi_char *out_string)
     out_string[6] = hex_to_ascii[(swapped.dword >> 0 ) & 0x0F];
 
     out_string[7] = '\0';
+}
+
+static uacpi_char *steal_or_copy_string(uacpi_object *obj)
+{
+    uacpi_char *ret;
+
+    if (uacpi_shareable_refcount(obj) == 1 &&
+        uacpi_shareable_refcount(obj->buffer) == 1) {
+        // No need to allocate anything, we can just steal the returned buffer
+        ret = obj->buffer->text;
+        obj->buffer->text = UACPI_NULL;
+        obj->buffer->size = 0;
+    } else {
+        ret = uacpi_kernel_alloc(obj->buffer->size);
+        if (uacpi_unlikely(ret == UACPI_NULL))
+            return UACPI_NULL;
+
+        uacpi_memcpy(ret, obj->buffer->text, obj->buffer->size);
+    }
+
+    return ret;
+}
+
+uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_char **out_hid)
+{
+    uacpi_status ret;
+    uacpi_object *hid_ret;
+    uacpi_char *out_id = UACPI_NULL;
+
+    ret = uacpi_eval_typed(
+        node, "_HID", UACPI_NULL,
+        UACPI_OBJECT_INTEGER_BIT | UACPI_OBJECT_STRING_BIT,
+        &hid_ret
+    );
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    switch (hid_ret->type) {
+    case UACPI_OBJECT_STRING:
+        out_id = steal_or_copy_string(hid_ret);
+        if (uacpi_unlikely(out_id == UACPI_NULL))
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+        break;
+    case UACPI_OBJECT_INTEGER:
+        out_id = uacpi_kernel_alloc(8);
+        if (uacpi_unlikely(out_id == UACPI_NULL)) {
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+            break;
+        }
+
+        uacpi_eisa_id_to_string(hid_ret->integer, out_id);
+        break;
+    }
+
+    *out_hid = out_id;
+    uacpi_object_unref(hid_ret);
+    return ret;
 }
