@@ -26,3 +26,5 @@ uacpi_status uacpi_check_tbl_signature_with_warn(void*, const char *expect);
  * Target buffer must have a length of at least 8 bytes.
  */
 void uacpi_eisa_id_to_string(uacpi_u32, uacpi_char *out_string);
+
+uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_char **out_hid);
