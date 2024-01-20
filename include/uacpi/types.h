@@ -15,6 +15,13 @@ typedef uacpi_u64 uacpi_phys_addr;
 typedef uacpi_u64 uacpi_io_addr;
 #endif
 
+typedef struct uacpi_pnp_id_list {
+    uacpi_size num_entries;
+    uacpi_char **ids;
+} uacpi_pnp_id_list;
+
+void uacpi_release_pnp_id_list(uacpi_pnp_id_list*);
+
 typedef struct uacpi_pci_address {
     uacpi_u16 segment;
     uacpi_u8 bus;

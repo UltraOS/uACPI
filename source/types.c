@@ -1034,3 +1034,16 @@ uacpi_object *uacpi_unwrap_internal_reference(uacpi_object *object)
         object = object->inner_object;
     }
 }
+
+void uacpi_release_pnp_id_list(uacpi_pnp_id_list *list)
+{
+    uacpi_size i;
+
+    for (i = 0; i < list->num_entries; ++i)
+        uacpi_kernel_free(list->ids[i]);
+
+    uacpi_kernel_free(list->ids);
+
+    list->num_entries = 0;
+    list->ids = UACPI_NULL;
+}

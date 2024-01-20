@@ -158,3 +158,69 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_char **out_hid)
     uacpi_object_unref(hid_ret);
     return ret;
 }
+
+uacpi_status uacpi_eval_cid(
+    uacpi_namespace_node *node, uacpi_pnp_id_list *out_list
+)
+{
+    uacpi_status ret;
+    uacpi_object *cid_ret;
+    uacpi_object **objects;
+    uacpi_size i;
+
+    ret = uacpi_eval_typed(
+        node, "_CID", UACPI_NULL,
+        UACPI_OBJECT_INTEGER_BIT | UACPI_OBJECT_STRING_BIT |
+        UACPI_OBJECT_PACKAGE_BIT,
+        &cid_ret
+    );
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    switch (cid_ret->type) {
+    case UACPI_OBJECT_PACKAGE:
+        objects = cid_ret->package->objects;
+        i = cid_ret->package->count;
+        break;
+    default:
+        objects = &cid_ret;
+        i = 1;
+        break;
+    }
+
+    out_list->ids = uacpi_kernel_calloc(i, sizeof(out_list->ids[0]));
+    if (uacpi_unlikely(out_list->ids == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    out_list->num_entries = i;
+
+    for (i = 0; i < out_list->num_entries; ++i) {
+        uacpi_object *object = objects[i];
+
+        switch (object->type) {
+        case UACPI_OBJECT_STRING:
+            out_list->ids[i] = steal_or_copy_string(object);
+            if (uacpi_unlikely(out_list->ids[i] == UACPI_NULL))
+                ret = UACPI_STATUS_OUT_OF_MEMORY;
+            break;
+        case UACPI_OBJECT_INTEGER:
+            out_list->ids[i] = uacpi_kernel_alloc(8);
+            if (uacpi_unlikely(out_list->ids[i] == UACPI_NULL)) {
+                ret = UACPI_STATUS_OUT_OF_MEMORY;
+                goto out_late_error;
+            }
+
+            uacpi_eisa_id_to_string(object->integer, out_list->ids[i]);
+            break;
+        default:
+            ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
+            goto out_late_error;
+        }
+    }
+
+out_late_error:
+    if (ret != UACPI_STATUS_OK)
+        uacpi_release_pnp_id_list(out_list);
+
+    uacpi_object_unref(cid_ret);
+    return ret;
+}
