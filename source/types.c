@@ -47,6 +47,40 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
     }
 }
 
+const uacpi_char *uacpi_address_space_to_string(
+    enum uacpi_address_space space
+)
+{
+    switch (space) {
+    case UACPI_ADDRESS_SPACE_SYSTEM_MEMORY:
+        return "System Memory";
+    case UACPI_ADDRESS_SPACE_SYSTEM_IO:
+        return "System IO";
+    case UACPI_ADDRESS_SPACE_PCI_CONFIG:
+        return "PCI Config";
+    case UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER:
+        return "Embedded Controller";
+    case UACPI_ADDRESS_SPACE_SMBUS:
+        return "SMBus";
+    case UACPI_ADDRESS_SPACE_SYSTEM_CMOS:
+        return "CMOS";
+    case UACPI_ADDRESS_SPACE_PCI_BAR_TARGET:
+        return "PCI BAR";
+    case UACPI_ADDRESS_SPACE_IPMI:
+        return "IPMI";
+    case UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO:
+        return "GPIO";
+    case UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS:
+        return "Generic Serial Bus";
+    case UACPI_ADDRESS_SPACE_PCC:
+        return "PCC";
+    case UACPI_ADDRESS_SPACE_TABLE_DATA:
+        return "Table Data";
+    default:
+        return "<vendor specific>";
+    }
+}
+
 static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
 {
     uacpi_buffer *buf;
