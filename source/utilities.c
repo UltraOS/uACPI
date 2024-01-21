@@ -224,3 +224,16 @@ out_late_error:
     uacpi_object_unref(cid_ret);
     return ret;
 }
+
+#define PCI_ROOT_PNP_ID "PNP0A03"
+#define PCI_EXPRESS_ROOT_PNP_ID "PNP0A08"
+
+uacpi_bool uacpi_is_pci_root_bridge(const uacpi_char *id)
+{
+    if (uacpi_strcmp(id, PCI_ROOT_PNP_ID) == 0)
+        return UACPI_TRUE;
+    if (uacpi_strcmp(id, PCI_EXPRESS_ROOT_PNP_ID) == 0)
+        return UACPI_TRUE;
+
+    return UACPI_FALSE;
+}
