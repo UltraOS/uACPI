@@ -10,6 +10,7 @@
 #include <uacpi/internal/helpers.h>
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/opregion.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -1175,6 +1176,9 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     );
     if (uacpi_unlikely(node->object == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
+
+    if (uacpi_opregion_find_and_install_handler(node) == UACPI_STATUS_OK)
+        uacpi_opregion_reg(node);
 
     return UACPI_STATUS_OK;
 }
