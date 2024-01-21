@@ -354,6 +354,9 @@ static enum uacpi_ns_iteration_decision do_sta_ini(
 uacpi_status uacpi_namespace_initialize(void)
 {
     struct ns_init_context ctx = { 0 };
+    uacpi_namespace_node *root;
+    uacpi_handlers *handlers;
+    uacpi_address_space_handler *handler;
 
     if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
                        UACPI_INIT_LEVEL_NAMESPACE_LOADED))
@@ -365,8 +368,10 @@ uacpi_status uacpi_namespace_initialize(void)
      * how to do it.
      */
 
+    root = uacpi_namespace_root();
+
     // Step 1 - Execute \_INI
-    ini_eval(&ctx, uacpi_namespace_root());
+    ini_eval(&ctx, root);
 
     // Step 2 - Execute \_SB._INI
     ini_eval(
@@ -374,16 +379,21 @@ uacpi_status uacpi_namespace_initialize(void)
     );
 
     /*
-     * Step 3 - This is where we would run _REG methods,
-     *          but we don't support that machinery yet.
-     * TODO: implement once we have proper support for operation region
-     *       override and other similar stuff.
+     * Step 3 - Run _REG methods for all globally installed
+     *          address space handlers.
      */
+    handlers = uacpi_node_get_address_space_handlers(root);
+    if (handlers) {
+        handler = handlers->head;
+
+        while (handler) {
+            uacpi_reg_all_opregions(root, handler->space);
+            handler = handler->next;
+        }
+    }
 
     // Step 4 - Run all other _STA and _INI methods
-    uacpi_namespace_for_each_node_depth_first(
-        uacpi_namespace_root(), do_sta_ini, &ctx
-    );
+    uacpi_namespace_for_each_node_depth_first(root, do_sta_ini, &ctx);
 
     uacpi_info(
         "Namespace initialization done: "
