@@ -166,6 +166,9 @@ class ASLSource:
 
             # Existing object has invalid type for Scope operator
             "-vw", "6117",
+
+            # Switch expression is not a static Integer/Buffer/String data
+            "-vw", "3124",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
