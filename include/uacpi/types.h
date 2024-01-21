@@ -177,6 +177,9 @@ enum uacpi_address_space {
     // Internal type
     UACPI_ADDRESS_SPACE_TABLE_DATA = 0xFE,
 };
+const uacpi_char *uacpi_address_space_to_string(
+    enum uacpi_address_space space
+);
 
 typedef struct uacpi_operation_region {
     struct uacpi_shareable shareable;
