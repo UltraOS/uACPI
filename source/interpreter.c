@@ -839,7 +839,7 @@ static uacpi_size field_byte_size(uacpi_object *obj)
     if (obj->type == UACPI_OBJECT_BUFFER_FIELD)
         bit_length = obj->buffer_field.bit_length;
     else
-        bit_length = obj->unit_field->bit_length;
+        bit_length = obj->field_unit->bit_length;
 
     return uacpi_round_up_bits_to_bytes(bit_length);
 }
@@ -888,10 +888,10 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     return UACPI_STATUS_OK;
 }
 
-static void write_unit_field(uacpi_unit_field *field,
+static void write_field_unit(uacpi_field_unit *field,
                              struct object_storage_as_buffer src_buf)
 {
-    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement writing unit fields\n");
+    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement writing field units\n");
 }
 
 static uacpi_u8 *buffer_index_cursor(uacpi_buffer_index *buf_idx)
@@ -944,8 +944,8 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
         uacpi_write_buffer_field(&dst->buffer_field, src_buf.ptr, src_buf.len);
         break;
 
-    case UACPI_OBJECT_UNIT_FIELD:
-        write_unit_field(dst->unit_field, src_buf);
+    case UACPI_OBJECT_FIELD_UNIT:
+        write_field_unit(dst->field_unit, src_buf);
         break;
 
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -1428,26 +1428,26 @@ uacpi_u32 get_field_length(struct item *item)
 
 struct field_specific_data {
     uacpi_operation_region *region;
-    struct uacpi_unit_field *field0;
-    struct uacpi_unit_field *field1;
+    struct uacpi_field_unit *field0;
+    struct uacpi_field_unit *field1;
     uacpi_u64 value;
 };
 
-static uacpi_status ensure_is_a_unit_field(uacpi_namespace_node *node,
-                                           uacpi_unit_field **out_field)
+static uacpi_status ensure_is_a_field_unit(uacpi_namespace_node *node,
+                                           uacpi_field_unit **out_field)
 {
     uacpi_object *obj;
 
     obj = uacpi_namespace_node_get_object(node);
-    if (obj->type != UACPI_OBJECT_UNIT_FIELD) {
+    if (obj->type != UACPI_OBJECT_FIELD_UNIT) {
         uacpi_error(
-            "Invalid argument: '%.4s' is not a unit field (%s)\n",
+            "Invalid argument: '%.4s' is not a field unit (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
-    *out_field = obj->unit_field;
+    *out_field = obj->field_unit;
     return UACPI_STATUS_OK;
 }
 
@@ -1496,7 +1496,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
             return ret;
 
         node = item_array_at(&op_ctx->items, i++)->node;
-        ret = ensure_is_a_unit_field(node, &field_data.field0);
+        ret = ensure_is_a_field_unit(node, &field_data.field0);
         if (uacpi_unlikely_error(ret))
             return ret;
 
@@ -1505,12 +1505,12 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
 
     case UACPI_AML_OP_IndexFieldOp:
         node = item_array_at(&op_ctx->items, i++)->node;
-        ret = ensure_is_a_unit_field(node, &field_data.field0);
+        ret = ensure_is_a_field_unit(node, &field_data.field0);
         if (uacpi_unlikely_error(ret))
             return ret;
 
         node = item_array_at(&op_ctx->items, i++)->node;
-        ret = ensure_is_a_unit_field(node, &field_data.field1);
+        ret = ensure_is_a_field_unit(node, &field_data.field1);
         if (uacpi_unlikely_error(ret))
             return ret;
         break;
@@ -1551,13 +1551,13 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
         // An actual field object
         if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL) {
             uacpi_u32 length;
-            uacpi_unit_field *field;
+            uacpi_field_unit *field;
 
             length = get_field_length(item_array_at(&op_ctx->items, i++));
             node = item->node;
 
             obj = item_array_at(&op_ctx->items, i++)->obj;
-            field = obj->unit_field;
+            field = obj->field_unit;
 
             field->update_rule = update_rule;
             field->lock_rule = lock_rule;
@@ -1570,7 +1570,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 field->region = field_data.region;
                 uacpi_shareable_ref(field->region);
 
-                field->kind = UACPI_UNIT_FIELD_KIND_NORMAL;
+                field->kind = UACPI_FIELD_UNIT_KIND_NORMAL;
                 break;
 
             case UACPI_AML_OP_BankFieldOp:
@@ -1578,7 +1578,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 uacpi_shareable_ref(field->bank_region);
 
                 field->bank_value = field_data.value;
-                field->kind = UACPI_UNIT_FIELD_KIND_BANK;
+                field->kind = UACPI_FIELD_UNIT_KIND_BANK;
                 break;
 
             case UACPI_AML_OP_IndexFieldOp:
@@ -1588,7 +1588,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 field->data = field_data.field1;
                 uacpi_shareable_ref(field->data);
 
-                field->kind = UACPI_UNIT_FIELD_KIND_INDEX;
+                field->kind = UACPI_FIELD_UNIT_KIND_INDEX;
                 break;
 
             default:
@@ -3395,8 +3395,8 @@ static uacpi_object_type buffer_field_get_read_type(
     return UACPI_OBJECT_INTEGER;
 }
 
-static uacpi_object_type unit_field_get_read_type(
-    struct uacpi_unit_field *field
+static uacpi_object_type field_unit_get_read_type(
+    struct uacpi_field_unit *field
 )
 {
     if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32 : 64))
@@ -3410,13 +3410,13 @@ static uacpi_object_type field_get_read_type(uacpi_object *obj)
     if (obj->type == UACPI_OBJECT_BUFFER_FIELD)
         return buffer_field_get_read_type(&obj->buffer_field);
 
-    return unit_field_get_read_type(obj->unit_field);
+    return field_unit_get_read_type(obj->field_unit);
 }
 
-static void do_read_unit_field(uacpi_unit_field *field, uacpi_u8 *dst)
+static void do_read_field_unit(uacpi_field_unit *field, uacpi_u8 *dst)
 {
     uacpi_size i, bytes;
-    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement reading unit fields\n");
+    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement reading field units\n");
 
     bytes = uacpi_round_up_bits_to_bytes(field->bit_length);
     for (i = 0; i < bytes; ++i)
@@ -3457,7 +3457,7 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
     if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD)
         uacpi_read_buffer_field(&src_obj->buffer_field, dst);
     else
-        do_read_unit_field(src_obj->unit_field, dst);
+        do_read_field_unit(src_obj->field_unit, dst);
 
     return UACPI_STATUS_OK;
 }
@@ -5017,7 +5017,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
             }
 
             case UACPI_OBJECT_BUFFER_FIELD:
-            case UACPI_OBJECT_UNIT_FIELD:
+            case UACPI_OBJECT_FIELD_UNIT:
                 if (!op_wants_term_arg_or_operand(prev_op))
                     break;
 

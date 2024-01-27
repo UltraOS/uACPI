@@ -87,7 +87,7 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op op)
         UACPI_PARSE_OP_AML_PC_DECREMENT,                               \
         UACPI_PARSE_OP_CREATE_NAMESTRING,                              \
         UACPI_PARSE_OP_PKGLEN,                                         \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_UNIT_FIELD,    \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_FIELD_UNIT,    \
         UACPI_PARSE_OP_JMP, parse_loop_pc,                             \
                                                                        \
     UACPI_PARSE_OP_INVOKE_HANDLER,                                     \
