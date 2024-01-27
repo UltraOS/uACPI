@@ -11,6 +11,7 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/opregion.h>
+#include <uacpi/internal/field_io.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -831,11 +832,6 @@ static uacpi_status handle_package(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_size round_up_field_size_to_bytes(uacpi_size bit_length)
-{
-    return UACPI_ALIGN_UP(bit_length, 8, uacpi_size) / 8;
-}
-
 static uacpi_size field_byte_size(uacpi_object *obj)
 {
     uacpi_size bit_length;
@@ -845,7 +841,7 @@ static uacpi_size field_byte_size(uacpi_object *obj)
     else
         bit_length = obj->unit_field->bit_length;
 
-    return round_up_field_size_to_bytes(bit_length);
+    return uacpi_round_up_bits_to_bytes(bit_length);
 }
 
 static uacpi_size sizeof_int()
@@ -890,108 +886,6 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     }
 
     return UACPI_STATUS_OK;
-}
-
-struct bit_span
-{
-    uacpi_u8 *data;
-    uacpi_u64 index;
-    uacpi_u64 length;
-};
-
-static void bit_copy(struct bit_span *dst, struct bit_span *src)
-{
-    uacpi_u8 src_shift, dst_shift, bits = 0;
-    uacpi_u16 dst_mask;
-    uacpi_u8 *dst_ptr, *src_ptr;
-    uacpi_u64 dst_count, src_count;
-
-    dst_ptr = dst->data + (dst->index / 8);
-    src_ptr = src->data + (src->index / 8);
-
-    dst_count = dst->length;
-    dst_shift = dst->index & 7;
-
-    src_count = src->length;
-    src_shift = src->index & 7;
-
-    while (dst_count)
-    {
-        bits = 0;
-
-        if (src_count) {
-            bits = *src_ptr >> src_shift;
-
-            if (src_shift && src_count > 8 - src_shift)
-                bits |= *(src_ptr + 1) << (8 - src_shift);
-
-            if (src_count < 8) {
-                bits &= (1 << src_count) - 1;
-                src_count = 0;
-            } else {
-                src_count -= 8;
-                src_ptr++;
-            }
-        }
-
-        dst_mask = (dst_count < 8 ? (1 << dst_count) - 1 : 0xFF) << dst_shift;
-        *dst_ptr = (*dst_ptr & ~dst_mask) | ((bits << dst_shift) & dst_mask);
-
-        if (dst_shift && dst_count > (8 - dst_shift)) {
-            dst_mask >>= 8;
-            *(dst_ptr + 1) &= ~dst_mask;
-            *(dst_ptr + 1) |= (bits >> (8 - dst_shift)) & dst_mask;
-        }
-
-        dst_count = dst_count > 8 ? dst_count - 8 : 0;
-        ++dst_ptr;
-    }
-}
-
-static void do_write_misaligned_buffer_field(
-    uacpi_buffer_field *field,
-    struct object_storage_as_buffer src_buf
-)
-{
-    struct bit_span src_span = {
-        .length = src_buf.len * 8,
-        .data = src_buf.ptr,
-    };
-    struct bit_span dst_span = {
-        .index = field->bit_index,
-        .length = field->bit_length,
-        .data = field->backing->data,
-    };
-
-    bit_copy(&dst_span, &src_span);
-}
-
-static void write_buffer_field(uacpi_buffer_field *field,
-                               struct object_storage_as_buffer src_buf)
-{
-    if (!(field->bit_index & 7)) {
-        uacpi_u8 *dst, last_byte, tail_shift;
-        uacpi_size count;
-
-        dst = field->backing->data;
-        dst += field->bit_index / 8;
-        count = round_up_field_size_to_bytes(field->bit_length);
-
-        last_byte = dst[count - 1];
-        tail_shift = field->bit_length & 7;
-
-        uacpi_memcpy_zerout(dst, src_buf.ptr, count, src_buf.len);
-        if (tail_shift) {
-            uacpi_u8 last_shift = 8 - tail_shift;
-            dst[count - 1] = dst[count - 1] << last_shift;
-            dst[count - 1] >>= last_shift;
-            dst[count - 1] |= (last_byte >> tail_shift) << tail_shift;
-        }
-
-        return;
-    }
-
-    do_write_misaligned_buffer_field(field, src_buf);
 }
 
 static void write_unit_field(uacpi_unit_field *field,
@@ -1047,7 +941,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     }
 
     case UACPI_OBJECT_BUFFER_FIELD:
-        write_buffer_field(&dst->buffer_field, src_buf);
+        uacpi_write_buffer_field(&dst->buffer_field, src_buf.ptr, src_buf.len);
         break;
 
     case UACPI_OBJECT_UNIT_FIELD:
@@ -3519,45 +3413,12 @@ static uacpi_object_type field_get_read_type(uacpi_object *obj)
     return unit_field_get_read_type(obj->unit_field);
 }
 
-static void do_misaligned_buffer_read(uacpi_buffer_field *field, uacpi_u8 *dst)
-{
-    struct bit_span src_span = {
-        .index = field->bit_index,
-        .length = field->bit_length,
-        .data = field->backing->data,
-    };
-    struct bit_span dst_span = {
-        .data = dst,
-    };
-
-    dst_span.length = round_up_field_size_to_bytes(field->bit_length) * 8;
-    bit_copy(&dst_span, &src_span);
-}
-
-static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
-{
-    if (!(field->bit_index & 7)) {
-        uacpi_u8 *src = field->backing->data;
-        uacpi_size count;
-
-        count = round_up_field_size_to_bytes(field->bit_length);
-        uacpi_memcpy(dst, src + (field->bit_index / 8), count);
-
-        if (field->bit_length & 7)
-            dst[count - 1] &= (1ul << (field->bit_length & 7)) - 1;
-
-        return;
-    }
-
-    do_misaligned_buffer_read(field, dst);
-}
-
 static void do_read_unit_field(uacpi_unit_field *field, uacpi_u8 *dst)
 {
     uacpi_size i, bytes;
     uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement reading unit fields\n");
 
-    bytes = round_up_field_size_to_bytes(field->bit_length);
+    bytes = uacpi_round_up_bits_to_bytes(field->bit_length);
     for (i = 0; i < bytes; ++i)
         dst[i] = 0xFF;
 
@@ -3594,7 +3455,7 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
     }
 
     if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD)
-        do_read_buffer_field(&src_obj->buffer_field, dst);
+        uacpi_read_buffer_field(&src_obj->buffer_field, dst);
     else
         do_read_unit_field(src_obj->unit_field, dst);
 
