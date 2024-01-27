@@ -38,6 +38,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "object type mismatch";
     case UACPI_STATUS_INIT_LEVEL_MISMATCH:
         return "init level too low/high for this action";
+    case UACPI_STATUS_NAMESPACE_NODE_DANGLING:
+        return "attempting to use a dangling namespace node";
 
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";

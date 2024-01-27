@@ -3929,7 +3929,7 @@ static uacpi_bool pop_item(struct op_context *op_ctx)
     if (item->type == ITEM_OBJECT)
         uacpi_object_unref(item->obj);
     if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL)
-        uacpi_namespace_node_free(item->node);
+        uacpi_namespace_node_unref(item->node);
 
     item_array_pop(&op_ctx->items);
     return UACPI_TRUE;

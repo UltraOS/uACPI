@@ -134,6 +134,9 @@ uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
     uacpi_status ret;
     uacpi_region_attach_data attach_data = { 0 };
 
+    if (uacpi_namespace_node_is_dangling(node))
+        return UACPI_STATUS_NAMESPACE_NODE_DANGLING;
+
     region = uacpi_namespace_node_get_object(node)->op_region;
     if (region->state_flags & UACPI_OP_REGION_STATE_ATTACHED)
         return UACPI_STATUS_OK;
