@@ -10,3 +10,10 @@ void uacpi_read_buffer_field(
 void uacpi_write_buffer_field(
     uacpi_buffer_field *field, const void *src, uacpi_size size
 );
+
+uacpi_status uacpi_read_field_unit(
+    uacpi_field_unit *field, void *dst, uacpi_size size
+);
+uacpi_status uacpi_write_field_unit(
+    uacpi_field_unit *field, const void *src, uacpi_size size
+);
