@@ -1427,7 +1427,7 @@ uacpi_u32 get_field_length(struct item *item)
 }
 
 struct field_specific_data {
-    uacpi_operation_region *region;
+    uacpi_namespace_node *region;
     struct uacpi_field_unit *field0;
     struct uacpi_field_unit *field1;
     uacpi_u64 value;
@@ -1452,7 +1452,7 @@ static uacpi_status ensure_is_a_field_unit(uacpi_namespace_node *node,
 }
 
 static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
-                                           uacpi_operation_region **out_region)
+                                           uacpi_namespace_node **out_node)
 {
     uacpi_object *obj;
 
@@ -1465,7 +1465,7 @@ static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
-    *out_region = obj->op_region;
+    *out_node = node;
     return UACPI_STATUS_OK;
 }
 

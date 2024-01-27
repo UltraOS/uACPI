@@ -4,6 +4,7 @@
 #include <uacpi/internal/shareable.h>
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/namespace.h>
 #include <uacpi/kernel_api.h>
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
@@ -539,14 +540,10 @@ static void free_field_unit(uacpi_handle handle)
 
     switch (field_unit->kind) {
     case UACPI_FIELD_UNIT_KIND_NORMAL:
-        uacpi_shareable_unref_and_delete_if_last(
-            field_unit->region, free_op_region
-        );
+        uacpi_namespace_node_unref(field_unit->region);
         break;
     case UACPI_FIELD_UNIT_KIND_BANK:
-        uacpi_shareable_unref_and_delete_if_last(
-            field_unit->bank_region, free_op_region
-        );
+        uacpi_namespace_node_unref(field_unit->bank_region);
         break;
     case UACPI_FIELD_UNIT_KIND_INDEX:
         uacpi_shareable_unref_and_delete_if_last(
