@@ -302,7 +302,7 @@ typedef struct uacpi_field_unit {
     union {
         // UACPI_FIELD_UNIT_KIND_NORMAL
         struct {
-            uacpi_operation_region *region;
+            uacpi_namespace_node *region;
         };
 
         // UACPI_FIELD_UNIT_KIND_INDEX
@@ -313,7 +313,7 @@ typedef struct uacpi_field_unit {
 
         // UACPI_FIELD_UNIT_KIND_BANK
         struct {
-            uacpi_operation_region *bank_region;
+            uacpi_namespace_node *bank_region;
             struct uacpi_field_unit *bank_selection;
             uacpi_u64 bank_value;
         };
