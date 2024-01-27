@@ -38,7 +38,7 @@ typedef enum uacpi_object_type {
     UACPI_OBJECT_STRING = 2,
     UACPI_OBJECT_BUFFER = 3,
     UACPI_OBJECT_PACKAGE = 4,
-    UACPI_OBJECT_UNIT_FIELD = 5,
+    UACPI_OBJECT_FIELD_UNIT = 5,
     UACPI_OBJECT_DEVICE = 6,
     UACPI_OBJECT_EVENT = 7,
     UACPI_OBJECT_METHOD = 8,
@@ -60,7 +60,7 @@ typedef enum uacpi_object_type {
 #define UACPI_OBJECT_STRING_BIT (1 << UACPI_OBJECT_STRING)
 #define UACPI_OBJECT_BUFFER_BIT (1 << UACPI_OBJECT_BUFFER)
 #define UACPI_OBJECT_PACKAGE_BIT (1 << UACPI_OBJECT_PACKAGE)
-#define UACPI_OBJECT_UNIT_FIELD_BIT (1 << UACPI_OBJECT_UNIT_FIELD)
+#define UACPI_OBJECT_FIELD_UNIT_BIT (1 << UACPI_OBJECT_FIELD_UNIT)
 #define UACPI_OBJECT_DEVICE_BIT (1 << UACPI_OBJECT_DEVICE)
 #define UACPI_OBJECT_EVENT_BIT (1 << UACPI_OBJECT_EVENT)
 #define UACPI_OBJECT_METHOD_BIT (1 << UACPI_OBJECT_METHOD)
@@ -290,31 +290,31 @@ typedef enum uacpi_update_rule {
     UACPI_UPDATE_RULE_WRITE_AS_ZEROES = 2,
 } uacpi_update_rule;
 
-typedef enum uacpi_unit_field_kind {
-    UACPI_UNIT_FIELD_KIND_NORMAL = 0,
-    UACPI_UNIT_FIELD_KIND_INDEX = 1,
-    UACPI_UNIT_FIELD_KIND_BANK = 2,
-} uacpi_unit_field_kind;
+typedef enum uacpi_field_unit_kind {
+    UACPI_FIELD_UNIT_KIND_NORMAL = 0,
+    UACPI_FIELD_UNIT_KIND_INDEX = 1,
+    UACPI_FIELD_UNIT_KIND_BANK = 2,
+} uacpi_field_unit_kind;
 
-typedef struct uacpi_unit_field {
+typedef struct uacpi_field_unit {
     struct uacpi_shareable shareable;
 
     union {
-        // UACPI_UNIT_FIELD_KIND_NORMAL
+        // UACPI_FIELD_UNIT_KIND_NORMAL
         struct {
             uacpi_operation_region *region;
         };
 
-        // UACPI_UNIT_FIELD_KIND_INDEX
+        // UACPI_FIELD_UNIT_KIND_INDEX
         struct {
-            struct uacpi_unit_field *index;
-            struct uacpi_unit_field *data;
+            struct uacpi_field_unit *index;
+            struct uacpi_field_unit *data;
         };
 
-        // UACPI_UNIT_FIELD_KIND_BANK
+        // UACPI_FIELD_UNIT_KIND_BANK
         struct {
             uacpi_operation_region *bank_region;
-            struct uacpi_unit_field *bank_selection;
+            struct uacpi_field_unit *bank_selection;
             uacpi_u64 bank_value;
         };
     };
@@ -330,7 +330,7 @@ typedef struct uacpi_unit_field {
     uacpi_u8 update_rule : 2;
     uacpi_u8 kind : 2;
     uacpi_u8 access_length;
-} uacpi_unit_field;
+} uacpi_field_unit;
 
 typedef struct uacpi_object {
     struct uacpi_shareable shareable;
@@ -353,7 +353,7 @@ typedef struct uacpi_object {
         uacpi_thermal_zone *thermal_zone;
         uacpi_handlers *handlers;
         uacpi_power_resource power_resource;
-        uacpi_unit_field *unit_field;
+        uacpi_field_unit *field_unit;
     };
 } uacpi_object;
 

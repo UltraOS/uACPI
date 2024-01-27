@@ -19,8 +19,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Buffer";
     case UACPI_OBJECT_PACKAGE:
         return "Package";
-    case UACPI_OBJECT_UNIT_FIELD:
-        return "Unit Field";
+    case UACPI_OBJECT_FIELD_UNIT:
+        return "Field Unit";
     case UACPI_OBJECT_DEVICE:
         return "Device";
     case UACPI_OBJECT_EVENT:
@@ -228,16 +228,16 @@ static uacpi_bool op_region_alloc(uacpi_object *obj)
     return UACPI_TRUE;
 }
 
-static uacpi_bool unit_field_alloc(uacpi_object *obj)
+static uacpi_bool field_unit_alloc(uacpi_object *obj)
 {
-    uacpi_unit_field *unit_field;
+    uacpi_field_unit *field_unit;
 
-    unit_field = uacpi_kernel_calloc(1, sizeof(*unit_field));
-    if (uacpi_unlikely(unit_field == UACPI_NULL))
+    field_unit = uacpi_kernel_calloc(1, sizeof(*field_unit));
+    if (uacpi_unlikely(field_unit == UACPI_NULL))
         return UACPI_FALSE;
 
-    uacpi_shareable_init(unit_field);
-    obj->unit_field = unit_field;
+    uacpi_shareable_init(field_unit);
+    obj->field_unit = field_unit;
 
     return UACPI_TRUE;
 }
@@ -290,7 +290,7 @@ static object_ctor object_constructor_table[UACPI_OBJECT_MAX_TYPE_VALUE + 1] = {
     [UACPI_OBJECT_STRING] = empty_buffer_or_string_alloc,
     [UACPI_OBJECT_BUFFER] = empty_buffer_or_string_alloc,
     [UACPI_OBJECT_PACKAGE] = empty_package_alloc,
-    [UACPI_OBJECT_UNIT_FIELD] = unit_field_alloc,
+    [UACPI_OBJECT_FIELD_UNIT] = field_unit_alloc,
     [UACPI_OBJECT_MUTEX] = mutex_alloc,
     [UACPI_OBJECT_EVENT] = event_alloc,
     [UACPI_OBJECT_OPERATION_REGION] = op_region_alloc,
@@ -533,34 +533,34 @@ static void free_thermal_zone(uacpi_handle handle)
     uacpi_kernel_free(thermal_zone);
 }
 
-static void free_unit_field(uacpi_handle handle)
+static void free_field_unit(uacpi_handle handle)
 {
-    uacpi_unit_field *unit_field = handle;
+    uacpi_field_unit *field_unit = handle;
 
-    switch (unit_field->kind) {
-    case UACPI_UNIT_FIELD_KIND_NORMAL:
+    switch (field_unit->kind) {
+    case UACPI_FIELD_UNIT_KIND_NORMAL:
         uacpi_shareable_unref_and_delete_if_last(
-            unit_field->region, free_op_region
+            field_unit->region, free_op_region
         );
         break;
-    case UACPI_UNIT_FIELD_KIND_BANK:
+    case UACPI_FIELD_UNIT_KIND_BANK:
         uacpi_shareable_unref_and_delete_if_last(
-            unit_field->bank_region, free_op_region
+            field_unit->bank_region, free_op_region
         );
         break;
-    case UACPI_UNIT_FIELD_KIND_INDEX:
+    case UACPI_FIELD_UNIT_KIND_INDEX:
         uacpi_shareable_unref_and_delete_if_last(
-            unit_field->index, free_unit_field
+            field_unit->index, free_field_unit
         );
         uacpi_shareable_unref_and_delete_if_last(
-            unit_field->data, free_unit_field
+            field_unit->data, free_field_unit
         );
         break;
     default:
         break;
     }
 
-    uacpi_kernel_free(unit_field);
+    uacpi_kernel_free(field_unit);
 }
 
 static void free_method(uacpi_handle handle)
@@ -597,9 +597,9 @@ static void free_object_storage(uacpi_object *obj)
         uacpi_shareable_unref_and_delete_if_last(obj->package,
                                                  free_package);
         break;
-    case UACPI_OBJECT_UNIT_FIELD:
-        uacpi_shareable_unref_and_delete_if_last(obj->unit_field,
-                                                 free_unit_field);
+    case UACPI_OBJECT_FIELD_UNIT:
+        uacpi_shareable_unref_and_delete_if_last(obj->field_unit,
+                                                 free_field_unit);
         break;
     case UACPI_OBJECT_MUTEX:
         uacpi_mutex_unref(obj->mutex);
@@ -979,9 +979,9 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
     case UACPI_OBJECT_PACKAGE:
         ret = assign_package(dst, src, behavior);
         break;
-    case UACPI_OBJECT_UNIT_FIELD:
-        dst->unit_field = src->unit_field;
-        uacpi_shareable_ref(dst->unit_field);
+    case UACPI_OBJECT_FIELD_UNIT:
+        dst->field_unit = src->field_unit;
+        uacpi_shareable_ref(dst->field_unit);
         break;
     case UACPI_OBJECT_REFERENCE:
         uacpi_object_attach_child(dst, src->inner_object);
