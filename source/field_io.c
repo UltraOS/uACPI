@@ -6,6 +6,18 @@ uacpi_size uacpi_round_up_bits_to_bytes(uacpi_size bit_length)
     return UACPI_ALIGN_UP(bit_length, 8, uacpi_size) / 8;
 }
 
+static void cut_misaligned_tail(
+    uacpi_u8 *data, uacpi_size offset, uacpi_u32 bit_length
+)
+{
+    uacpi_u8 remainder = bit_length & 7;
+
+    if (remainder == 0)
+        return;
+
+    data[offset] &= ((1ull << remainder) - 1);
+}
+
 struct bit_span
 {
     union {
@@ -92,9 +104,7 @@ void uacpi_read_buffer_field(
 
         count = uacpi_round_up_bits_to_bytes(field->bit_length);
         uacpi_memcpy(dst, src + (field->bit_index / 8), count);
-        if (field->bit_length & 7)
-            ((uacpi_u8*)dst)[count - 1] &= (1ul << (field->bit_length & 7)) - 1;
-
+        cut_misaligned_tail(dst, count - 1, field->bit_length);
         return;
     }
 
