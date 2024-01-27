@@ -888,12 +888,6 @@ static uacpi_status get_object_storage(uacpi_object *obj,
     return UACPI_STATUS_OK;
 }
 
-static void write_field_unit(uacpi_field_unit *field,
-                             struct object_storage_as_buffer src_buf)
-{
-    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement writing field units\n");
-}
-
 static uacpi_u8 *buffer_index_cursor(uacpi_buffer_index *buf_idx)
 {
     uacpi_u8 *out_cursor;
@@ -945,8 +939,9 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
         break;
 
     case UACPI_OBJECT_FIELD_UNIT:
-        write_field_unit(dst->field_unit, src_buf);
-        break;
+        return uacpi_write_field_unit(
+            dst->field_unit, src_buf.ptr, src_buf.len
+        );
 
     case UACPI_OBJECT_BUFFER_INDEX:
         write_buffer_index(&dst->buffer_index, &src_buf);
@@ -3457,24 +3452,12 @@ static uacpi_object_type field_get_read_type(uacpi_object *obj)
     return field_unit_get_read_type(obj->field_unit);
 }
 
-static void do_read_field_unit(uacpi_field_unit *field, uacpi_u8 *dst)
-{
-    uacpi_size i, bytes;
-    uacpi_kernel_log(UACPI_LOG_WARN, "TODO: implement reading field units\n");
-
-    bytes = uacpi_round_up_bits_to_bytes(field->bit_length);
-    for (i = 0; i < bytes; ++i)
-        dst[i] = 0xFF;
-
-    if (field->bit_length & 7)
-        dst[bytes - 1] &= (1ul << (field->bit_length & 7)) - 1;
-}
-
 static uacpi_status handle_field_read(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     struct uacpi_namespace_node *node;
     uacpi_object *src_obj, *dst_obj;
+    uacpi_size dst_size;
     void *dst;
 
     node = item_array_at(&op_ctx->items, 0)->node;
@@ -3483,27 +3466,27 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
 
     if (field_get_read_type(src_obj) == UACPI_OBJECT_BUFFER) {
         uacpi_buffer *buf;
-        uacpi_size buf_size;
 
         buf = dst_obj->buffer;
-        buf_size = field_byte_size(src_obj);
+        dst_size = field_byte_size(src_obj);
 
-        dst = uacpi_kernel_calloc(buf_size, 1);
+        dst = uacpi_kernel_calloc(dst_size, 1);
         if (dst == UACPI_NULL)
             return UACPI_STATUS_OUT_OF_MEMORY;
 
         buf->data = dst;
-        buf->size = buf_size;
+        buf->size = dst_size;
     } else {
         dst = &dst_obj->integer;
+        dst_size = sizeof(uacpi_u64);
     }
 
-    if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD)
+    if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD) {
         uacpi_read_buffer_field(&src_obj->buffer_field, dst);
-    else
-        do_read_field_unit(src_obj->field_unit, dst);
+        return UACPI_STATUS_OK;
+    }
 
-    return UACPI_STATUS_OK;
+    return uacpi_read_field_unit(src_obj->field_unit, dst, dst_size);
 }
 
 static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
