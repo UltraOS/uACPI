@@ -899,7 +899,7 @@ struct bit_span
     uacpi_u64 length;
 };
 
-static void do_rw_misaligned_buffer_field(struct bit_span *dst, struct bit_span *src)
+static void bit_copy(struct bit_span *dst, struct bit_span *src)
 {
     uacpi_u8 src_shift, dst_shift, bits = 0;
     uacpi_u16 dst_mask;
@@ -963,7 +963,7 @@ static void do_write_misaligned_buffer_field(
         .data = field->backing->data,
     };
 
-    do_rw_misaligned_buffer_field(&dst_span, &src_span);
+    bit_copy(&dst_span, &src_span);
 }
 
 static void write_buffer_field(uacpi_buffer_field *field,
@@ -3531,7 +3531,7 @@ static void do_misaligned_buffer_read(uacpi_buffer_field *field, uacpi_u8 *dst)
     };
 
     dst_span.length = round_up_field_size_to_bytes(field->bit_length) * 8;
-    do_rw_misaligned_buffer_field(&dst_span, &src_span);
+    bit_copy(&dst_span, &src_span);
 }
 
 static void do_read_buffer_field(uacpi_buffer_field *field, uacpi_u8 *dst)
