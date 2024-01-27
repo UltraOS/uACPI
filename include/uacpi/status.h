@@ -20,6 +20,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_INTERNAL_ERROR = 10,
     UACPI_STATUS_TYPE_MISMATCH = 11,
     UACPI_STATUS_INIT_LEVEL_MISMATCH = 12,
+    UACPI_STATUS_NAMESPACE_NODE_DANGLING = 13,
 
     // All errors that have bytecode-related origin should go here
     UACPI_STATUS_AML_UNDEFINED_REFERENCE = 0xEFFF0000,

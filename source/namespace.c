@@ -4,6 +4,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/opregion.h>
+#include <uacpi/internal/log.h>
 #include <uacpi/kernel_api.h>
 
 #define UACPI_REV_VALUE 2
@@ -96,6 +97,7 @@ uacpi_status uacpi_namespace_initialize_predefined(void)
 
     for (ns = 0; ns <= UACPI_PREDEFINED_NAMESPACE_MAX; ns++) {
         node = &predefined_namespaces[ns];
+        uacpi_shareable_init(node);
 
         obj = make_object_for_predefined(ns);
         if (uacpi_unlikely(obj == UACPI_NULL))
@@ -145,18 +147,24 @@ uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
     if (uacpi_unlikely(ret == UACPI_NULL))
         return ret;
 
+    uacpi_shareable_init(ret);
     ret->name = name;
     return ret;
 }
 
-void uacpi_namespace_node_free(uacpi_namespace_node *node)
+static void free_namespace_node(uacpi_handle handle)
 {
-    if (node == UACPI_NULL)
-        return;
+    uacpi_namespace_node *node = handle;
+
     if (node->object)
         uacpi_object_unref(node->object);
 
     uacpi_kernel_free(node);
+}
+
+void uacpi_namespace_node_unref(uacpi_namespace_node *node)
+{
+    uacpi_shareable_unref_and_delete_if_last(node, free_namespace_node);
 }
 
 uacpi_status uacpi_node_install(
@@ -168,6 +176,12 @@ uacpi_status uacpi_node_install(
 
     if (parent == UACPI_NULL)
         parent = uacpi_namespace_root();
+
+    if (uacpi_unlikely(uacpi_namespace_node_is_dangling(node))) {
+        uacpi_warn("attempting to install a dangling namespace node %.4s\n",
+                   node->name.text);
+        return UACPI_STATUS_NAMESPACE_NODE_DANGLING;
+    }
 
     prev = parent->child;
     parent->child = node;
@@ -189,32 +203,58 @@ uacpi_status uacpi_node_install(
     return UACPI_STATUS_OK;
 }
 
+uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node)
+{
+    return node->flags & UACPI_NAMESPACE_NODE_FLAG_DANGLING;
+}
+
 void uacpi_node_uninstall(uacpi_namespace_node *node)
 {
     uacpi_object *object;
 
+    if (uacpi_unlikely(uacpi_namespace_node_is_dangling(node))) {
+        uacpi_warn("attempting to uninstall a dangling namespace node %.4s\n",
+                   node->name.text);
+        return;
+    }
+
+    /*
+     * Even though namespace_node is reference-counted it still has an 'invalid'
+     * state that is entered after it is uninstalled from the global namespace.
+     *
+     * Reference counting is only needed to combat dangling pointer issues
+     * whereas bad AML might try to prolong a local object lifetime by
+     * returning it from a method, or CopyObject it somewhere. In that case the
+     * namespace node object itself is still alive, but no longer has a valid
+     * object associated with it.
+     *
+     * Example:
+     *     Method (BAD) {
+     *         OperationRegion(REG, SystemMemory, 0xDEADBEEF, 4)
+     *         Field (REG, AnyAcc, NoLock) {
+     *             FILD, 8,
+     *         }
+     *
+     *         Return (RefOf(FILD))
+     *     }
+     *
+     *     // Local0 is now the sole owner of the 'FILD' object that under the
+     *     // hood is still referencing the 'REG' operation region object from
+     *     // the 'BAD' method.
+     *     Local0 = DerefOf(BAD())
+     *
+     * This is done to prevent potential very deep recursion where an object
+     * frees a namespace node that frees an attached object that frees a
+     * namespace node as well as potential infinite cycles between a namespace
+     * node and an object.
+     */
     object = uacpi_namespace_node_get_object(node);
-    if (object != UACPI_NULL && object->type == UACPI_OBJECT_OPERATION_REGION) {
-        /*
-         * Detach this region from its handler while the node object
-         * that it belongs to is still alive.
-         *
-         * Bad AML could do something along the lines of:
-         *     Method(BAD) {
-         *         OperationRegion(REGN, ...)
-         *         Return (REGN)
-         *     }
-         *     Local0 = BAD()
-         *
-         * In this case, the object stored at Local0 is this same region, which
-         * doesn't really make sense. We can't properly remove the region from
-         * its handler in this case, as there is simply no namespace node
-         * controlling it that we could give to the handler.
-         *
-         * Unconditionally disconnect the region from its handler when
-         * uninstalling a namespace node to combat this.
-         */
-        uacpi_opregion_uninstall_handler(node);
+    if (object != UACPI_NULL) {
+        if (object->type == UACPI_OBJECT_OPERATION_REGION)
+            uacpi_opregion_uninstall_handler(node);
+
+        uacpi_object_unref(node->object);
+        node->object = UACPI_NULL;
     }
 
     if (node->parent && node->parent->child == node)
@@ -233,7 +273,8 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
         );
     }
 
-    uacpi_namespace_node_free(node);
+    node->flags |= UACPI_NAMESPACE_NODE_FLAG_DANGLING;
+    uacpi_namespace_node_unref(node);
 }
 
 uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
