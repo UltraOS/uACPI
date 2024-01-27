@@ -6,6 +6,10 @@
 void uacpi_trace_region_error(
     uacpi_namespace_node *node, uacpi_char *message, uacpi_status ret
 );
+void uacpi_trace_region_io(
+    uacpi_namespace_node *node, uacpi_region_op op,
+    uacpi_u64 offset, uacpi_u8 byte_size, uacpi_u64 ret
+);
 
 void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node);
 
