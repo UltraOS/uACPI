@@ -321,15 +321,16 @@ typedef struct uacpi_field_unit {
 
     uacpi_object *connection;
 
-    uacpi_u32 bit_offset;
+    uacpi_u32 byte_offset;
     uacpi_u32 bit_length;
+    uacpi_u8 bit_offset_within_first_byte;
+    uacpi_u8 access_width_bytes;
+    uacpi_u8 access_length;
 
     uacpi_u8 attributes : 4;
-    uacpi_u8 access_type : 3;
-    uacpi_u8 lock_rule : 1;
     uacpi_u8 update_rule : 2;
     uacpi_u8 kind : 2;
-    uacpi_u8 access_length;
+    uacpi_u8 lock_rule : 1;
 } uacpi_field_unit;
 
 typedef struct uacpi_object {

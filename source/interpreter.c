@@ -1561,9 +1561,56 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
 
             field->update_rule = update_rule;
             field->lock_rule = lock_rule;
-            field->access_type = access_type;
             field->attributes = access_attrib;
             field->access_length = access_length;
+
+            /*
+             * 0 AnyAcc
+             * 1 ByteAcc
+             * 2 WordAcc
+             * 3 DWordAcc
+             * 4 QWordAcc
+             * 5 BufferAcc
+             * 6 Reserved
+             * 7-15 Reserved
+             */
+            switch (access_type) {
+            case 0:
+                /*
+                 * TODO: optimize to calculate best access strategy
+                 * FALLTHROUGH intended for now
+                 */
+            case 1:
+            case 5:
+                field->access_width_bytes = 1;
+                break;
+            case 2:
+                field->access_width_bytes = 2;
+                break;
+            case 3:
+                field->access_width_bytes = 4;
+                break;
+            case 4:
+                field->access_width_bytes = 8;
+                break;
+            default:
+                uacpi_error("invalid field '%.4s' access type %d\n",
+                            node->name.text, access_type);
+                return UACPI_STATUS_AML_BAD_ENCODING;
+            }
+
+            field->bit_length = length;
+
+            // FIXME: overflow, OOB, etc checks
+            field->byte_offset = UACPI_ALIGN_DOWN(
+                bit_offset / 8,
+                field->access_width_bytes,
+                uacpi_u32
+            );
+
+            field->bit_offset_within_first_byte = bit_offset;
+            field->bit_offset_within_first_byte =
+                bit_offset & ((field->access_width_bytes * 8) - 1);
 
             switch (op_ctx->op->code) {
             case UACPI_AML_OP_FieldOp:
@@ -1598,9 +1645,6 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
             field->connection = connection_obj;
             if (field->connection)
                 uacpi_object_ref(field->connection);
-
-            field->bit_offset = bit_offset;
-            field->bit_length = length;
 
             node->object = uacpi_create_internal_reference(
                 UACPI_REFERENCE_KIND_NAMED, obj
