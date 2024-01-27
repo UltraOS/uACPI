@@ -2,6 +2,7 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/namespace.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/log.h>
 
 void uacpi_trace_region_error(
@@ -19,6 +20,47 @@ void uacpi_trace_region_error(
         message, path, op_region, uacpi_status_to_string(ret)
     );
     uacpi_kernel_free((void*)path);
+}
+
+#define UACPI_TRACE_REGION_IO
+
+void uacpi_trace_region_io(
+    uacpi_namespace_node *node, uacpi_region_op op,
+    uacpi_u64 offset, uacpi_u8 byte_size, uacpi_u64 ret
+)
+{
+#ifdef UACPI_TRACE_REGION_IO
+    const uacpi_char *path;
+    uacpi_operation_region *op_region;
+    const uacpi_char *type_str;
+
+    switch (op) {
+    case UACPI_REGION_OP_READ:
+        type_str = "read from";
+        break;
+    case UACPI_REGION_OP_WRITE:
+        type_str = "write to";
+        break;
+    default:
+        type_str = "<INVALID-OP>";
+    }
+
+    op_region = uacpi_namespace_node_get_object(node)->op_region;
+    path = uacpi_namespace_node_generate_absolute_path(node);
+
+    uacpi_trace(
+        "%s [%s] (%d bytes) %s[0x%016"UACPI_PRIX64"] = 0x%"PRIX64"\n",
+        type_str, path, byte_size,
+        uacpi_address_space_to_string(op_region->space),
+        offset, ret
+    );
+
+    uacpi_kernel_free((void*)path);
+#else
+    UACPI_UNUSED(node);
+    UACPI_UNUSED(offset);
+    UACPI_UNUSED(byte_size);
+#endif
 }
 
 static uacpi_bool space_needs_reg(enum uacpi_address_space space)
