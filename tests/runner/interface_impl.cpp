@@ -42,6 +42,7 @@ uacpi_status uacpi_kernel_io_read(
         break;
     case 4:
         *value = 0xFFFFFFFF;
+        break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
