@@ -40,6 +40,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "init level too low/high for this action";
     case UACPI_STATUS_NAMESPACE_NODE_DANGLING:
         return "attempting to use a dangling namespace node";
+    case UACPI_STATUS_NO_HANDLER:
+        return "no handler found";
 
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";
