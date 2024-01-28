@@ -25,6 +25,7 @@
     prefix void name##_clear(struct name *arr);
 
 #define DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(name, type, prefix)           \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix uacpi_size name##_inline_capacity(struct name *arr)               \
     {                                                                        \
         return sizeof(arr->inline_storage) / sizeof(arr->inline_storage[0]); \
@@ -41,6 +42,7 @@
         return &arr->dynamic_storage[idx - name##_inline_capacity(arr)];     \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix type *name##_alloc(struct name *arr)                              \
     {                                                                        \
         uacpi_size inline_cap;                                               \
@@ -85,6 +87,7 @@
         return out_ptr;                                                      \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix type *name##_calloc(struct name *arr)                             \
     {                                                                        \
         type *ret;                                                           \
@@ -96,6 +99,7 @@
         return ret;                                                          \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix void name##_pop(struct name *arr)                                 \
     {                                                                        \
         if (arr->size_including_inline == 0)                                 \
@@ -104,11 +108,13 @@
         arr->size_including_inline--;                                        \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix uacpi_size name##_size(struct name *arr)                          \
     {                                                                        \
         return arr->size_including_inline;                                   \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
     prefix type *name##_last(struct name *arr)                               \
     {                                                                        \
         return name##_at(arr, arr->size_including_inline - 1);               \
