@@ -360,9 +360,8 @@ static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
 
         if (uacpi_unlikely(!free_queue_push(queue,
                                             obj->package))) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
-                "Unable to free nested package @p: not enough memory\n",
+            uacpi_warn(
+                "unable to free nested package @p: not enough memory\n",
                 obj->package
             );
         }
@@ -634,9 +633,7 @@ static void free_object(uacpi_object *obj)
 
 static void make_chain_bugged(uacpi_object *obj)
 {
-    uacpi_kernel_log(UACPI_LOG_WARN,
-                     "Object refcount bug, marking chain @%p as bugged\n",
-                     obj);
+    uacpi_warn("object refcount bug, marking chain @%p as bugged\n", obj);
 
     while (obj) {
         uacpi_make_shareable_bugged(obj);
