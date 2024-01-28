@@ -6,14 +6,19 @@
 #include <chrono>
 #include <thread>
 #include <condition_variable>
+#include <unordered_set>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <mach/mach_time.h>
+#include <unistd.h>
+#include <fcntl.h>
 #else
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 
 #include <uacpi/kernel_api.h>
@@ -80,12 +85,43 @@ uacpi_status uacpi_kernel_pci_write(
     return UACPI_STATUS_OK;
 }
 
-void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size)
+static bool is_physical_address(uacpi_phys_addr addr, uacpi_size size)
 {
+#ifdef _WIN32
+    return IsBadReadPtr((void*)addr, size);
+#else
+    // https://stackoverflow.com/questions/4611776/isbadreadptr-analogue-on-unix
+    int nullfd = open("/dev/random", O_WRONLY);
+    bool ok = true;
+
+    if (write(nullfd, (void*)addr, size) < 0)
+        ok = false;
+
+    close(nullfd);
+    return !ok;
+#endif
+}
+
+static std::unordered_set<void*> fake_phys_mappings;
+
+void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size size)
+{
+    if (is_physical_address(addr, size)) {
+        void *virt = std::calloc(size, 1);
+        fake_phys_mappings.emplace(virt);
+        return virt;
+    }
+
     return reinterpret_cast<void*>(addr);
 }
 
-void uacpi_kernel_unmap(void*, uacpi_size) {}
+void uacpi_kernel_unmap(void* addr, uacpi_size)
+{
+    if (fake_phys_mappings.count(addr)) {
+        fake_phys_mappings.erase(addr);
+        std::free(addr);
+    }
+}
 
 void* uacpi_kernel_alloc(uacpi_size size) { return malloc(size); }
 void uacpi_kernel_free(void* mem) { free(mem); }
