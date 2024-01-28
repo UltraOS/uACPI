@@ -24,9 +24,17 @@
 #ifdef __GNUC__
     #define uacpi_unlikely(expr) __builtin_expect(!!(expr), 0)
     #define uacpi_likely(expr)   __builtin_expect(!!(expr), 1)
+
+    #if __has_attribute(__fallthrough__)
+        #define UACPI_FALLTHROUGH __attribute__((__fallthrough__))
+    #endif
 #else
     #define uacpi_unlikely(expr) expr
     #define uacpi_likely(expr)   expr
+#endif
+
+#ifndef UACPI_FALLTHROUGH
+    #define UACPI_FALLTHROUGH do {} while (0)
 #endif
 
 #ifndef UACPI_POINTER_SIZE
