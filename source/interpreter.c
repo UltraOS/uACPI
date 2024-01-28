@@ -1570,10 +1570,8 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
              */
             switch (access_type) {
             case 0:
-                /*
-                 * TODO: optimize to calculate best access strategy
-                 * FALLTHROUGH intended for now
-                 */
+                 // TODO: optimize to calculate best access strategy
+                 UACPI_FALLTHROUGH;
             case 1:
             case 5:
                 field->access_width_bytes = 1;
@@ -1827,7 +1825,7 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
     case UACPI_AML_OP_ScopeOp:
         // Disarm the tracked package so that we don't skip the Scope
         op_ctx->tracked_pkg_idx = 0;
-        // FALLTHROUGH intended here
+        UACPI_FALLTHROUGH;
     case UACPI_AML_OP_DeviceOp:
     case UACPI_AML_OP_ProcessorOp:
     case UACPI_AML_OP_PowerResOp:
@@ -2039,7 +2037,7 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
             break;
         }
 
-        // FALLTHROUGH intended here
+        UACPI_FALLTHROUGH;
     }
     case UACPI_REFERENCE_KIND_LOCAL:
     case UACPI_REFERENCE_KIND_PKG_INDEX:
@@ -2241,11 +2239,13 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
         break;
     case UACPI_AML_OP_NandOp:
         should_negate = UACPI_TRUE;
+        UACPI_FALLTHROUGH;
     case UACPI_AML_OP_AndOp:
         res = rhs & lhs;
         break;
     case UACPI_AML_OP_NorOp:
         should_negate = UACPI_TRUE;
+        UACPI_FALLTHROUGH;
     case UACPI_AML_OP_OrOp:
         res = rhs | lhs;
         break;
@@ -2259,7 +2259,7 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
             uacpi_warn("Attempted division by zero!\n");
             tgt1->integer = 0;
         }
-        // FALLTHROUGH intended here
+        UACPI_FALLTHROUGH;
     case UACPI_AML_OP_ModOp:
         res = lhs % rhs;
         break;
@@ -2596,7 +2596,7 @@ static uacpi_status handle_to(struct execution_context *ctx)
             ret = buffer_to_string(src->buffer, dst->buffer, is_hex);
             break;
         }
-        // FALLTHROUGH for string -> string conversion
+        UACPI_FALLTHROUGH;
     }
     case UACPI_AML_OP_ToBufferOp: {
         struct object_storage_as_buffer buf;
@@ -3657,7 +3657,7 @@ static uacpi_status handle_code_block(struct execution_context *ctx)
         if (uacpi_unlikely_error(ret))
             return ret;
 
-        // FALLTHROUGH intended
+        UACPI_FALLTHROUGH;
     }
     case UACPI_AML_OP_ScopeOp:
         skip_block = UACPI_FALSE;
@@ -3855,6 +3855,7 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
             ret = UACPI_STATUS_OK;
             break;
         }
+        UACPI_FALLTHROUGH;
     default:
         ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
@@ -4631,6 +4632,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_TRACKED_PKGLEN:
             op_ctx->tracked_pkg_idx = item_array_size(&op_ctx->items);
+            UACPI_FALLTHROUGH;
         case UACPI_PARSE_OP_PKGLEN:
             ret = parse_package_length(frame, &item->pkg);
             break;
