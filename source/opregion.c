@@ -181,7 +181,7 @@ uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
 
     region = uacpi_namespace_node_get_object(node)->op_region;
     if (region->handler == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
+        return UACPI_STATUS_NO_HANDLER;
     if (region->state_flags & UACPI_OP_REGION_STATE_ATTACHED)
         return UACPI_STATUS_OK;
 
@@ -399,7 +399,7 @@ uacpi_status uacpi_reg_all_opregions(
 
     this_handler = find_handler(handlers, space);
     if (uacpi_unlikely(this_handler == UACPI_NULL))
-        return UACPI_STATUS_NOT_FOUND;
+        return UACPI_STATUS_NO_HANDLER;
 
     uacpi_namespace_for_each_node_depth_first(
         device_node->child, do_run_reg, &ctx
@@ -490,7 +490,7 @@ uacpi_status uacpi_uninstall_address_space_handler(
 
     handler = find_handler(handlers, space);
     if (uacpi_unlikely(handler == UACPI_NULL))
-        return UACPI_STATUS_NOT_FOUND;
+        return UACPI_STATUS_NO_HANDLER;
 
     iter_ctx.handler = handler;
     iter_ctx.action = OPREGION_ITER_ACTION_UNINSTALL;

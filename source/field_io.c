@@ -186,8 +186,12 @@ static uacpi_status dispatch_field_io(
     };
 
     ret = uacpi_opregion_attach(region_node);
-    if (uacpi_unlikely_error(ret))
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_trace_region_error(
+            region_node, "unable to attach", ret
+        );
         return ret;
+    }
 
     region = uacpi_namespace_node_get_object(region_node)->op_region;
 
