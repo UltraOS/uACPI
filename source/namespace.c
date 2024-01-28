@@ -129,10 +129,7 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
 )
 {
     if (uacpi_unlikely(ns > UACPI_PREDEFINED_NAMESPACE_MAX)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN, "Requested invalid predefined namespace %d\n",
-            ns
-        );
+        uacpi_warn("requested invalid predefined namespace %d\n", ns);
         return UACPI_NULL;
     }
 
@@ -190,8 +187,7 @@ uacpi_status uacpi_node_install(
 
     if (prev) {
         if (uacpi_unlikely(prev->prev != UACPI_NULL)) {
-            uacpi_kernel_log(
-                UACPI_LOG_WARN,
+            uacpi_warn(
                 "while installing node @p: previous node @p already has "
                 " a valid prev link @p\n", node, prev, prev->prev
             );
@@ -266,8 +262,7 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
         node->next->prev = node->prev;
 
     if (uacpi_unlikely(node->child)) {
-        uacpi_kernel_log(
-            UACPI_LOG_WARN,
+        uacpi_warn(
             "trying to uninstall a node @p with a valid child link @p\n",
             node, node->child
         );
@@ -373,10 +368,7 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     return cur_node;
 
 out_invalid_path:
-    uacpi_kernel_log(
-        UACPI_LOG_WARN, "Invalid path '%s'\n",
-        path
-    );
+    uacpi_warn("invalid path '%s'\n", path);
     return UACPI_NULL;
 }
 
