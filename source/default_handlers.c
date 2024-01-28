@@ -105,21 +105,26 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
     if (ret == UACPI_STATUS_OK) {
         ctx->address.function = (obj->integer >> 0)  & 0xFF;
         ctx->address.device   = (obj->integer >> 16) & 0xFF;
+        uacpi_object_unref(obj);
     }
 
     ret = uacpi_eval_typed(
         pci_root, "_SEG", UACPI_NULL,
         UACPI_OBJECT_INTEGER_BIT, &obj
     );
-    if (ret == UACPI_STATUS_OK)
+    if (ret == UACPI_STATUS_OK) {
         ctx->address.segment = obj->integer;
+        uacpi_object_unref(obj);
+    }
 
     ret = uacpi_eval_typed(
         pci_root, "_BBN", UACPI_NULL,
         UACPI_OBJECT_INTEGER_BIT, &obj
     );
-    if (ret == UACPI_STATUS_OK)
+    if (ret == UACPI_STATUS_OK) {
         ctx->address.bus = obj->integer;
+        uacpi_object_unref(obj);
+    }
 
     uacpi_trace(
         "detected PCI device %.4s@%04X:%02X:%02X:%01X\n",
