@@ -63,7 +63,7 @@ static void bit_copy(struct bit_span *dst, struct bit_span *src)
         if (src_count) {
             bits = *src_ptr >> src_shift;
 
-            if (src_shift && src_count > 8 - src_shift)
+            if (src_shift && src_count > (uacpi_u32)(8 - src_shift))
                 bits |= *(src_ptr + 1) << (8 - src_shift);
 
             if (src_count < 8) {
@@ -78,7 +78,7 @@ static void bit_copy(struct bit_span *dst, struct bit_span *src)
         dst_mask = (dst_count < 8 ? (1 << dst_count) - 1 : 0xFF) << dst_shift;
         *dst_ptr = (*dst_ptr & ~dst_mask) | ((bits << dst_shift) & dst_mask);
 
-        if (dst_shift && dst_count > (8 - dst_shift)) {
+        if (dst_shift && dst_count > (uacpi_u32)(8 - dst_shift)) {
             dst_mask >>= 8;
             *(dst_ptr + 1) &= ~dst_mask;
             *(dst_ptr + 1) |= (bits >> (8 - dst_shift)) & dst_mask;
