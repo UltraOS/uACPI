@@ -28,9 +28,13 @@
     #if __has_attribute(__fallthrough__)
         #define UACPI_FALLTHROUGH __attribute__((__fallthrough__))
     #endif
+
+    #define UACPI_MAYBE_UNUSED __attribute__ ((unused))
 #else
     #define uacpi_unlikely(expr) expr
     #define uacpi_likely(expr)   expr
+
+    #define UACPI_MAYBE_UNUSED
 #endif
 
 #ifndef UACPI_FALLTHROUGH
