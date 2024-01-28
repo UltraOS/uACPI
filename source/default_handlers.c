@@ -65,17 +65,15 @@ static uacpi_namespace_node *find_pci_root(uacpi_namespace_node *node)
 static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
 {
     struct pci_region_ctx *ctx;
-    uacpi_operation_region *op_region;
     uacpi_namespace_node *node, *pci_root;
     uacpi_object *obj;
-    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_status ret;
 
     ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
     if (ctx == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     node = data->region_node;
-    op_region = uacpi_namespace_node_get_object(node)->op_region;
 
     pci_root = find_pci_root(node);
 
