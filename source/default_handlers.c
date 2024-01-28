@@ -326,6 +326,31 @@ static uacpi_status handle_memory_region(uacpi_region_op op, uacpi_handle op_dat
     }
 }
 
+static uacpi_status table_data_region_do_rw(
+    uacpi_region_op op, uacpi_region_rw_data *data
+)
+{
+    void *addr = UACPI_VIRT_ADDR_TO_PTR((uacpi_virt_addr)data->offset);
+
+    return op == UACPI_REGION_OP_READ ?
+       memory_read(addr, data->byte_width, &data->value) :
+       memory_write(addr, data->byte_width, data->value);
+}
+
+static uacpi_status handle_table_data_region(uacpi_region_op op, uacpi_handle op_data)
+{
+    switch (op) {
+    case UACPI_REGION_OP_ATTACH:
+    case UACPI_REGION_OP_DETACH:
+        return UACPI_STATUS_OK;
+    case UACPI_REGION_OP_READ:
+    case UACPI_REGION_OP_WRITE:
+        return table_data_region_do_rw(op, op_data);
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+}
+
 static uacpi_status io_region_do_rw(
     uacpi_region_op op, uacpi_region_rw_data *data
 )
@@ -376,5 +401,10 @@ void uacpi_install_default_address_space_handlers(void)
     uacpi_install_address_space_handler(
         root, UACPI_ADDRESS_SPACE_PCI_CONFIG,
         handle_pci_region, UACPI_NULL
+    );
+
+    uacpi_install_address_space_handler(
+        root, UACPI_ADDRESS_SPACE_TABLE_DATA,
+        handle_table_data_region, UACPI_NULL
     );
 }
