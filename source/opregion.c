@@ -124,7 +124,7 @@ uacpi_handlers *uacpi_node_get_address_space_handlers(
         if (node != uacpi_namespace_root() ||
             object->type != UACPI_OBJECT_UNINITIALIZED)
             return UACPI_NULL;
-        // FALLTHROUGH intended here
+        UACPI_FALLTHROUGH;
     case UACPI_OBJECT_DEVICE:
     case UACPI_OBJECT_PROCESSOR:
     case UACPI_OBJECT_THERMAL_ZONE:

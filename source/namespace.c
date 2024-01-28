@@ -412,7 +412,7 @@ void uacpi_namespace_for_each_node_depth_first(
                 depth++;
                 continue;
             }
-            // FALLTHROUGH intended
+            UACPI_FALLTHROUGH;
         case UACPI_NS_ITERATION_DECISION_NEXT_PEER:
             walking_up = UACPI_TRUE;
             continue;
