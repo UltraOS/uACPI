@@ -21,7 +21,7 @@ static const struct uacpi_op_spec ext_opcode_table[] = {
 
 #define _(op) (op & 0x00FF)
 
-const static uacpi_u8 ext_op_to_idx[0x100] = {
+static const uacpi_u8 ext_op_to_idx[0x100] = {
     [_(UACPI_AML_OP_MutexOp)]       = 1,  [_(UACPI_AML_OP_EventOp)]       = 2,
     [_(UACPI_AML_OP_CondRefOfOp)]   = 3,  [_(UACPI_AML_OP_CreateFieldOp)] = 4,
     [_(UACPI_AML_OP_LoadTableOp)]   = 5,  [_(UACPI_AML_OP_LoadOp)]        = 6,
