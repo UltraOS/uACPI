@@ -28,17 +28,24 @@ target_include_directories(
     ${UACPI_INCLUDES}
 )
 
-# Address sanitizer on MSVC depends on a dynamic library that is not present in
-# PATH by default. Lets just not enable it here.
-if (NOT MSVC)
+if (MSVC)
+    # Address sanitizer on MSVC depends on a dynamic library that is not present in
+    # PATH by default. Lets just not enable it here.
     target_compile_options(
         test-runner
         PRIVATE
-        -fsanitize=address,undefined
+        /W3 /WX
+        /wd4200 /wd4267 /wd4244
+    )
+else ()
+    target_compile_options(
+        test-runner
+        PRIVATE
+        -fsanitize=address,undefined -g3 -Wall -Wextra -Werror
     )
     target_link_options(
         test-runner
         PRIVATE
-        -fsanitize=address,undefined
+        -fsanitize=address,undefined -g3
     )
 endif ()
