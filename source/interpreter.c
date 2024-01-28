@@ -3428,7 +3428,7 @@ static uacpi_object_type buffer_field_get_read_type(
     struct uacpi_buffer_field *field
 )
 {
-    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32 : 64) ||
+    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32u : 64u) ||
         field->force_buffer)
         return UACPI_OBJECT_BUFFER;
 
@@ -3439,7 +3439,7 @@ static uacpi_object_type field_unit_get_read_type(
     struct uacpi_field_unit *field
 )
 {
-    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32 : 64))
+    if (field->bit_length > (g_uacpi_rt_ctx.is_rev1 ? 32u : 64u))
         return UACPI_OBJECT_BUFFER;
 
     return UACPI_OBJECT_INTEGER;
