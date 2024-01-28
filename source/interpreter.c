@@ -352,7 +352,6 @@ static uacpi_status name_string_to_path(
     uacpi_char **out_string, uacpi_size *out_size
 )
 {
-    uacpi_status ret = UACPI_STATUS_OK;
     uacpi_size bytes_left, prefix_bytes, nameseg_bytes, namesegs;
     uacpi_char *base_cursor, *cursor;
     uacpi_char prev_char;
@@ -2029,7 +2028,6 @@ static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
 {
     uacpi_status ret;
     uacpi_object *src_obj, *new_obj;
-    uacpi_u32 refs;
 
     switch (dst->flags) {
     case UACPI_REFERENCE_KIND_ARG: {
@@ -2661,7 +2659,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     uacpi_object *src, *dst;
     struct object_storage_as_buffer src_buf;
     uacpi_buffer *dst_buf;
-    uacpi_size idx, len, buf_size;
+    uacpi_size idx, len;
     uacpi_bool is_string;
 
     src = item_array_at(&op_ctx->items, 0)->obj;
