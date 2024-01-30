@@ -731,7 +731,14 @@ UACPI_BUILD_BINARY_MATH_OP(Mod, 0x85)                            \
 UACPI_OP(                                                        \
     NotifyOp, 0x86,                                              \
     {                                                            \
-        UACPI_PARSE_OP_TODO,                                     \
+    /* This is technically wrong according to spec but I was */  \
+    /* unable to find any examples of anything else after    */  \
+    /* inspecting about 500 AML dumps. Spec says this is a   */  \
+    /* SuperName that must evaluate to Device/ThermalZone or */  \
+    /* Processor, just ignore for now.                       */  \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING,                      \
+        UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
 UACPI_OP(                                                        \
