@@ -500,20 +500,24 @@ uacpi_status uacpi_uninstall_address_space_handler(
     );
 
     prev_handler = handlers->head;
-    while (prev_handler) {
-        // We are the last linked handler
-        if (prev_handler == handler) {
-            handlers->head = handler->next;
-            break;
-        }
 
-        // We have a parent
-        if (prev_handler->next == handler) {
-            prev_handler->next = handler->next;
-            break;
-        }
+    // Are we the last linked handler?
+    if (prev_handler == handler) {
+        handlers->head = handler->next;
+        goto out;
     }
 
+    // Nope, we're somewhere in the middle. Do a search.
+    while (prev_handler) {
+        if (prev_handler->next == handler) {
+            prev_handler->next = handler->next;
+            goto out;
+        }
+
+        prev_handler = prev_handler->next;
+    }
+
+out:
     uacpi_address_space_handler_unref(handler);
     return UACPI_STATUS_OK;
 }
