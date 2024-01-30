@@ -2,6 +2,7 @@
 
 #include <uacpi/types.h>
 #include <uacpi/status.h>
+#include <uacpi/namespace.h>
 
 #define UACPI_NAMESPACE_NODE_FLAG_ALIAS (1 << 0)
 
