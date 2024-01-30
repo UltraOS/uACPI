@@ -13,7 +13,7 @@ void uacpi_trace_region_io(
 
 void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node);
 
-uacpi_handlers *uacpi_node_get_address_space_handlers(
+uacpi_address_space_handlers *uacpi_node_get_address_space_handlers(
     uacpi_namespace_node *node
 );
 

@@ -104,7 +104,7 @@ static uacpi_status region_run_reg(
     return ret;
 }
 
-uacpi_handlers *uacpi_node_get_address_space_handlers(
+uacpi_address_space_handlers *uacpi_node_get_address_space_handlers(
     uacpi_namespace_node *node
 )
 {
@@ -128,12 +128,12 @@ uacpi_handlers *uacpi_node_get_address_space_handlers(
     case UACPI_OBJECT_DEVICE:
     case UACPI_OBJECT_PROCESSOR:
     case UACPI_OBJECT_THERMAL_ZONE:
-        return object->handlers;
+        return object->address_space_handlers;
     }
 }
 
 static uacpi_address_space_handler *find_handler(
-    uacpi_handlers *handlers,
+    uacpi_address_space_handlers *handlers,
     enum uacpi_address_space space
 )
 {
@@ -277,7 +277,7 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
 )
 {
     struct opregion_iter_ctx *ctx = opaque;
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_object *object;
 
     object = uacpi_namespace_node_get_object(node);
@@ -383,7 +383,7 @@ uacpi_status uacpi_reg_all_opregions(
     enum uacpi_address_space space
 )
 {
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *this_handler;
     struct reg_run_ctx ctx = {
         .space = space,
@@ -418,7 +418,7 @@ uacpi_status uacpi_install_address_space_handler(
     uacpi_region_handler handler, uacpi_handle handler_context
 )
 {
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *this_handler, *new_handler;
     struct opregion_iter_ctx iter_ctx;
 
@@ -480,7 +480,7 @@ uacpi_status uacpi_uninstall_address_space_handler(
     enum uacpi_address_space space
 )
 {
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler, *prev_handler;
     struct opregion_iter_ctx iter_ctx;
 
@@ -527,7 +527,7 @@ uacpi_status uacpi_opregion_find_and_install_handler(
 )
 {
     uacpi_namespace_node *parent = node->parent;
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
     uacpi_u8 space;
 

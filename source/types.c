@@ -475,27 +475,51 @@ static void free_event(uacpi_handle handle)
     uacpi_kernel_free(event);
 }
 
-static void free_handler(uacpi_handle handle)
+static void free_address_space_handler(uacpi_handle handle)
 {
     uacpi_address_space_handler *handler = handle;
     uacpi_kernel_free(handler);
 }
 
-static void free_handlers(uacpi_handle handle)
+static void free_address_space_handlers(
+    uacpi_address_space_handler *handler
+)
 {
-    uacpi_handlers *handlers = handle;
-    uacpi_address_space_handler *next_handler, *handler = handlers->head;
+    uacpi_address_space_handler *next_handler;
 
     while (handler) {
         next_handler = handler->next;
-        uacpi_shareable_unref_and_delete_if_last(handler, free_handler);
+        uacpi_shareable_unref_and_delete_if_last(
+            handler, free_address_space_handler
+        );
         handler = next_handler;
     }
 }
 
+static void free_device_notify_handlers(uacpi_device_notify_handler *handler)
+{
+    uacpi_device_notify_handler *next_handler;
+
+    while (handler) {
+        next_handler = handler->next;
+        uacpi_kernel_free(handler);
+        handler = next_handler;
+    }
+}
+
+static void free_handlers(uacpi_handle handle)
+{
+    uacpi_handlers *handlers = handle;
+
+    free_address_space_handlers(handlers->address_space_head);
+    free_device_notify_handlers(handlers->notify_head);
+}
+
 void uacpi_address_space_handler_unref(uacpi_address_space_handler *handler)
 {
-    uacpi_shareable_unref_and_delete_if_last(handler, free_handler);
+    uacpi_shareable_unref_and_delete_if_last(
+        handler, free_address_space_handler
+    );
 }
 
 static void free_op_region(uacpi_handle handle)

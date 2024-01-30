@@ -163,17 +163,40 @@ typedef struct uacpi_address_space_handler {
     uacpi_u8 space;
 } uacpi_address_space_handler;
 
+typedef uacpi_status (*uacpi_notify_handler)
+    (uacpi_handle context, uacpi_namespace_node *node, uacpi_u64 value);
+
+typedef struct uacpi_device_notify_handler {
+    uacpi_notify_handler callback;
+    uacpi_handle user_context;
+    struct uacpi_device_notify_handler *next;
+} uacpi_device_notify_handler;
+
 /*
- * NOTE: This is the common header for all of the following:
+ * NOTE: These are common object headers.
+ * Any changes to these structs must be propagated to all objects.
+ * ==============================================================
+ * Common for the following objects:
  * - UACPI_OBJECT_OPERATION_REGION
  * - UACPI_OBJECT_PROCESSOR
  * - UACPI_OBJECT_DEVICE
  * - UACPI_OBJECT_THERMAL_ZONE
- * Any changes to this struct must be propagated to all objects.
+ */
+typedef struct uacpi_address_space_handlers {
+    struct uacpi_shareable shareable;
+    uacpi_address_space_handler *head;
+} uacpi_address_space_handlers;
+
+/*
+ * Common for the following objects:
+ * - UACPI_OBJECT_PROCESSOR
+ * - UACPI_OBJECT_DEVICE
+ * - UACPI_OBJECT_THERMAL_ZONE
  */
 typedef struct uacpi_handlers {
     struct uacpi_shareable shareable;
-    uacpi_address_space_handler *head;
+    uacpi_address_space_handler *address_space_head;
+    uacpi_device_notify_handler *notify_head;
 } uacpi_handlers;
 
 enum uacpi_address_space {
@@ -217,12 +240,14 @@ typedef struct uacpi_operation_region {
 
 typedef struct uacpi_device {
     struct uacpi_shareable shareable;
-    uacpi_address_space_handler *handlers;
+    uacpi_address_space_handler *address_space_handlers;
+    uacpi_device_notify_handler *notify_handlers;
 } uacpi_device;
 
 typedef struct uacpi_processor {
     struct uacpi_shareable shareable;
-    uacpi_address_space_handler *handlers;
+    uacpi_address_space_handler *address_space_handlers;
+    uacpi_device_notify_handler *notify_handlers;
     uacpi_u8 id;
     uacpi_u32 block_address;
     uacpi_u8 block_length;
@@ -230,7 +255,8 @@ typedef struct uacpi_processor {
 
 typedef struct uacpi_thermal_zone {
     struct uacpi_shareable shareable;
-    uacpi_address_space_handler *handlers;
+    uacpi_address_space_handler *address_space_handlers;
+    uacpi_device_notify_handler *notify_handlers;
 } uacpi_thermal_zone;
 
 typedef struct uacpi_power_resource {
@@ -352,6 +378,7 @@ typedef struct uacpi_object {
         uacpi_device *device;
         uacpi_processor *processor;
         uacpi_thermal_zone *thermal_zone;
+        uacpi_address_space_handlers *address_space_handlers;
         uacpi_handlers *handlers;
         uacpi_power_resource power_resource;
         uacpi_field_unit *field_unit;
