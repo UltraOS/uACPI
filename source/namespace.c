@@ -292,6 +292,29 @@ uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
     return UACPI_NULL;
 }
 
+static uacpi_object_name segment_to_name(
+    const uacpi_char **string, uacpi_size *in_out_size
+)
+{
+    uacpi_object_name out_name;
+    const uacpi_char *cursor = *string;
+    uacpi_size offset, bytes_left = *in_out_size;
+
+    for (offset = 0; offset < 4; offset++) {
+        if (bytes_left < 1 || *cursor == '.') {
+            out_name.text[offset] = '_';
+            continue;
+        }
+
+        out_name.text[offset] = *cursor++;
+        bytes_left--;
+    }
+
+    *string = cursor;
+    *in_out_size = bytes_left;
+    return out_name;
+}
+
 uacpi_namespace_node *uacpi_namespace_node_find(
     uacpi_namespace_node *parent,
     const uacpi_char *path
@@ -353,13 +376,7 @@ uacpi_namespace_node *uacpi_namespace_node_find(
             bytes_left--;
         }
 
-        if (uacpi_unlikely(bytes_left < 4))
-            goto out_invalid_path;
-
-        uacpi_memcpy(nameseg.text, cursor, sizeof(nameseg));
-        cursor += sizeof(nameseg);
-        bytes_left -= sizeof(nameseg);
-
+        nameseg = segment_to_name(&cursor, &bytes_left);
         cur_node = uacpi_namespace_node_find_sub_node(cur_node, nameseg);
         if (cur_node == UACPI_NULL)
             return cur_node;
