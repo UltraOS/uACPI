@@ -11,4 +11,5 @@ uacpi_add_sources(
     opregion.c
     default_handlers.c
     field_io.c
+    notify.c
 )
