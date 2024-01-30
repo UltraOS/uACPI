@@ -395,6 +395,30 @@ typedef union uacpi_object_name {
     uacpi_u32 id;
 } uacpi_object_name;
 
+typedef enum uacpi_firmware_request_type {
+    UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
+    UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
+} uacpi_firmware_request_type;
+
+typedef struct uacpi_firmware_request {
+    uacpi_u8 type;
+
+    union {
+        // UACPI_FIRMWARE_REQUEST_BREAKPOINT
+        struct {
+            // The context of the method currently being executed
+            uacpi_handle ctx;
+        } breakpoint;
+
+        // UACPI_FIRMWARE_REQUEST_FATAL
+        struct {
+            uacpi_u8 type;
+            uacpi_u32 code;
+            uacpi_u64 arg;
+        } fatal;
+    };
+} uacpi_firmware_request;
+
 uacpi_object *uacpi_create_object(uacpi_object_type type);
 
 void uacpi_object_ref(uacpi_object *obj);

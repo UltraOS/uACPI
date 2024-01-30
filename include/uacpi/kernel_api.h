@@ -109,6 +109,13 @@ void uacpi_kernel_signal_event(uacpi_handle);
  */
 void uacpi_kernel_reset_event(uacpi_handle);
 
+/*
+ * Handle a firmware request.
+ *
+ * Currently either a Breakpoint or Fatal operators.
+ */
+uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request*);
+
 #ifdef __cplusplus
 }
 #endif

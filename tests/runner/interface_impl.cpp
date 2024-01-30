@@ -340,3 +340,20 @@ void uacpi_kernel_reset_event(uacpi_handle handle)
     auto *event = (Event*)handle;
     return event->reset();
 }
+
+uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request* req)
+{
+    switch (req->type) {
+    case UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT:
+        std::cout << "Ignoring breakpoint" << std::endl;
+        break;
+    case UACPI_FIRMWARE_REQUEST_TYPE_FATAL:
+        std::cout << "Fatal firmware error:"
+                  << " type: " << std::hex << (int)req->fatal.type
+                  << " code: " << std::hex << req->fatal.code
+                  << " arg: " << std::hex << req->fatal.arg << std::endl;
+        break;
+    }
+
+    return UACPI_STATUS_OK;
+}
