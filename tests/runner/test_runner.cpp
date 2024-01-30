@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "helpers.h"
+#include <uacpi/notify.h>
 
 uacpi_object_type string_to_object_type(std::string_view str)
 {
@@ -78,6 +79,19 @@ private:
     ExprT callback;
 };
 
+static uacpi_status handle_notify(
+    uacpi_handle, uacpi_namespace_node *node, uacpi_u64 value
+)
+{
+    auto *path = uacpi_namespace_node_generate_absolute_path(node);
+    auto guard = ScopeGuard([path] { std::free((void*)path); });
+
+    std::cout << "Received a notification from " << path << " "
+              << std::hex << value << std::endl;
+
+    return UACPI_STATUS_OK;
+}
+
 void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
               std::string_view expected_value)
 {
@@ -100,6 +114,11 @@ void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
     };
 
     uacpi_status st = uacpi_initialize(&params);
+    ensure_ok_status(st);
+
+    st = uacpi_install_notify_handler(
+        uacpi_namespace_root(), handle_notify, nullptr
+    );
     ensure_ok_status(st);
 
     st = uacpi_namespace_load();
