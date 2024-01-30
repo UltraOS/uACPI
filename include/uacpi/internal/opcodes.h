@@ -945,7 +945,7 @@ UACPI_BAD_OPCODE(0xCB)                                           \
 UACPI_OP(                                                        \
     BreakPointOp, 0xCC,                                          \
     {                                                            \
-        UACPI_PARSE_OP_END,                                      \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
 UACPI_BAD_OPCODE(0xCD)                                           \
@@ -1228,7 +1228,10 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     FatalOp, UACPI_EXT_OP(0x32),                            \
     {                                                       \
-        UACPI_PARSE_OP_TODO,                                \
+        UACPI_PARSE_OP_LOAD_IMM, 1,                         \
+        UACPI_PARSE_OP_LOAD_IMM, 4,                         \
+        UACPI_PARSE_OP_OPERAND,                             \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \

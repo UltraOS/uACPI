@@ -3444,6 +3444,30 @@ static uacpi_status handle_notify(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_firmware_request(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_firmware_request req = { 0 };
+
+    switch (op_ctx->op->code) {
+    case UACPI_AML_OP_BreakPointOp:
+        req.type = UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT;
+        req.breakpoint.ctx = ctx;
+        break;
+    case UACPI_AML_OP_FatalOp:
+        req.type = UACPI_FIRMWARE_REQUEST_TYPE_FATAL;
+        req.fatal.type = item_array_at(&op_ctx->items, 0)->immediate;
+        req.fatal.code = item_array_at(&op_ctx->items, 1)->immediate;
+        req.fatal.arg = item_array_at(&op_ctx->items, 2)->obj->integer;
+        break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    uacpi_kernel_handle_firmware_request(&req);
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_named(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4375,6 +4399,7 @@ enum op_handler {
     OP_HANDLER_EVENT_CTL,
     OP_HANDLER_MUTEX_CTL,
     OP_HANDLER_NOTIFY,
+    OP_HANDLER_FIRMWARE_REQUEST,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -4424,6 +4449,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_EVENT_CTL] = handle_event_ctl,
     [OP_HANDLER_MUTEX_CTL] = handle_mutex_ctl,
     [OP_HANDLER_NOTIFY] = handle_notify,
+    [OP_HANDLER_FIRMWARE_REQUEST] = handle_firmware_request,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4531,6 +4557,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_MatchOp] = OP_HANDLER_MATCH,
 
     [UACPI_AML_OP_NotifyOp] = OP_HANDLER_NOTIFY,
+
+    [UACPI_AML_OP_BreakPointOp] = OP_HANDLER_FIRMWARE_REQUEST,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
@@ -4568,6 +4596,8 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
 
     [EXT_OP_IDX(UACPI_AML_OP_AcquireOp)] = OP_HANDLER_MUTEX_CTL,
     [EXT_OP_IDX(UACPI_AML_OP_ReleaseOp)] = OP_HANDLER_MUTEX_CTL,
+
+    [EXT_OP_IDX(UACPI_AML_OP_FatalOp)] = OP_HANDLER_FIRMWARE_REQUEST,
 };
 
 static uacpi_status exec_op(struct execution_context *ctx)
