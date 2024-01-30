@@ -359,7 +359,7 @@ uacpi_status uacpi_namespace_initialize(void)
 {
     struct ns_init_context ctx = { 0 };
     uacpi_namespace_node *root;
-    uacpi_handlers *handlers;
+    uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
 
     if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
