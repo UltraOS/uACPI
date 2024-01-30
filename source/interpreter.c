@@ -12,6 +12,7 @@
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/field_io.h>
+#include <uacpi/internal/notify.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -3407,6 +3408,42 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_notify(struct execution_context *ctx)
+{
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    struct uacpi_namespace_node *node;
+    uacpi_bool did_notify = UACPI_FALSE;
+    uacpi_u64 value;
+    uacpi_handlers *handlers;
+
+    node = item_array_at(&op_ctx->items, 0)->node;
+    value = item_array_at(&op_ctx->items, 1)->obj->integer;
+
+    handlers = uacpi_node_get_handlers(node);
+    if (uacpi_unlikely(handlers == UACPI_NULL)) {
+        uacpi_error("Notify() called on an invalid object %.4s\n",
+                    node->name.text);
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
+    }
+    did_notify |= uacpi_notify_all(node, value, handlers->notify_head);
+
+    handlers = uacpi_node_get_handlers(uacpi_namespace_root());
+    did_notify |= uacpi_notify_all(node, value, handlers->notify_head);
+
+    if (!did_notify) {
+        const uacpi_char *path;
+
+        path = uacpi_namespace_node_generate_absolute_path(node);
+        uacpi_warn(
+            "ignoring firmware Notify(%s, 0x%"PRIX64") request, no listeners\n",
+            path, value
+        );
+        uacpi_kernel_free((void*)path);
+    }
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_create_named(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4337,6 +4374,7 @@ enum op_handler {
     OP_HANDLER_STALL_OR_SLEEP,
     OP_HANDLER_EVENT_CTL,
     OP_HANDLER_MUTEX_CTL,
+    OP_HANDLER_NOTIFY,
 };
 
 static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
@@ -4385,6 +4423,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_STALL_OR_SLEEP] = handle_stall_or_sleep,
     [OP_HANDLER_EVENT_CTL] = handle_event_ctl,
     [OP_HANDLER_MUTEX_CTL] = handle_mutex_ctl,
+    [OP_HANDLER_NOTIFY] = handle_notify,
 };
 
 static uacpi_u8 handler_idx_of_op[0x100] = {
@@ -4490,6 +4529,8 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_MidOp] = OP_HANDLER_MID,
 
     [UACPI_AML_OP_MatchOp] = OP_HANDLER_MATCH,
+
+    [UACPI_AML_OP_NotifyOp] = OP_HANDLER_NOTIFY,
 };
 
 #define EXT_OP_IDX(op) (op & 0xFF)
