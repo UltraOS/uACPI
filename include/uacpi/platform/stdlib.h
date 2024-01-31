@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <inttypes.h>
 
 #define UACPI_PRIx64 PRIx64
@@ -24,3 +25,5 @@
 #define uacpi_strlen strlen
 #define uacpi_strtoull strtoull
 #define uacpi_snprintf snprintf
+
+#define uacpi_offsetof offsetof
