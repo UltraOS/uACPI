@@ -426,6 +426,20 @@ UACPI_OP(                                            \
     UACPI_OP_PROPERTY_TERM_ARG                       \
 )
 
+#define UACPI_BUILD_INC_DEC_OP(prefix, code)                     \
+UACPI_OP(                                                        \
+    prefix##Op, code,                                            \
+    {                                                            \
+        UACPI_PARSE_OP_SUPERNAME,                                \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
+        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
+        UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 0,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
+    },                                                           \
+    UACPI_OP_PROPERTY_TERM_ARG                                   \
+)                                                                \
+
 #define UACPI_ENUMERATE_OPCODES                                  \
 UACPI_OP(                                                        \
     ZeroOp, 0x00,                                                \
@@ -660,30 +674,8 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_BUILD_BINARY_MATH_OP(Subtract, 0x74)                       \
-UACPI_OP(                                                        \
-    IncrementOp, 0x75,                                           \
-    {                                                            \
-        UACPI_PARSE_OP_SUPERNAME,                                \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
-        UACPI_PARSE_OP_STORE_TO_TARGET, 0,                       \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
-UACPI_OP(                                                        \
-    DecrementOp, 0x76,                                           \
-    {                                                            \
-        UACPI_PARSE_OP_SUPERNAME,                                \
-        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                           \
-        UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
-        UACPI_PARSE_OP_STORE_TO_TARGET, 0,                       \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
-    },                                                           \
-    UACPI_OP_PROPERTY_TERM_ARG                                   \
-)                                                                \
+UACPI_BUILD_INC_DEC_OP(Increment, 0x75)                          \
+UACPI_BUILD_INC_DEC_OP(Decrement, 0x76)                          \
 UACPI_BUILD_BINARY_MATH_OP(Multiply, 0x77)                       \
 UACPI_OP(                                                        \
     DivideOp, 0x78,                                              \
