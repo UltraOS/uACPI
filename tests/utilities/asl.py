@@ -169,6 +169,9 @@ class ASLSource:
 
             # Switch expression is not a static Integer/Buffer/String data
             "-vw", "3124",
+
+            # Static OperationRegion should be declared outside control method
+            "-vw", "3175",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
