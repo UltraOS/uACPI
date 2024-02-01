@@ -26,7 +26,6 @@ enum uacpi_parse_op {
 
     // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
     UACPI_PARSE_OP_SUPERNAME,
-    UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF,
     // The resulting item will be set to null if name couldn't be resolved
     UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED,
 
@@ -664,22 +663,24 @@ UACPI_BUILD_BINARY_MATH_OP(Subtract, 0x74)                       \
 UACPI_OP(                                                        \
     IncrementOp, 0x75,                                           \
     {                                                            \
-        UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF,                 \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_INTEGER,          \
+        UACPI_PARSE_OP_SUPERNAME,                                \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
-        UACPI_PARSE_OP_OBJECT_COPY_TO_PREV,                      \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 0,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \
 UACPI_OP(                                                        \
     DecrementOp, 0x76,                                           \
     {                                                            \
-        UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF,                 \
-        UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_INTEGER,          \
+        UACPI_PARSE_OP_SUPERNAME,                                \
+        UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_TRUNCATE_NUMBER,                          \
-        UACPI_PARSE_OP_OBJECT_COPY_TO_PREV,                      \
+        UACPI_PARSE_OP_STORE_TO_TARGET, 0,                       \
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     },                                                           \
     UACPI_OP_PROPERTY_TERM_ARG                                   \
 )                                                                \

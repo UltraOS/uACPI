@@ -1988,26 +1988,6 @@ uacpi_object *reference_unwind(uacpi_object *obj)
     return UACPI_NULL;
 }
 
-/*
- * Object implicit dereferencing [Store(..., obj)/Increment(obj),...] behavior:
- * RefOf -> the bottom-most referenced object
- * LocalX/ArgX -> object stored at LocalX if LocalX is not a reference,
- *                otherwise goto RefOf case.
- * NAME -> object stored at NAME
- */
-static uacpi_object *object_deref_implicit(uacpi_object *obj)
-{
-    if (obj->flags != UACPI_REFERENCE_KIND_REFOF) {
-        if (obj->flags == UACPI_REFERENCE_KIND_NAMED ||
-            obj->inner_object->type != UACPI_OBJECT_REFERENCE)
-            return obj->inner_object;
-
-        obj = obj->inner_object;
-    }
-
-    return reference_unwind(obj)->inner_object;
-}
-
 static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
 {
     uacpi_object_detach_child(parent);
@@ -2135,21 +2115,6 @@ static uacpi_status store_to_reference(uacpi_object *dst,
     }
 
     return object_assign_with_implicit_cast(dst->inner_object, src_obj);
-}
-
-static uacpi_status handle_inc_dec(struct execution_context *ctx)
-{
-    uacpi_object *obj;
-    struct op_context *op_ctx = ctx->cur_op_ctx;
-
-    obj = item_array_at(&op_ctx->items, 0)->obj;
-
-    if (op_ctx->op->code == UACPI_AML_OP_IncrementOp)
-        obj->integer++;
-    else
-        obj->integer--;
-
-    return UACPI_STATUS_OK;
 }
 
 static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
@@ -3944,6 +3909,77 @@ static uacpi_status handle_copy_object_or_store(struct execution_context *ctx)
     return copy_object_to_reference(dst, src);
 }
 
+static uacpi_status handle_inc_dec(struct execution_context *ctx)
+{
+    uacpi_object *src, *dst;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_bool field_allowed = UACPI_FALSE;
+    uacpi_object_type true_src_type;
+    uacpi_status ret;
+
+    src = item_array_at(&op_ctx->items, 0)->obj;
+    dst = item_array_at(&op_ctx->items, 1)->obj;
+
+    if (src->type == UACPI_OBJECT_REFERENCE) {
+        /*
+         * Increment/Decrement are the only two operators that modify the value
+         * in-place, thus we need very specific dereference rules here.
+         *
+         * Reading buffer fields & field units is only allowed if we were passed
+         * a namestring directly as opposed to some nested reference chain
+         * containing a field at the bottom.
+         */
+        if (src->flags == UACPI_REFERENCE_KIND_NAMED)
+            field_allowed = src->inner_object->type != UACPI_OBJECT_REFERENCE;
+
+        src = reference_unwind(src)->inner_object;
+    } // else buffer index
+
+    true_src_type = src->type;
+
+    switch (true_src_type) {
+    case UACPI_OBJECT_INTEGER:
+        dst->integer = src->integer;
+        break;
+    case UACPI_OBJECT_FIELD_UNIT:
+    case UACPI_OBJECT_BUFFER_FIELD:
+        if (uacpi_unlikely(!field_allowed))
+            goto out_bad_type;
+
+        true_src_type = field_get_read_type(src);
+        if (true_src_type != UACPI_OBJECT_INTEGER)
+            goto out_bad_type;
+
+        if (src->type == UACPI_OBJECT_FIELD_UNIT) {
+            ret = uacpi_read_field_unit(
+                src->field_unit, &dst->integer, sizeof_int()
+            );
+            if (uacpi_unlikely_error(ret))
+                return ret;
+        } else {
+            uacpi_read_buffer_field(&src->buffer_field, &dst->integer);
+        }
+        break;
+    case UACPI_OBJECT_BUFFER_INDEX:
+        dst->integer = *buffer_index_cursor(&src->buffer_index);
+        break;
+    default:
+        goto out_bad_type;
+    }
+
+    if (op_ctx->op->code == UACPI_AML_OP_IncrementOp)
+        dst->integer++;
+    else
+        dst->integer--;
+
+    return UACPI_STATUS_OK;
+
+out_bad_type:
+    uacpi_error("Increment/Decrement: invalid object type '%s'\n",
+                uacpi_object_type_to_string(true_src_type));
+    return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
+}
+
 static uacpi_status enter_method(
     struct execution_context *ctx, struct call_frame *new_frame,
     uacpi_control_method *method
@@ -4063,7 +4099,6 @@ static void call_frame_clear(struct call_frame *frame)
 static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_SIMPLE_NAME] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_SUPERNAME] = ITEM_EMPTY_OBJECT,
-    [UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL] = ITEM_EMPTY_OBJECT,
@@ -4140,7 +4175,6 @@ static uacpi_bool op_wants_supername(enum uacpi_parse_op op)
     switch (op) {
     case UACPI_PARSE_OP_SIMPLE_NAME:
     case UACPI_PARSE_OP_SUPERNAME:
-    case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
     case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
     case UACPI_PARSE_OP_TARGET:
         return UACPI_TRUE;
@@ -4197,7 +4231,6 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
 
     // SuperName := SimpleName | DebugObj | ReferenceTypeOpcode
     case UACPI_PARSE_OP_SUPERNAME:
-    case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
     case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
         expected_type_str = SPEC_SUPER_NAME;
         ok_mask |= UACPI_OP_PROPERTY_SUPERNAME;
@@ -4686,7 +4719,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_SIMPLE_NAME:
         case UACPI_PARSE_OP_SUPERNAME:
-        case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
         case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
         case UACPI_PARSE_OP_TERM_ARG:
         case UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL:
@@ -4951,12 +4983,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
                 break;
             case UACPI_PARSE_OP_SUPERNAME:
-            case UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF:
             case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
-                if (prev_op == UACPI_PARSE_OP_SUPERNAME_IMPLICIT_DEREF)
-                    src = object_deref_implicit(item->obj);
-                else
-                    src = item->obj;
+                src = item->obj;
                 break;
 
             case UACPI_PARSE_OP_SIMPLE_NAME:
