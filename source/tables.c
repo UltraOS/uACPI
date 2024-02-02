@@ -12,6 +12,10 @@ static uacpi_object_name dsdt_signature = {
     .text = { ACPI_DSDT_SIGNATURE },
 };
 
+static uacpi_object_name facs_signature = {
+    .text = { ACPI_FACS_SIGNATURE },
+};
+
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
 
 // TODO: thread safety/locking
@@ -128,12 +132,18 @@ uacpi_table_append(uacpi_phys_addr addr, struct uacpi_table **out_table)
     if (uacpi_unlikely_error(ret))
         goto out_bad_table;
 
-    ret = uacpi_verify_table_checksum_with_warn(
-        UACPI_VIRT_ADDR_TO_PTR(table->virt_addr),
-        table->length
-    );
-    if (uacpi_unlikely_error(ret))
-        goto out_bad_table;
+    /*
+     * FACS is the only(?) table without a checksum because it has OSPM
+     * writable fields. Don't try to validate it here.
+     */
+    if (table->signature.id != facs_signature.id) {
+        ret = uacpi_verify_table_checksum_with_warn(
+            UACPI_VIRT_ADDR_TO_PTR(table->virt_addr),
+            table->length
+        );
+        if (uacpi_unlikely_error(ret))
+            goto out_bad_table;
+    }
 
     if (table->signature.id == fadt_signature.id) {
         ret = initialize_fadt(table);
