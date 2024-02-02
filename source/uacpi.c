@@ -146,7 +146,7 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     if (rsdp == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
 
-    if (rsdp->revision > 0 &&
+    if (rsdp->revision > 1 && rsdp->xsdt_addr &&
         !uacpi_rt_params_check(UACPI_PARAM_BAD_XSDT))
     {
         rxsdt = uacpi_truncate_phys_addr_with_warn(rsdp->xsdt_addr);
@@ -157,6 +157,11 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     }
 
     uacpi_kernel_unmap(rsdp, sizeof(struct acpi_rsdp));
+
+    if (!rxsdt) {
+        uacpi_error("both RSDT & XSDT tables are NULL!\n");
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     ret = initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
     if (uacpi_unlikely_error(ret))
