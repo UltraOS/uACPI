@@ -5,6 +5,10 @@
  * placeholder using libc/posix headers.
  */
 
+#ifdef UACPI_OVERRIDE_STDLIB
+#include "uacpi_stdlib.h"
+#else
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -27,3 +31,5 @@
 #define uacpi_snprintf snprintf
 
 #define uacpi_offsetof offsetof
+
+#endif

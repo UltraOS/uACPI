@@ -5,6 +5,10 @@
  * types from the standard headers.
  */
 
+#ifdef UACPI_OVERRIDE_TYPES
+#include "uacpi_types.h"
+#else
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -32,3 +36,5 @@ typedef size_t uacpi_size;
 typedef va_list uacpi_va_list;
 
 typedef char uacpi_char;
+
+#endif
