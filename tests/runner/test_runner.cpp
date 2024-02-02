@@ -127,6 +127,10 @@ void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
+    if (expected_type == UACPI_OBJECT_UNINITIALIZED)
+        // We're done with emulation mode
+        return;
+
     uacpi_object* ret = UACPI_NULL;
     auto guard = ScopeGuard(
         [&ret] { uacpi_object_unref(ret); }
@@ -140,16 +144,27 @@ void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
 
 int main(int argc, char** argv)
 {
-    if (argc < 4) {
-        std::cout << "Usage: " << argv[0]
-                  << "<dsdt_path> <expected_type> <expected_value>";
+    if (argc != 2 && argc != 4) {
+        std::cout << "Usage:"
+            << "\n[EMULATION] " << argv[0] << " <dsdt_path>"
+            << "\n[TEST MODE] " << argv[0]
+            << " <dsdt_path> <expected_type> <expected_value>"
+            << std::endl;
         return 1;
     }
 
     try {
-        run_test(argv[1], string_to_object_type(argv[2]), argv[3]);
+        std::string_view expected_value;
+        uacpi_object_type expected_type = UACPI_OBJECT_UNINITIALIZED;
+
+        if (argc == 4) {
+            expected_type = string_to_object_type(argv[2]);
+            expected_value = argv[3];
+        }
+
+        run_test(argv[1], expected_type, expected_value);
     } catch (const std::exception& ex) {
-        std::cout << "unexpected error: " << ex.what();
+        std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;
     }
 }
