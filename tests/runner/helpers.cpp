@@ -38,7 +38,7 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
 
         rsdp.xsdt_addr = reinterpret_cast<size_t>(&xsdt);
         rsdp.length = sizeof(rsdp);
-        rsdp.revision = 1;
+        rsdp.revision = 2;
     }
 }
 
