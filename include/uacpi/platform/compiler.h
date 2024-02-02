@@ -5,6 +5,10 @@
  * that should work for MSVC/GCC/clang.
  */
 
+#ifdef UACPI_OVERRIDE_COMPILER
+#include "uacpi_compiler.h"
+#else
+
 #define UACPI_ALIGN(x) __declspec(align(x))
 
 #ifdef _MSC_VER
@@ -61,4 +65,6 @@
 
 #ifndef UACPI_POINTER_SIZE
 #error Failed to detect pointer size
+#endif
+
 #endif
