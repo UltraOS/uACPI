@@ -10,6 +10,6 @@ uacpi_add_sources(
     shareable.c
     opregion.c
     default_handlers.c
-    field_io.c
+    io.c
     notify.c
 )
