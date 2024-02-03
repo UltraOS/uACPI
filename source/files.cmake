@@ -12,4 +12,5 @@ uacpi_add_sources(
     default_handlers.c
     io.c
     notify.c
+    sleep.c
 )
