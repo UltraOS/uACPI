@@ -1,4 +1,4 @@
-#include <uacpi/internal/field_io.h>
+#include <uacpi/internal/io.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/opregion.h>

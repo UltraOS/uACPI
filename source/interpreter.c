@@ -11,7 +11,7 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/opregion.h>
-#include <uacpi/internal/field_io.h>
+#include <uacpi/internal/io.h>
 #include <uacpi/internal/notify.h>
 
 enum item_type {
