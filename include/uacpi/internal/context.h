@@ -63,6 +63,10 @@ struct uacpi_runtime_context {
     struct acpi_gas pm1a_enable_blk;
     struct acpi_gas pm1b_enable_blk;
 
+#define UACPI_SLEEP_TYP_INVALID 0xFF
+    uacpi_u8 last_sleep_typ_a;
+    uacpi_u8 last_sleep_typ_b;
+
     /*
      * This is a per-table value but we mimic the NT implementation:
      * treat all other definition blocks as if they were the same revision
