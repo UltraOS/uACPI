@@ -18,6 +18,8 @@
 #define UACPI_IS_ALIGNED_MASK(x, mask) (((x) & (mask)) == 0)
 #define UACPI_IS_ALIGNED(x, val, type) UACPI_IS_ALIGNED_MASK(x, (type)(val) - 1)
 
+#define UACPI_IS_POWER_OF_TWO(x, type) UACPI_IS_ALIGNED(x, x, type)
+
 void uacpi_memcpy_zerout(void *dst, const void *src,
                          uacpi_size dst_size, uacpi_size src_size);
 
