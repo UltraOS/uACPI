@@ -344,3 +344,75 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
 
     return enter_sleep_state(state);
 }
+
+uacpi_status uacpi_reboot(void)
+{
+    uacpi_status ret;
+    struct acpi_fadt *fadt = &g_uacpi_rt_ctx.fadt;
+    struct acpi_gas *reset_reg = &fadt->reset_reg;
+
+    /*
+     * Allow restarting earlier than namespace load so that the kernel can
+     * use this in case of some initialization error.
+     */
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_TABLES_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    if (!(fadt->flags & ACPI_RESET_REG_SUP) || !reset_reg->address)
+        return UACPI_STATUS_NOT_FOUND;
+
+    switch (reset_reg->address_space_id) {
+    case UACPI_ADDRESS_SPACE_SYSTEM_IO:
+        /*
+         * For SystemIO we don't do any checking, and we ignore bit width
+         * because that's what NT does.
+         */
+        ret = uacpi_kernel_raw_io_write(
+            reset_reg->address, 1, fadt->reset_value
+        );
+        break;
+    case UACPI_ADDRESS_SPACE_SYSTEM_MEMORY:
+        ret = uacpi_write_register(UACPI_REGISTER_RESET, fadt->reset_value);
+        break;
+    case UACPI_ADDRESS_SPACE_PCI_CONFIG: {
+        // Bus is assumed to be 0 here
+        uacpi_pci_address address = {
+            .segment = 0,
+            .bus = 0,
+            .device = (reset_reg->address >> 32) & 0xFF,
+            .function = (reset_reg->address >> 16) & 0xFF,
+        };
+
+        ret = uacpi_kernel_pci_write(
+            &address, reset_reg->address & 0xFFFF, 1, fadt->reset_value
+        );
+        break;
+    }
+    default:
+        uacpi_warn(
+            "unable to perform a reset: unsupported address space '%s' (%d)\n",
+            uacpi_address_space_to_string(reset_reg->address_space_id),
+            reset_reg->address_space_id
+        );
+        ret = UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    if (ret == UACPI_STATUS_OK) {
+        /*
+         * This should've worked but we're still here.
+         * Spin for a bit then give up.
+         */
+        uacpi_u64 stalled_time = 0;
+
+        while (stalled_time < (1000 * 1000)) {
+            uacpi_kernel_stall(100);
+            stalled_time += 100;
+        }
+
+        uacpi_error("reset timeout\n");
+        return UACPI_STATUS_INTERNAL_ERROR;
+    }
+
+    return ret;
+}
