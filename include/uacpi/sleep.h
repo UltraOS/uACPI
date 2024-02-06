@@ -23,6 +23,12 @@ typedef enum uacpi_sleep_state {
  */
 uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state);
 
+/*
+ * Enter the given sleep state after preparation.
+ * Must be called with interrupts DISABLED.
+ */
+uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state);
+
 #ifdef __cplusplus
 }
 #endif
