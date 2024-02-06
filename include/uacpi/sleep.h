@@ -29,6 +29,11 @@ uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state);
  */
 uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state);
 
+/*
+ * Attempt reset via the FADT reset register.
+ */
+uacpi_status uacpi_reboot(void);
+
 #ifdef __cplusplus
 }
 #endif
