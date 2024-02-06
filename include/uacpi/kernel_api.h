@@ -6,6 +6,27 @@
 extern "C" {
 #endif
 
+/*
+ * Raw IO API, this is only used for accessing verified data from
+ * "safe" code (aka not indirectly invoked by the AML interpreter),
+ * e.g. programming FADT & FACS registers.
+ * -------------------------------------------------------------------------
+ */
+uacpi_status uacpi_kernel_raw_memory_read(
+    uacpi_phys_addr address, uacpi_u8 byte_width, uacpi_u64 *out_value
+);
+uacpi_status uacpi_kernel_raw_memory_write(
+    uacpi_phys_addr address, uacpi_u8 byte_width, uacpi_u64 in_value
+);
+
+uacpi_status uacpi_kernel_raw_io_read(
+    uacpi_io_addr address, uacpi_u8 byte_width, uacpi_u64 *out_value
+);
+uacpi_status uacpi_kernel_raw_io_write(
+    uacpi_io_addr address, uacpi_u8 byte_width, uacpi_u64 in_value
+);
+// -------------------------------------------------------------------------
+
 uacpi_status uacpi_kernel_pci_read(
     uacpi_pci_address *address, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 *value
