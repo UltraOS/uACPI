@@ -423,3 +423,194 @@ uacpi_status uacpi_write_field_unit(
 
     return UACPI_STATUS_OK;
 }
+
+static uacpi_u8 gas_get_access_bit_width(const struct acpi_gas *gas)
+{
+    /*
+     * Same algorithm as ACPICA.
+     *
+     * The reason we do this is apparently GAS bit offset being non-zero means
+     * that it's an APEI register, as opposed to FADT, which needs special
+     * handling. In the case of a FADT register we want to ignore the specified
+     * access size.
+     */
+    uacpi_u8 access_bit_width;
+
+    if (gas->register_bit_offset == 0 &&
+        UACPI_IS_POWER_OF_TWO(gas->register_bit_width, uacpi_u8) &&
+        UACPI_IS_ALIGNED(gas->register_bit_width, 8, uacpi_u8)) {
+        access_bit_width = gas->register_bit_width;
+    } else if (gas->access_size) {
+        access_bit_width = gas->access_size * 8;
+    } else {
+        uacpi_u8 msb;
+
+        msb = uacpi_bit_scan_backward(
+            (gas->register_bit_offset + gas->register_bit_width) - 1
+        );
+        access_bit_width = 1 << msb;
+
+        if (access_bit_width <= 8) {
+            access_bit_width = 8;
+        } else {
+            /*
+             * Keep backing off to previous power of two until we find one
+             * that is aligned to the address specified in GAS.
+             */
+            while (!UACPI_IS_ALIGNED(
+                gas->address, access_bit_width / 8, uacpi_u64
+            ))
+                access_bit_width /= 2;
+        }
+    }
+
+    return UACPI_MIN(
+        access_bit_width,
+        gas->address_space_id == UACPI_ADDRESS_SPACE_SYSTEM_IO ? 32 : 64
+    );
+}
+
+static uacpi_status gas_validate(
+    const struct acpi_gas *gas, uacpi_u8 *access_bit_width
+)
+{
+    uacpi_size total_width;
+
+    if (uacpi_unlikely(gas == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    if (!gas->address)
+        return UACPI_STATUS_NOT_FOUND;
+
+    if (gas->address_space_id != UACPI_ADDRESS_SPACE_SYSTEM_IO &&
+        gas->address_space_id != UACPI_ADDRESS_SPACE_SYSTEM_MEMORY) {
+        uacpi_warn("unsupported GAS address space '%s' (%d)\n",
+                   uacpi_address_space_to_string(gas->address_space_id),
+                   gas->address_space_id);
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    if (gas->access_size > 4) {
+        uacpi_warn("unsupported GAS access size %d\n",
+                   gas->access_size);
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    *access_bit_width = gas_get_access_bit_width(gas);
+
+    total_width = UACPI_ALIGN_UP(
+        gas->register_bit_offset + gas->register_bit_width,
+        *access_bit_width, uacpi_size
+    );
+    if (total_width > 64) {
+        uacpi_warn(
+            "GAS register total width is too large: %zu\n", total_width
+        );
+        return UACPI_STATUS_UNIMPLEMENTED;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+/*
+ * Apparently both reading and writing GAS works differently from operation
+ * region in that bit offsets are not respected when writing the data.
+ *
+ * Let's follow ACPICA's approach here so that we don't accidentally
+ * break any quirky hardware.
+ */
+
+uacpi_status uacpi_gas_read(const struct acpi_gas *gas, uacpi_u64 *out_value)
+{
+    uacpi_status ret;
+    uacpi_u8 access_bit_width, access_byte_width;
+    uacpi_u8 bit_offset, bits_left, index = 0;
+    uacpi_u64 data, mask = 0xFFFFFFFFFFFFFFFF;
+
+    ret = gas_validate(gas, &access_bit_width);
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    bit_offset = gas->register_bit_offset;
+    bits_left = bit_offset + gas->register_bit_width;
+
+    access_byte_width = access_bit_width / 8;
+
+    if (access_byte_width < 8)
+        mask = ~(mask << access_bit_width);
+
+    *out_value = 0;
+
+    while (bits_left) {
+        if (bit_offset >= access_bit_width) {
+            data = 0;
+            bit_offset -= access_bit_width;
+        } else {
+            uacpi_u64 address = gas->address + (index * access_byte_width);
+
+            if (gas->address_space_id == UACPI_ADDRESS_SPACE_SYSTEM_IO) {
+                ret = uacpi_kernel_raw_io_read(
+                    address, access_byte_width, &data
+                );
+            } else {
+                ret = uacpi_kernel_raw_memory_read(
+                    address, access_byte_width, &data
+                );
+            }
+            if (uacpi_unlikely_error(ret))
+                return ret;
+        }
+
+        *out_value |= (data & mask) << (index * access_bit_width);
+        bits_left -= UACPI_MIN(bits_left, access_bit_width);
+        ++index;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_gas_write(const struct acpi_gas *gas, uacpi_u64 in_value)
+{
+    uacpi_status ret;
+    uacpi_u8 access_bit_width, access_byte_width;
+    uacpi_u8 bit_offset, bits_left, index = 0;
+    uacpi_u64 data, mask = 0xFFFFFFFFFFFFFFFF;
+
+    ret = gas_validate(gas, &access_bit_width);
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    bit_offset = gas->register_bit_offset;
+    bits_left = bit_offset + gas->register_bit_width;
+    access_byte_width = access_bit_width / 8;
+
+    if (access_byte_width < 8)
+        mask = ~(mask << access_bit_width);
+
+    while (bits_left) {
+        data = (in_value >> (index * access_bit_width)) & mask;
+
+        if (bit_offset >= access_bit_width) {
+            bit_offset -= access_bit_width;
+        } else {
+            uacpi_u64 address = gas->address + (index * access_byte_width);
+
+            if (gas->address_space_id == UACPI_ADDRESS_SPACE_SYSTEM_IO) {
+                ret = uacpi_kernel_raw_io_write(
+                    address, access_byte_width, data
+                );
+            } else {
+                ret = uacpi_kernel_raw_memory_write(
+                    address, access_byte_width, data
+                );
+            }
+            if (uacpi_unlikely_error(ret))
+                return ret;
+        }
+
+        bits_left -= UACPI_MIN(bits_left, access_bit_width);
+        ++index;
+    }
+
+    return UACPI_STATUS_OK;
+}
