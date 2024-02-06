@@ -1,6 +1,8 @@
 #pragma once
 
 #include <uacpi/types.h>
+#include <uacpi/acpi.h>
+#include <uacpi/io.h>
 
 uacpi_size uacpi_round_up_bits_to_bytes(uacpi_size bit_length);
 
