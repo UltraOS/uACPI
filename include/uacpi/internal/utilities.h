@@ -1,6 +1,7 @@
 #pragma once
 
 #include <uacpi/types.h>
+#include <uacpi/utilities.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/stdlib.h>
 
@@ -29,5 +30,3 @@ void uacpi_eisa_id_to_string(uacpi_u32, uacpi_char *out_string);
 
 uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_char **out_hid);
 uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list *out_list);
-
-uacpi_bool uacpi_is_pci_root_bridge(const uacpi_char*);

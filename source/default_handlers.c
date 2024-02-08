@@ -1,50 +1,26 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/namespace.h>
-#include <uacpi/kernel_api.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/helpers.h>
+#include <uacpi/internal/log.h>
+#include <uacpi/kernel_api.h>
 #include <uacpi/uacpi.h>
 
-struct pci_region_ctx {
-    uacpi_pci_address address;
-};
-
-static uacpi_bool is_node_pci_root(uacpi_namespace_node *node)
-{
-    uacpi_status st;
-    uacpi_bool ret = UACPI_FALSE;
-    uacpi_char *id = UACPI_NULL;
-    uacpi_pnp_id_list id_list = { 0 };
-
-    st = uacpi_eval_hid(node, &id);
-    if (st == UACPI_STATUS_OK && uacpi_is_pci_root_bridge(id)) {
-        ret = UACPI_TRUE;
-        goto out;
-    }
-
-    st = uacpi_eval_cid(node, &id_list);
-    if (st == UACPI_STATUS_OK) {
-        uacpi_size i;
-
-        for (i = 0; i < id_list.num_entries; ++i) {
-            if (uacpi_is_pci_root_bridge(id_list.ids[i])) {
-                ret = UACPI_TRUE;
-                goto out;
-            }
-        }
-    }
-
-out:
-    uacpi_kernel_free(id);
-    uacpi_release_pnp_id_list(&id_list);
-    return ret;
-}
+#define PCI_ROOT_PNP_ID "PNP0A03"
+#define PCI_EXPRESS_ROOT_PNP_ID "PNP0A08"
 
 static uacpi_namespace_node *find_pci_root(uacpi_namespace_node *node)
 {
+    static const uacpi_char *pci_root_ids[] = {
+        PCI_ROOT_PNP_ID,
+        PCI_EXPRESS_ROOT_PNP_ID,
+    };
     uacpi_namespace_node *parent = node->parent;
 
     while (parent != uacpi_namespace_root()) {
-        if (is_node_pci_root(parent)) {
+        if (uacpi_device_matches_pnp_id(
+                parent, pci_root_ids, UACPI_ARRAY_SIZE(pci_root_ids))
+        ) {
             uacpi_trace(
                 "found a PCI root node %.4s controlling region %.4s\n",
                 parent->name.text, node->name.text
@@ -61,6 +37,10 @@ static uacpi_namespace_node *find_pci_root(uacpi_namespace_node *node)
     );
     return node;
 }
+
+struct pci_region_ctx {
+    uacpi_pci_address address;
+};
 
 static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
 {

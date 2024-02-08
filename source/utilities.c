@@ -225,15 +225,49 @@ out_late_error:
     return ret;
 }
 
-#define PCI_ROOT_PNP_ID "PNP0A03"
-#define PCI_EXPRESS_ROOT_PNP_ID "PNP0A08"
-
-uacpi_bool uacpi_is_pci_root_bridge(const uacpi_char *id)
+static uacpi_bool matches_any(
+    const uacpi_char *hid, const uacpi_char **ids, uacpi_size num_entries
+)
 {
-    if (uacpi_strcmp(id, PCI_ROOT_PNP_ID) == 0)
-        return UACPI_TRUE;
-    if (uacpi_strcmp(id, PCI_EXPRESS_ROOT_PNP_ID) == 0)
-        return UACPI_TRUE;
+    uacpi_size i;
+
+    for (i = 0; i < num_entries; ++i) {
+        if (uacpi_strcmp(hid, ids[i]) == 0)
+            return UACPI_TRUE;
+    }
 
     return UACPI_FALSE;
+}
+
+uacpi_bool uacpi_device_matches_pnp_id(
+    uacpi_namespace_node *node, const uacpi_char **ids, uacpi_size num_entries
+)
+{
+    uacpi_status st;
+    uacpi_bool ret = UACPI_FALSE;
+    uacpi_char *id = UACPI_NULL;
+    uacpi_pnp_id_list id_list = { 0 };
+
+    st = uacpi_eval_hid(node, &id);
+    if (st == UACPI_STATUS_OK && matches_any(id, ids, num_entries)) {
+        ret = UACPI_TRUE;
+        goto out;
+    }
+
+    st = uacpi_eval_cid(node, &id_list);
+    if (st == UACPI_STATUS_OK) {
+        uacpi_size i;
+
+        for (i = 0; i < id_list.num_entries; ++i) {
+            if (matches_any(id_list.ids[i], ids, num_entries)) {
+                ret = UACPI_TRUE;
+                goto out;
+            }
+        }
+    }
+
+out:
+    uacpi_kernel_free(id);
+    uacpi_release_pnp_id_list(&id_list);
+    return ret;
 }
