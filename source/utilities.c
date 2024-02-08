@@ -300,3 +300,60 @@ out:
     uacpi_release_pnp_id_list(&id_list);
     return ret;
 }
+
+struct device_find_ctx {
+    const uacpi_char *target_hid;
+    void *user;
+    uacpi_iteration_callback cb;
+};
+
+enum uacpi_ns_iteration_decision find_one_device(
+    void *opaque, uacpi_namespace_node *node
+)
+{
+    struct device_find_ctx *ctx = opaque;
+    uacpi_status ret;
+    uacpi_u32 flags;
+    uacpi_object *obj;
+
+    obj = uacpi_namespace_node_get_object(node);
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    if (obj->type != UACPI_OBJECT_DEVICE)
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+
+    if (!uacpi_device_matches_pnp_id(node, &ctx->target_hid, 1))
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+
+    ret = uacpi_eval_sta(node, &flags);
+    if (uacpi_unlikely_error(ret))
+        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+
+    if (!(flags & ACPI_STA_RESULT_DEVICE_PRESENT) &&
+        !(flags & ACPI_STA_RESULT_DEVICE_FUNCTIONING))
+        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+
+    return ctx->cb(ctx->user, node);
+}
+
+uacpi_status uacpi_find_devices(
+    const uacpi_char *hid,
+    uacpi_iteration_callback cb,
+    void *user
+)
+{
+    struct device_find_ctx ctx = {
+        .target_hid = hid,
+        .user = user,
+        .cb = cb,
+    };
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    uacpi_namespace_for_each_node_depth_first(
+        uacpi_namespace_root(), find_one_device, &ctx
+    );
+    return UACPI_STATUS_OK;
+}

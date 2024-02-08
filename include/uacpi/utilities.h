@@ -21,6 +21,17 @@ uacpi_bool uacpi_device_matches_pnp_id(
     uacpi_size num_entries
 );
 
+/*
+ * Find all the devices in the namespace matching the specified 'hid', only
+ * devices reported as present via _STA are checked. Any matching devices
+ * are then passed to the 'cb'.
+ */
+uacpi_status uacpi_find_devices(
+    const uacpi_char *hid,
+    uacpi_iteration_callback cb,
+    void *user
+);
+
 #ifdef __cplusplus
 }
 #endif
