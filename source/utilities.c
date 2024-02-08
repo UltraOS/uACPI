@@ -225,6 +225,35 @@ out_late_error:
     return ret;
 }
 
+uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+
+    ret = uacpi_eval_typed(node, "_STA", NULL, UACPI_OBJECT_INTEGER_BIT, &obj);
+
+    /*
+     * ACPI 6.5 specification:
+     * If a device object (including the processor object) does not have
+     * an _STA object, then OSPM assumes that all of the above bits are
+     * set (i.e., the device is present, enabled, shown in the UI,
+     * and functioning).
+     */
+    if (ret == UACPI_STATUS_NOT_FOUND) {
+        *flags = 0xFFFFFFFF;
+        return UACPI_STATUS_OK;
+    }
+
+    if (ret == UACPI_STATUS_OK) {
+        *flags = obj->integer;
+        uacpi_object_unref(obj);
+        return ret;
+    }
+
+    *flags = 0;
+    return ret;
+}
+
 static uacpi_bool matches_any(
     const uacpi_char *hid, const uacpi_char **ids, uacpi_size num_entries
 )

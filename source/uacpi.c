@@ -274,30 +274,13 @@ static uacpi_status sta_eval(
 )
 {
     uacpi_status ret;
-    uacpi_object *obj;
 
-    ret = uacpi_eval_typed(node, "_STA", NULL, UACPI_OBJECT_INTEGER_BIT, &obj);
-    do_account_sta_ini("_STA", &ctx->sta_executed, &ctx->sta_errors, node, ret);
+    ret = uacpi_eval_sta(node, value);
+    do_account_sta_ini(
+        "_STA", &ctx->sta_executed, &ctx->sta_errors, node,
+        *value == 0xFFFFFFFF ? UACPI_STATUS_NOT_FOUND : ret
+    );
 
-    /*
-     * ACPI 6.5 specification:
-     * If a device object (including the processor object) does not have
-     * an _STA object, then OSPM assumes that all of the above bits are
-     * set (i.e., the device is present, enabled, shown in the UI,
-     * and functioning).
-     */
-    if (ret == UACPI_STATUS_NOT_FOUND) {
-        *value = 0xFFFFFFFF;
-        return UACPI_STATUS_OK;
-    }
-
-    if (ret == UACPI_STATUS_OK) {
-        *value = obj->integer;
-        uacpi_object_unref(obj);
-        return ret;
-    }
-
-    *value = 0;
     return ret;
 }
 
