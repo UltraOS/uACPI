@@ -17,6 +17,7 @@
 #define ACPI_FACS_SIGNATURE "FACS"
 #define ACPI_DSDT_SIGNATURE "DSDT"
 #define ACPI_SSDT_SIGNATURE "SSDT"
+#define ACPI_ECDT_SIGNATURE "ECDT"
 
 #define ACPI_AS_ID_SYS_MEM       0x00
 #define ACPI_AS_ID_SYS_IO        0x01
@@ -346,3 +347,13 @@ UACPI_PACKED(struct acpi_ssdt {
 
 #define ACPI_REG_DISCONNECT 0
 #define ACPI_REG_CONNECT 1
+
+UACPI_PACKED(struct acpi_ecdt {
+    struct acpi_sdt_hdr hdr;
+    struct acpi_gas ec_control;
+    struct acpi_gas ec_data;
+    uacpi_u32 uid;
+    uacpi_u8 gpe_bit;
+    uacpi_char ec_id[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_ecdt, 65);
