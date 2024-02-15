@@ -85,6 +85,7 @@ typedef struct uacpi_buffer {
     struct uacpi_shareable shareable;
     union {
         void *data;
+        uacpi_u8 *byte_data;
         uacpi_char *text;
     };
     uacpi_size size;
