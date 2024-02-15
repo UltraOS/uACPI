@@ -4867,11 +4867,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             break;
         }
 
-        case UACPI_PARSE_OP_TODO:
-            EXEC_OP_WARN("not yet implemented");
-            ret = UACPI_STATUS_UNIMPLEMENTED;
-            break;
-
         case UACPI_PARSE_OP_BAD_OPCODE:
         case UACPI_PARSE_OP_UNREACHABLE:
             EXEC_OP_WARN("invalid/unexpected opcode");

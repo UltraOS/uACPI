@@ -160,9 +160,6 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT,
 
-    // Error out saying the op is not yet implemented
-    UACPI_PARSE_OP_TODO,
-
     /*
      * Error if reached. Should be used for opcodes that are supposed to be
      * converted at op parse time, e.g. invoking a method or referring to
