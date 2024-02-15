@@ -42,6 +42,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "attempting to use a dangling namespace node";
     case UACPI_STATUS_NO_HANDLER:
         return "no handler found";
+    case UACPI_STATUS_NO_RESOURCE_END_TAG:
+        return "resource template without an end tag";
 
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";
@@ -59,6 +61,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "out of bounds AML index";
     case UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH:
         return "AML attempted to acquire a mutex with a lower sync level";
+    case UACPI_STATUS_AML_INVALID_RESOURCE:
+        return "invalid resource template encoding or type";
     default:
         return "<invalid status>";
     }
