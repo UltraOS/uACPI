@@ -14,4 +14,5 @@ uacpi_add_sources(
     notify.c
     sleep.c
     registers.c
+    resources.c
 )
