@@ -13,6 +13,7 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/io.h>
 #include <uacpi/internal/notify.h>
+#include <uacpi/internal/resources.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -2787,6 +2788,50 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
     return ret;
 }
 
+static uacpi_status handle_concatenate_res(struct execution_context *ctx)
+{
+    uacpi_status ret;
+    struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_object *arg0, *arg1, *dst;
+    uacpi_u8 *dst_buf;
+    uacpi_size dst_size, arg0_size, arg1_size;
+
+    arg0 = item_array_at(&op_ctx->items, 0)->obj;
+    arg1 = item_array_at(&op_ctx->items, 1)->obj;
+    dst = item_array_at(&op_ctx->items, 3)->obj;
+
+    ret = uacpi_find_aml_resource_end_tag(arg0->buffer, &arg0_size);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_find_aml_resource_end_tag(arg1->buffer, &arg1_size);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    dst_size = arg0_size + arg1_size + sizeof(struct acpi_resource_end_tag);
+
+    dst_buf = uacpi_kernel_alloc(dst_size);
+    if (uacpi_unlikely(dst_buf == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    dst->buffer->data = dst_buf;
+    dst->buffer->size = dst_size;
+
+    uacpi_memcpy(dst_buf, arg0->buffer->data, arg0_size);
+    uacpi_memcpy(dst_buf + arg0_size, arg1->buffer->data, arg1_size);
+
+    /*
+     * Small item (0), End Tag (0x0F), length 1
+     * Leave the checksum as 0
+     */
+    dst_buf[dst_size - 2] =
+        (ACPI_RESOURCE_END_TAG << ACPI_SMALL_ITEM_NAME_IDX) |
+        (sizeof(struct acpi_resource_end_tag) - 1);
+    dst_buf[dst_size - 1] = 0;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status handle_sizeof(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
@@ -4412,6 +4457,7 @@ enum op_handler {
     OP_HANDLER_READ_FIELD,
     OP_HANDLER_ALIAS,
     OP_HANDLER_CONCATENATE,
+    OP_HANDLER_CONCATENATE_RES,
     OP_HANDLER_SIZEOF,
     OP_HANDLER_UNARY_MATH,
     OP_HANDLER_INDEX,
@@ -4464,6 +4510,7 @@ static uacpi_status (*op_handlers[])(struct execution_context *ctx) = {
     [OP_HANDLER_TO] = handle_to,
     [OP_HANDLER_ALIAS] = handle_create_alias,
     [OP_HANDLER_CONCATENATE] = handle_concatenate,
+    [OP_HANDLER_CONCATENATE_RES] = handle_concatenate_res,
     [OP_HANDLER_SIZEOF] = handle_sizeof,
     [OP_HANDLER_UNARY_MATH] = handle_unary_math,
     [OP_HANDLER_INDEX] = handle_index,
@@ -4574,6 +4621,7 @@ static uacpi_u8 handler_idx_of_op[0x100] = {
     [UACPI_AML_OP_AliasOp] = OP_HANDLER_ALIAS,
 
     [UACPI_AML_OP_ConcatOp] = OP_HANDLER_CONCATENATE,
+    [UACPI_AML_OP_ConcatResOp] = OP_HANDLER_CONCATENATE_RES,
 
     [UACPI_AML_OP_SizeOfOp] = OP_HANDLER_SIZEOF,
 
