@@ -46,3 +46,12 @@ uacpi_u8 uacpi_bit_scan_backward(uacpi_u64 value)
     return 64 - __builtin_clzll(value);
 #endif
 }
+
+uacpi_u8 uacpi_popcount(uacpi_u64 value)
+{
+#ifdef _MSC_VER
+    return __popcnt64(value);
+#else
+    return __builtin_popcountll(value);
+#endif
+}
