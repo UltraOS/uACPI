@@ -188,7 +188,7 @@ static uacpi_status held_mutexes_array_remove_and_release(
     if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
                        force != FORCE_RELEASE_YES)) {
         uacpi_warn(
-            "Ignoring mutex @p release due to sync level mismatch: %d vs %d\n",
+            "Ignoring mutex @%p release due to sync level mismatch: %d vs %d\n",
             mutex, mutex->sync_level, item->sync_level
         );
 
