@@ -11,7 +11,7 @@ typedef struct uacpi_namespace_node uacpi_namespace_node;
 
 uacpi_namespace_node *uacpi_namespace_root(void);
 
-enum uacpi_predefined_namespace {
+typedef enum uacpi_predefined_namespace {
     UACPI_PREDEFINED_NAMESPACE_ROOT = 0,
     UACPI_PREDEFINED_NAMESPACE_GPE,
     UACPI_PREDEFINED_NAMESPACE_PR,
@@ -23,9 +23,9 @@ enum uacpi_predefined_namespace {
     UACPI_PREDEFINED_NAMESPACE_OSI,
     UACPI_PREDEFINED_NAMESPACE_REV,
     UACPI_PREDEFINED_NAMESPACE_MAX = UACPI_PREDEFINED_NAMESPACE_REV,
-};
+} uacpi_predefined_namespace;
 uacpi_namespace_node *uacpi_namespace_get_predefined(
-    enum uacpi_predefined_namespace
+    uacpi_predefined_namespace
 );
 
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node);
@@ -35,7 +35,7 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     const uacpi_char *path
 );
 
-enum uacpi_ns_iteration_decision {
+typedef enum uacpi_ns_iteration_decision {
     // Continue to the next child of this node
     UACPI_NS_ITERATION_DECISION_CONTINUE,
 
@@ -47,10 +47,10 @@ enum uacpi_ns_iteration_decision {
 
     // Abort iteration
     UACPI_NS_ITERATION_DECISION_BREAK,
-};
+} uacpi_ns_iteration_decision;
 
-typedef enum uacpi_ns_iteration_decision
-    (*uacpi_iteration_callback)(void *user, uacpi_namespace_node* node);
+typedef uacpi_ns_iteration_decision
+    (*uacpi_iteration_callback)(void *user, uacpi_namespace_node *node);
 
 void uacpi_namespace_for_each_node_depth_first(
     uacpi_namespace_node *parent,
