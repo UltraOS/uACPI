@@ -1,6 +1,7 @@
 #pragma once
 
 #include <uacpi/internal/compiler.h>
+#include <uacpi/platform/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +35,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH = 0x0EFF0007,
 } uacpi_status;
 
-const char *uacpi_status_to_string(uacpi_status);
+const uacpi_char *uacpi_status_to_string(uacpi_status);
 
 #define uacpi_unlikely_error(expr) uacpi_unlikely((expr) != UACPI_STATUS_OK)
 #define uacpi_likely_error(expr)   uacpi_likely((expr) != UACPI_STATUS_OK)
