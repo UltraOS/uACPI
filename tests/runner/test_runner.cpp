@@ -6,7 +6,7 @@
 #include "helpers.h"
 #include <uacpi/notify.h>
 
-uacpi_object_type string_to_object_type(std::string_view str)
+static uacpi_object_type string_to_object_type(std::string_view str)
 {
     if (str == "int")
         return UACPI_OBJECT_INTEGER;
@@ -18,9 +18,10 @@ uacpi_object_type string_to_object_type(std::string_view str)
     );
 }
 
-void validate_ret_against_expected(uacpi_object& obj,
-                                   uacpi_object_type expected_type,
-                                   std::string_view expected_val)
+static void validate_ret_against_expected(
+    uacpi_object& obj, uacpi_object_type expected_type,
+    std::string_view expected_val
+)
 {
     auto ret_is_wrong = [](std::string_view expected, std::string_view actual)
     {
@@ -92,8 +93,10 @@ static uacpi_status handle_notify(
     return UACPI_STATUS_OK;
 }
 
-void run_test(std::string_view dsdt_path, uacpi_object_type expected_type,
-              std::string_view expected_value)
+static void run_test(
+    std::string_view dsdt_path, uacpi_object_type expected_type,
+    std::string_view expected_value
+)
 {
     acpi_rsdp rsdp {};
     full_xsdt xsdt {};
