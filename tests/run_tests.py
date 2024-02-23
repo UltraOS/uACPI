@@ -5,6 +5,7 @@ import os
 import sys
 import platform
 from typing import List, Tuple, Optional
+from types import TracebackType
 
 from utilities.asl import ASLSource
 import generated_test_cases.buffer_field as bf
@@ -31,6 +32,26 @@ def get_case_name_and_expected_result(case: str) -> Tuple[str, str, str]:
         expected = [val.strip() for val in expected_line.split("=>")]
 
         return name, expected[0], expected[1]
+
+
+class TestHeaderFooter:
+    def __init__(self, text: str) -> None:
+        self.hdr = "{:=^80}".format(" " + text + " ")
+
+    def __enter__(self) -> None:
+        print(self.hdr)
+
+    def __exit__(
+        self, exc_type: Optional[type[BaseException]],
+        ex: Optional[BaseException], traceback: Optional[TracebackType]
+    ) -> Optional[bool]:
+        print("=" * len(self.hdr))
+        return None
+
+
+def run_resource_tests(runner: str) -> int:
+    with TestHeaderFooter("Resource Conversion Tests"):
+        return subprocess.run([runner, "--test-resources"]).returncode
 
 
 def run_tests(
@@ -159,6 +180,10 @@ def main() -> int:
     if test_runner is None:
         test_runner = build_test_runner()
 
+    ret = run_resource_tests(test_runner)
+    if ret != 0:
+        sys.exit(ret)
+
     bin_dir = args.binary_directory
     os.makedirs(bin_dir, exist_ok=True)
 
@@ -169,7 +194,8 @@ def main() -> int:
     ]
     test_cases.extend(generate_test_cases(test_compiler, bin_dir))
 
-    ret = run_tests(test_cases, test_runner, test_compiler, bin_dir)
+    with TestHeaderFooter("AML Tests"):
+        ret = run_tests(test_cases, test_runner, test_compiler, bin_dir)
     sys.exit(ret)
 
 
