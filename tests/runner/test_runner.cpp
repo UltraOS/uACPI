@@ -6,6 +6,8 @@
 #include "helpers.h"
 #include <uacpi/notify.h>
 
+void run_resource_tests();
+
 static uacpi_object_type string_to_object_type(std::string_view str)
 {
     if (str == "int")
@@ -152,11 +154,17 @@ int main(int argc, char** argv)
             << "\n[EMULATION] " << argv[0] << " <dsdt_path>"
             << "\n[TEST MODE] " << argv[0]
             << " <dsdt_path> <expected_type> <expected_value>"
+            << "\n[RESOURCE TESTS] " << argv[0] << " --test-resources"
             << std::endl;
         return 1;
     }
 
     try {
+        if (argc == 2 && std::string_view(argv[1]) == "--test-resources") {
+            run_resource_tests();
+            return 0;
+        }
+
         std::string_view expected_value;
         uacpi_object_type expected_type = UACPI_OBJECT_UNINITIALIZED;
 
