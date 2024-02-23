@@ -20,6 +20,7 @@ add_executable(
     test_runner.cpp
     helpers.cpp
     interface_impl.cpp
+    resource_tests.cpp
     ${UACPI_SOURCES}
 )
 target_include_directories(
