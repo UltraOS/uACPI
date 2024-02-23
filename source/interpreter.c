@@ -5382,7 +5382,7 @@ uacpi_status uacpi_osi(uacpi_handle handle, uacpi_object *retval)
 
     arg = uacpi_unwrap_internal_reference(ctx->cur_frame->args[0]);
     if (arg->type != UACPI_OBJECT_STRING) {
-        uacpi_warn("_OSI: Invalid argument type %s, expected a String",
+        uacpi_warn("_OSI: invalid argument type %s, expected a String\n",
                    uacpi_object_type_to_string(arg->type));
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
