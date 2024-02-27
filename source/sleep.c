@@ -9,22 +9,12 @@ static uacpi_status get_slp_type_for_state(uacpi_u8 state)
 {
     uacpi_char path[] = "_S0";
     uacpi_status ret;
-    uacpi_object *arg, *obj0, *obj1, *ret_obj = UACPI_NULL;
-    uacpi_args args;
-
-    arg = uacpi_create_object(UACPI_OBJECT_INTEGER);
-    if (uacpi_unlikely(arg == UACPI_NULL)) {
-        ret = UACPI_STATUS_OUT_OF_MEMORY;
-        goto out;
-    }
+    uacpi_object *obj0, *obj1, *ret_obj = UACPI_NULL;
 
     path[2] += state;
-    arg->integer = state;
-    args.objects = &arg;
-    args.count = 1;
 
     ret = uacpi_eval_typed(
-        uacpi_namespace_root(), path, &args,
+        uacpi_namespace_root(), path, UACPI_NULL,
         UACPI_OBJECT_PACKAGE_BIT, &ret_obj
     );
     if (ret != UACPI_STATUS_OK) {
@@ -85,7 +75,6 @@ out:
         g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
     }
 
-    uacpi_object_unref(arg);
     uacpi_object_unref(ret_obj);
     return ret;
 }
