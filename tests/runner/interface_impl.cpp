@@ -176,9 +176,6 @@ void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list
     case UACPI_LOG_ERROR:
         lvl_str = "ERROR";
         break;
-    case UACPI_LOG_FATAL:
-        lvl_str = "FATAL";
-        break;
     default:
         std::abort();
     }

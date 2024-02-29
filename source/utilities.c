@@ -27,7 +27,7 @@ uacpi_status uacpi_verify_table_checksum_with_warn(void *table, uacpi_size size)
 
         if (uacpi_rt_params_check(UACPI_PARAM_BAD_CSUM_FATAL)) {
             ret = UACPI_STATUS_BAD_CHECKSUM;
-            lvl = UACPI_LOG_FATAL;
+            lvl = UACPI_LOG_ERROR;
         }
 
         uacpi_log_lvl(lvl, "invalid table '%.4s' checksum!\n", (const char*)table);
@@ -46,7 +46,7 @@ uacpi_status uacpi_check_tbl_signature_with_warn(void *table, const char *expect
 
         if (uacpi_rt_params_check(UACPI_PARAM_BAD_TBL_HDR_FATAL)) {
             ret = UACPI_STATUS_INVALID_SIGNATURE;
-            lvl = UACPI_LOG_FATAL;
+            lvl = UACPI_LOG_ERROR;
         }
 
         uacpi_log_lvl(lvl, "invalid table signature '%.4s' (expected '%.4s')\n",
