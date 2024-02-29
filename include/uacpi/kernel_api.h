@@ -66,11 +66,10 @@ void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size);
 void uacpi_kernel_free(void *mem);
 
 enum uacpi_log_level {
-    UACPI_LOG_TRACE = 4,
-    UACPI_LOG_INFO  = 3,
-    UACPI_LOG_WARN  = 2,
-    UACPI_LOG_ERROR = 1,
-    UACPI_LOG_FATAL = 0
+    UACPI_LOG_TRACE = 3,
+    UACPI_LOG_INFO  = 2,
+    UACPI_LOG_WARN  = 1,
+    UACPI_LOG_ERROR = 0,
 };
 
 void uacpi_kernel_log(enum uacpi_log_level, const char*, ...);
