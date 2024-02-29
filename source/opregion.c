@@ -57,9 +57,11 @@ void uacpi_trace_region_io(
 
     uacpi_kernel_free((void*)path);
 #else
+    UACPI_UNUSED(op);
     UACPI_UNUSED(node);
     UACPI_UNUSED(offset);
     UACPI_UNUSED(byte_size);
+    UACPI_UNUSED(ret);
 #endif
 }
 
