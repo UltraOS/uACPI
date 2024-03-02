@@ -32,6 +32,14 @@ uacpi_status uacpi_find_devices(
     void *user
 );
 
+typedef enum uacpi_interrupt_model {
+    UACPI_INTERRUPT_MODEL_PIC = 0,
+    UACPI_INTERRUPT_MODEL_IOAPIC = 1,
+    UACPI_INTERRUPT_MODEL_IOSAPIC = 2,
+} uacpi_interrupt_model;
+
+uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model);
+
 #ifdef __cplusplus
 }
 #endif

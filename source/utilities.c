@@ -357,3 +357,27 @@ uacpi_status uacpi_find_devices(
     );
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
+{
+    uacpi_status ret;
+    uacpi_object *arg;
+    uacpi_args args;
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    arg = uacpi_create_object(UACPI_OBJECT_INTEGER);
+    if (uacpi_unlikely(arg == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    arg->integer = model;
+    args.objects = &arg;
+    args.count = 1;
+
+    ret = uacpi_eval(uacpi_namespace_root(), "_PIC", &args, UACPI_NULL);
+    uacpi_object_unref(arg);
+
+    return ret;
+}
