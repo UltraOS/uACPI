@@ -35,6 +35,17 @@ uacpi_namespace_node *uacpi_namespace_node_find(
     const uacpi_char *path
 );
 
+/*
+ * Same as uacpi_namespace_node_find, except the search recurses upwards when
+ * the namepath consists of only a single nameseg. Usually, this behavior is
+ * only desired if resolving a namepath specified in an aml-provided object,
+ * such as a package element.
+ */
+uacpi_namespace_node *uacpi_namespace_node_resolve_from_aml_namepath(
+    uacpi_namespace_node *scope,
+    const uacpi_char *path
+);
+
 typedef enum uacpi_ns_iteration_decision {
     // Continue to the next child of this node
     UACPI_NS_ITERATION_DECISION_CONTINUE,
