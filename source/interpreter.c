@@ -1247,8 +1247,9 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     ret_obj = item_array_at(items, 7)->obj;
 
     if (root_path->size > 1) {
-        root_node = uacpi_namespace_node_find(ctx->cur_frame->cur_scope,
-                                              root_path->text);
+        root_node = uacpi_namespace_node_resolve_from_aml_namepath(
+            ctx->cur_frame->cur_scope, root_path->text
+        );
     } else {
         root_node = uacpi_namespace_root();
     }
@@ -1259,7 +1260,9 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     }
 
     if (param_path->size > 1) {
-        param_node = uacpi_namespace_node_find(root_node, param_path->text);
+        param_node = uacpi_namespace_node_resolve_from_aml_namepath(
+            root_node, param_path->text
+        );
         if (uacpi_unlikely(param_node == UACPI_NULL)) {
             table_id_error("LoadTable", "ParameterPathString", root_path);
             goto return_false;
