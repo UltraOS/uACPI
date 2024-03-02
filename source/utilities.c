@@ -381,3 +381,116 @@ uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
 
     return ret;
 }
+
+uacpi_status uacpi_get_pci_routing_table(
+    uacpi_namespace_node *parent, uacpi_pci_routing_table *out_table
+)
+{
+    uacpi_status ret;
+    uacpi_object *obj, *entry_obj, *elem_obj;
+    uacpi_package *table_pkg, *entry_pkg;
+    uacpi_pci_routing_table_entry *entry;
+    uacpi_size size, i;
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    obj = uacpi_namespace_node_get_object(parent);
+    if (uacpi_unlikely(obj == UACPI_NULL || obj->type != UACPI_OBJECT_DEVICE))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    ret = uacpi_eval_typed(
+        parent, "_PRT", UACPI_NULL, UACPI_OBJECT_PACKAGE_BIT, &obj
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    table_pkg = obj->package;
+    if (uacpi_unlikely(table_pkg->count == 0 || table_pkg->count > 1024)) {
+        uacpi_warn("invalid number of _PRT entries: %zu\n", table_pkg->count);
+        uacpi_object_unref(obj);
+        return UACPI_STATUS_AML_BAD_ENCODING;
+    }
+
+    size = table_pkg->count * sizeof(uacpi_pci_routing_table_entry);
+    out_table->entries = uacpi_kernel_alloc(size);
+    if (uacpi_unlikely(out_table->entries == UACPI_NULL)) {
+        uacpi_object_unref(obj);
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    for (i = 0; i < table_pkg->count; ++i) {
+        entry_obj = table_pkg->objects[i];
+
+        if (uacpi_unlikely(entry_obj->type != UACPI_OBJECT_PACKAGE)) {
+            uacpi_error("_PRT sub-object %zu is not a package: %s\n",
+                        i, uacpi_object_type_to_string(entry_obj->type));
+            goto out_bad_encoding;
+        }
+
+        entry_pkg = entry_obj->package;
+        if (uacpi_unlikely(entry_pkg->count != 4)) {
+            uacpi_warn("invalid _PRT sub-package entry count %zu\n",
+                       entry_pkg->count);
+            goto out_bad_encoding;
+        }
+
+        entry = &out_table->entries[i];
+
+        elem_obj = entry_pkg->objects[0];
+        if (uacpi_unlikely(elem_obj->type != UACPI_OBJECT_INTEGER)) {
+            uacpi_error("invalid _PRT sub-package %zu address type: %s\n",
+                        i, uacpi_object_type_to_string(elem_obj->type));
+            goto out_bad_encoding;
+        }
+        entry->address = elem_obj->integer;
+
+        elem_obj = entry_pkg->objects[1];
+        if (uacpi_unlikely(elem_obj->type != UACPI_OBJECT_INTEGER)) {
+            uacpi_error("invalid _PRT sub-package %zu pin type: %s\n",
+                        i, uacpi_object_type_to_string(elem_obj->type));
+            goto out_bad_encoding;
+        }
+        entry->pin = elem_obj->integer;
+
+        elem_obj = entry_pkg->objects[2];
+        switch (elem_obj->type) {
+        case UACPI_OBJECT_STRING:
+            entry->source = uacpi_namespace_node_resolve_from_aml_namepath(
+                parent, elem_obj->buffer->text
+            );
+            if (uacpi_unlikely(entry->source == UACPI_NULL)) {
+                // Just warn here, don't error out
+                uacpi_warn("unable to lookup _PRT source: %s\n",
+                           elem_obj->buffer->text);
+            }
+            break;
+        case UACPI_OBJECT_INTEGER:
+            entry->source = UACPI_NULL;
+            break;
+        default:
+            uacpi_error("invalid _PRT sub-package %zu source type: %s\n",
+                        i, uacpi_object_type_to_string(elem_obj->type));
+            goto out_bad_encoding;
+        }
+
+        elem_obj = entry_pkg->objects[3];
+        if (uacpi_unlikely(elem_obj->type != UACPI_OBJECT_INTEGER)) {
+            uacpi_error("invalid _PRT sub-package %zu source index type: %s\n",
+                        i, uacpi_object_type_to_string(elem_obj->type));
+            goto out_bad_encoding;
+        }
+        entry->index = elem_obj->integer;
+    }
+
+    out_table->num_entries = table_pkg->count;
+    uacpi_object_unref(obj);
+    return UACPI_STATUS_OK;
+
+out_bad_encoding:
+    uacpi_object_unref(obj);
+    uacpi_kernel_free(out_table->entries);
+    out_table->entries = UACPI_NULL;
+    return UACPI_STATUS_AML_BAD_ENCODING;
+}
