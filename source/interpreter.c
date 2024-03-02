@@ -5418,6 +5418,7 @@ static uacpi_char *supported_osi_strings[] = {
     "Windows 2019",
     "Windows 2020",
     "Windows 2021",
+    "Extended Address Space Descriptor",
 };
 
 uacpi_status uacpi_osi(uacpi_handle handle, uacpi_object *retval)
