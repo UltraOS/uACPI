@@ -315,15 +315,21 @@ static uacpi_object_name segment_to_name(
     return out_name;
 }
 
-uacpi_namespace_node *uacpi_namespace_node_find(
-    uacpi_namespace_node *parent,
-    const uacpi_char *path
+enum may_search_above_parent {
+    MAY_SEARCH_ABOVE_PARENT_NO,
+    MAY_SEARCH_ABOVE_PARENT_YES,
+};
+
+static uacpi_namespace_node *uacpi_namespace_node_do_find(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    enum may_search_above_parent may_search_above_parent
 )
 {
     uacpi_namespace_node *cur_node = parent;
     const uacpi_char *cursor = path;
     uacpi_size bytes_left;
     uacpi_char prev_char = 0;
+    uacpi_bool single_nameseg = UACPI_TRUE;
 
     if (cur_node == UACPI_NULL)
         cur_node = uacpi_namespace_root();
@@ -336,12 +342,16 @@ uacpi_namespace_node *uacpi_namespace_node_find(
 
         switch (*cursor) {
         case '\\':
+            single_nameseg = UACPI_FALSE;
+
             if (prev_char == '^')
                 goto out_invalid_path;
 
             cur_node = uacpi_namespace_root();
             break;
         case '^':
+            single_nameseg = UACPI_FALSE;
+
             // Tried to go behind root
             if (uacpi_unlikely(cur_node == uacpi_namespace_root()))
                 goto out_invalid_path;
@@ -377,9 +387,27 @@ uacpi_namespace_node *uacpi_namespace_node_find(
         }
 
         nameseg = segment_to_name(&cursor, &bytes_left);
+        if (bytes_left != 0 && single_nameseg)
+            single_nameseg = UACPI_FALSE;
+
         cur_node = uacpi_namespace_node_find_sub_node(cur_node, nameseg);
-        if (cur_node == UACPI_NULL)
+        if (cur_node == UACPI_NULL) {
+            if (may_search_above_parent == MAY_SEARCH_ABOVE_PARENT_NO ||
+                !single_nameseg)
+                return cur_node;
+
+            parent = parent->parent;
+
+            while (parent) {
+                cur_node = uacpi_namespace_node_find_sub_node(parent, nameseg);
+                if (cur_node != UACPI_NULL)
+                    return cur_node;
+
+                parent = parent->parent;
+            }
+
             return cur_node;
+        }
     }
 
     return cur_node;
@@ -387,6 +415,24 @@ uacpi_namespace_node *uacpi_namespace_node_find(
 out_invalid_path:
     uacpi_warn("invalid path '%s'\n", path);
     return UACPI_NULL;
+}
+
+uacpi_namespace_node *uacpi_namespace_node_find(
+    uacpi_namespace_node *parent, const uacpi_char *path
+)
+{
+    return uacpi_namespace_node_do_find(
+        parent, path, MAY_SEARCH_ABOVE_PARENT_NO
+    );
+}
+
+uacpi_namespace_node *uacpi_namespace_node_resolve_from_aml_namepath(
+    uacpi_namespace_node *scope, const uacpi_char *path
+)
+{
+    return uacpi_namespace_node_do_find(
+        scope, path, MAY_SEARCH_ABOVE_PARENT_YES
+    );
 }
 
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
