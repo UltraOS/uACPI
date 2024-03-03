@@ -12,7 +12,7 @@
  * Map raw AML resource types to the internal enum, this also takes care of type
  * sanitization by returning UACPI_AML_RESOURCE_INVALID for any unknown type.
  */
-uacpi_u8 aml_resource_to_type[] = {
+static const uacpi_u8 aml_resource_to_type[] = {
     // Small items
     [ACPI_RESOURCE_IRQ] = UACPI_AML_RESOURCE_IRQ,
     [ACPI_RESOURCE_DMA] = UACPI_AML_RESOURCE_DMA,
@@ -45,7 +45,7 @@ uacpi_u8 aml_resource_to_type[] = {
     [L(ACPI_RESOURCE_CLOCK_INPUT)] = UACPI_AML_RESOURCE_CLOCK_INPUT,
 };
 
-uacpi_u8 type_to_aml_resource[] = {
+static const uacpi_u8 type_to_aml_resource[] = {
     [UACPI_AML_RESOURCE_IRQ] = ACPI_RESOURCE_IRQ,
     [UACPI_AML_RESOURCE_DMA] = ACPI_RESOURCE_DMA,
     [UACPI_AML_RESOURCE_START_DEPENDENT] = ACPI_RESOURCE_START_DEPENDENT,
@@ -77,7 +77,7 @@ uacpi_u8 type_to_aml_resource[] = {
     [UACPI_AML_RESOURCE_CLOCK_INPUT] = ACPI_RESOURCE_CLOCK_INPUT,
 };
 
-uacpi_u8 native_resource_to_type[UACPI_RESOURCE_TYPE_MAX + 1] = {
+static const uacpi_u8 native_resource_to_type[UACPI_RESOURCE_TYPE_MAX + 1] = {
     [UACPI_RESOURCE_TYPE_IRQ] = UACPI_AML_RESOURCE_IRQ,
     [UACPI_RESOURCE_TYPE_EXTENDED_IRQ] = UACPI_AML_RESOURCE_EXTENDED_IRQ,
     [UACPI_RESOURCE_TYPE_DMA] = UACPI_AML_RESOURCE_DMA,
@@ -113,19 +113,19 @@ uacpi_u8 native_resource_to_type[UACPI_RESOURCE_TYPE_MAX + 1] = {
 #define SMALL_ITEM_HEADER_SIZE sizeof(struct acpi_small_item)
 #define LARGE_ITEM_HEADER_SIZE sizeof(struct acpi_large_item)
 
-static uacpi_u8 aml_resource_kind_to_header_size[2] = {
+static const uacpi_u8 aml_resource_kind_to_header_size[2] = {
     [UACPI_AML_RESOURCE_KIND_SMALL] = SMALL_ITEM_HEADER_SIZE,
     [UACPI_AML_RESOURCE_KIND_LARGE] = LARGE_ITEM_HEADER_SIZE,
 };
 
-static uacpi_size aml_size_with_header(struct uacpi_resource_spec *spec)
+static uacpi_size aml_size_with_header(const struct uacpi_resource_spec *spec)
 {
     return spec->aml_size +
            aml_resource_kind_to_header_size[spec->resource_kind];
 }
 
 static uacpi_size extra_size_for_native_irq_or_dma(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     UACPI_UNUSED(size);
@@ -143,7 +143,7 @@ static uacpi_size extra_size_for_native_irq_or_dma(
 }
 
 static uacpi_size size_for_aml_irq(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_resource_irq *irq = &resource->irq;
@@ -177,7 +177,7 @@ out_full:
 }
 
 static uacpi_size size_for_aml_start_dependent(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_resource_start_dependent *start_dep = &resource->start_dependent;
@@ -208,7 +208,7 @@ out_full:
 }
 
 static uacpi_size extra_size_for_native_vendor(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     UACPI_UNUSED(spec);
@@ -217,7 +217,7 @@ static uacpi_size extra_size_for_native_vendor(
 }
 
 static uacpi_size size_for_aml_vendor(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     UACPI_UNUSED(spec);
@@ -278,7 +278,7 @@ static uacpi_size size_for_aml_resource_source(
 }
 
 static uacpi_size extra_size_for_native_address_or_clock_input(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     UACPI_UNUSED(data);
@@ -286,7 +286,7 @@ static uacpi_size extra_size_for_native_address_or_clock_input(
 }
 
 static uacpi_size size_for_aml_address_or_clock_input(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_resource_source *source;
@@ -315,7 +315,7 @@ static uacpi_size size_for_aml_address_or_clock_input(
 }
 
 static uacpi_size extra_size_for_extended_irq(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     struct acpi_resource_extended_irq *irq = data;
@@ -330,7 +330,7 @@ static uacpi_size extra_size_for_extended_irq(
 }
 
 static uacpi_size size_for_aml_extended_irq(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_resource_extended_irq *irq = &resource->extended_irq;
@@ -344,7 +344,7 @@ static uacpi_size size_for_aml_extended_irq(
 }
 
 static uacpi_size extra_size_for_native_gpio_or_pins(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     uacpi_size pin_table_offset;
@@ -399,7 +399,7 @@ static uacpi_size extra_size_for_native_gpio_or_pins(
 }
 
 static uacpi_size size_for_aml_gpio_or_pins(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_size source_length, vendor_length, pin_table_length, size;
@@ -450,7 +450,7 @@ static uacpi_size size_for_aml_gpio_or_pins(
 }
 
 static uacpi_size extra_size_for_native_pin_group(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     uacpi_size source_offset;
@@ -477,7 +477,7 @@ static uacpi_size extra_size_for_native_pin_group(
 }
 
 static uacpi_size size_for_aml_pin_group(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_size source_length, label_length, vendor_length, size;
@@ -520,7 +520,7 @@ static uacpi_size size_for_aml_pin_group(
     (sizeof(uacpi_resource_##type##_connection)  \
      - sizeof(uacpi_resource_serial_bus_common))
 
-static uacpi_u8 aml_serial_resource_to_extra_aml_size
+static const uacpi_u8 aml_serial_resource_to_extra_aml_size
 [ACPI_SERIAL_TYPE_MAX + 1] = {
     [ACPI_SERIAL_TYPE_I2C] = AML_SERIAL_RESOURCE_EXTRA_SIZE(i2c),
     [ACPI_SERIAL_TYPE_SPI] = AML_SERIAL_RESOURCE_EXTRA_SIZE(spi),
@@ -528,7 +528,7 @@ static uacpi_u8 aml_serial_resource_to_extra_aml_size
     [ACPI_SERIAL_TYPE_CSI2] = AML_SERIAL_RESOURCE_EXTRA_SIZE(csi2),
 };
 
-static uacpi_u8 aml_serial_resource_to_extra_native_size
+static const uacpi_u8 aml_serial_resource_to_extra_native_size
 [ACPI_SERIAL_TYPE_MAX + 1] = {
     [ACPI_SERIAL_TYPE_I2C] = NATIVE_SERIAL_RESOURCE_EXTRA_SIZE(i2c),
     [ACPI_SERIAL_TYPE_SPI] = NATIVE_SERIAL_RESOURCE_EXTRA_SIZE(spi),
@@ -537,7 +537,7 @@ static uacpi_u8 aml_serial_resource_to_extra_native_size
 };
 
 static uacpi_size extra_size_for_serial_connection(
-    struct uacpi_resource_spec *spec, void *data, uacpi_size size
+    const struct uacpi_resource_spec *spec, void *data, uacpi_size size
 )
 {
     struct acpi_resource_serial *serial = data;
@@ -551,7 +551,7 @@ static uacpi_size extra_size_for_serial_connection(
 }
 
 static uacpi_size aml_size_for_serial_connection(
-    struct uacpi_resource_spec *spec, uacpi_resource *resource
+    const struct uacpi_resource_spec *spec, uacpi_resource *resource
 )
 {
     uacpi_size size;
@@ -591,7 +591,7 @@ static uacpi_size aml_size_for_serial_connection(
 #define ARG2(value) .arg2 = (value)
 
 
-static struct uacpi_resource_convert_instruction convert_irq_to_native[] = {
+static const struct uacpi_resource_convert_instruction convert_irq_to_native[] = {
     OP(PACKED_ARRAY_16, AML_F(irq, irq_mask), NATIVE_F(irq, irqs),
        ARG2(NATIVE_O(irq, num_irqs))),
     OP(SKIP_IF_AML_SIZE_LESS_THAN, ARG0(3), IMM(6)),
@@ -608,7 +608,7 @@ static struct uacpi_resource_convert_instruction convert_irq_to_native[] = {
     END(),
 };
 
-struct uacpi_resource_convert_instruction convert_irq_to_aml[] = {
+const struct uacpi_resource_convert_instruction convert_irq_to_aml[] = {
     OP(PACKED_ARRAY_16, AML_F(irq, irq_mask), NATIVE_F(irq, irqs),
        ARG2(NATIVE_O(irq, num_irqs))),
     OP(SKIP_IF_AML_SIZE_LESS_THAN, ARG0(3), IMM(4)),
@@ -619,7 +619,7 @@ struct uacpi_resource_convert_instruction convert_irq_to_aml[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_dma[] = {
+static const struct uacpi_resource_convert_instruction convert_dma[] = {
     OP(PACKED_ARRAY_8, AML_F(dma, channel_mask), NATIVE_F(dma, channels),
        ARG2(NATIVE_O(dma, num_channels))),
     OP(BIT_FIELD_2, AML_F(dma, flags), NATIVE_F(dma, transfer_type), IMM(0)),
@@ -628,7 +628,7 @@ static struct uacpi_resource_convert_instruction convert_dma[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction
+static const struct uacpi_resource_convert_instruction
 convert_start_dependent_to_native[] = {
     OP(SKIP_IF_AML_SIZE_LESS_THAN, ARG0(1), IMM(4)),
         OP(SET_TO_IMM, NATIVE_F(start_dependent, length_kind),
@@ -647,7 +647,7 @@ convert_start_dependent_to_native[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction
+static const struct uacpi_resource_convert_instruction
 convert_start_dependent_to_aml[] = {
     OP(SKIP_IF_AML_SIZE_LESS_THAN, ARG0(1), IMM(1)),
         OP(BIT_FIELD_2, AML_F(start_dependent, flags),
@@ -657,7 +657,7 @@ convert_start_dependent_to_aml[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_io[] = {
+static const struct uacpi_resource_convert_instruction convert_io[] = {
     OP(BIT_FIELD_1, AML_F(io, information), NATIVE_F(io, decode_type)),
     OP(FIELD_16, AML_F(io, minimum), NATIVE_F(io, minimum)),
     OP(FIELD_16, AML_F(io, maximum), NATIVE_F(io, maximum)),
@@ -666,13 +666,13 @@ static struct uacpi_resource_convert_instruction convert_io[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_fixed_io[] = {
+static const struct uacpi_resource_convert_instruction convert_fixed_io[] = {
     OP(FIELD_16, AML_F(fixed_io, address), NATIVE_F(fixed_io, address)),
     OP(FIELD_8, AML_F(fixed_io, length), NATIVE_F(fixed_io, length)),
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_fixed_dma[] = {
+static const struct uacpi_resource_convert_instruction convert_fixed_dma[] = {
     OP(FIELD_16, AML_F(fixed_dma, request_line),
                  NATIVE_F(fixed_dma, request_line)),
     OP(FIELD_16, AML_F(fixed_dma, channel), NATIVE_F(fixed_dma, channel)),
@@ -681,33 +681,34 @@ static struct uacpi_resource_convert_instruction convert_fixed_dma[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_vendor_type0[] = {
+static const struct uacpi_resource_convert_instruction convert_vendor_type0[] = {
     OP(LOAD_AML_SIZE_32, NATIVE_F(vendor, length)),
     OP(FIELD_8, AML_F(vendor_defined_type0, byte_data), NATIVE_F(vendor, data)),
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_vendor_type1[] = {
+static const struct uacpi_resource_convert_instruction convert_vendor_type1[] = {
     OP(LOAD_AML_SIZE_32, NATIVE_F(vendor, length)),
     OP(FIELD_8, AML_F(vendor_defined_type1, byte_data), NATIVE_F(vendor, data)),
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_memory24[] = {
+static const struct uacpi_resource_convert_instruction convert_memory24[] = {
     OP(BIT_FIELD_1, AML_F(memory24, information),
                     NATIVE_F(memory24, write_status), IMM(0)),
     OP(FIELD_16, AML_F(memory24, minimum), NATIVE_F(memory24, minimum), IMM(4)),
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_memory32[] = {
+static const struct uacpi_resource_convert_instruction convert_memory32[] = {
     OP(BIT_FIELD_1, AML_F(memory32, information),
                     NATIVE_F(memory32, write_status), IMM(0)),
     OP(FIELD_32, AML_F(memory32, minimum), NATIVE_F(memory32, minimum), IMM(4)),
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_fixed_memory32[] = {
+static const struct uacpi_resource_convert_instruction
+convert_fixed_memory32[] = {
     OP(BIT_FIELD_1, AML_F(fixed_memory32, information),
                     NATIVE_F(fixed_memory32, write_status), IMM(0)),
     OP(FIELD_32, AML_F(fixed_memory32, address),
@@ -717,7 +718,8 @@ static struct uacpi_resource_convert_instruction convert_fixed_memory32[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_generic_register[] = {
+static const struct uacpi_resource_convert_instruction
+convert_generic_register[] = {
     OP(FIELD_8, AML_F(generic_register, address_space_id),
                 NATIVE_F(generic_register, address_space_id), IMM(4)),
     OP(FIELD_64, AML_F(generic_register, address),
@@ -773,7 +775,7 @@ static struct uacpi_resource_convert_instruction convert_generic_register[] = {
       NATIVE_F(addr_type, common.fixed_max_address), IMM(3))   \
 
 #define DEFINE_ADDRESS_CONVERSION(width)                              \
-    static struct uacpi_resource_convert_instruction                  \
+    static const struct uacpi_resource_convert_instruction            \
     convert_address##width[] = {                                      \
         CONVERT_GENERAL_ADDRESS_FLAGS(address##width),                \
         OP(FIELD_##width, AML_F(address##width, granularity),         \
@@ -786,7 +788,7 @@ DEFINE_ADDRESS_CONVERSION(16)
 DEFINE_ADDRESS_CONVERSION(32)
 DEFINE_ADDRESS_CONVERSION(64)
 
-static struct uacpi_resource_convert_instruction
+static const struct uacpi_resource_convert_instruction
 convert_address64_extended[] = {
     CONVERT_GENERAL_ADDRESS_FLAGS(address64_extended),
     OP(FIELD_8, AML_F(address64_extended, revision_id),
@@ -796,7 +798,8 @@ convert_address64_extended[] = {
     CONVERT_TYPE_SPECIFIC_FLAGS(address64_extended),
 };
 
-static struct uacpi_resource_convert_instruction convert_extended_irq[] = {
+static const struct uacpi_resource_convert_instruction
+convert_extended_irq[] = {
     OP(BIT_FIELD_1, AML_F(extended_irq, flags),
                     NATIVE_F(extended_irq, direction), IMM(0)),
     OP(BIT_FIELD_1, AML_F(extended_irq, flags),
@@ -807,8 +810,8 @@ static struct uacpi_resource_convert_instruction convert_extended_irq[] = {
                     NATIVE_F(extended_irq, sharing), IMM(3)),
     OP(BIT_FIELD_1, AML_F(extended_irq, flags),
                     NATIVE_F(extended_irq, wake_capability), IMM(4)),
-    OP(LOAD_8_STORE, AML_F(extended_irq, num_irqs), NATIVE_F(extended_irq, num_irqs),
-       IMM(4)),
+    OP(LOAD_8_STORE, AML_F(extended_irq, num_irqs),
+       NATIVE_F(extended_irq, num_irqs), IMM(4)),
     OP(RESOURCE_SOURCE, NATIVE_F(extended_irq, source)),
 
     // Use FIELD_8 here since the accumulator has been multiplied by 4
@@ -816,7 +819,7 @@ static struct uacpi_resource_convert_instruction convert_extended_irq[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_clock_input[] = {
+static const struct uacpi_resource_convert_instruction convert_clock_input[] = {
     OP(FIELD_8, AML_F(clock_input, revision_id),
        NATIVE_F(clock_input, revision_id)),
     OP(BIT_FIELD_1, AML_F(clock_input, flags), NATIVE_F(clock_input, frequency),
@@ -849,7 +852,8 @@ static struct uacpi_resource_convert_instruction convert_clock_input[] = {
        NATIVE_F(short_aml_name, vendor_data_length),                   \
        ARG2(NATIVE_O(short_aml_name, vendor_data)))
 
-static struct uacpi_resource_convert_instruction convert_gpio_connection[] = {
+static const struct uacpi_resource_convert_instruction
+convert_gpio_connection[] = {
     OP(FIELD_8, AML_F(gpio_connection, revision_id),
        NATIVE_F(gpio_connection, revision_id)),
     OP(BIT_FIELD_1, AML_F(gpio_connection, general_flags),
@@ -884,7 +888,8 @@ static struct uacpi_resource_convert_instruction convert_gpio_connection[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_pin_function[] = {
+static const struct uacpi_resource_convert_instruction
+convert_pin_function[] = {
     OP(FIELD_8, AML_F(pin_function, revision_id),
        NATIVE_F(pin_function, revision_id)),
     OP(BIT_FIELD_1, AML_F(pin_function, flags),
@@ -900,7 +905,8 @@ static struct uacpi_resource_convert_instruction convert_pin_function[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_pin_configuration[] = {
+static const struct uacpi_resource_convert_instruction
+convert_pin_configuration[] = {
     OP(FIELD_8, AML_F(pin_configuration, revision_id),
        NATIVE_F(pin_configuration, revision_id)),
     OP(BIT_FIELD_1, AML_F(pin_configuration, flags),
@@ -918,7 +924,7 @@ static struct uacpi_resource_convert_instruction convert_pin_configuration[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction convert_pin_group[] = {
+static const struct uacpi_resource_convert_instruction convert_pin_group[] = {
     OP(FIELD_8, AML_F(pin_group, revision_id),
        NATIVE_F(pin_group, revision_id)),
     OP(BIT_FIELD_1, AML_F(pin_group, flags),
@@ -942,7 +948,8 @@ static struct uacpi_resource_convert_instruction convert_pin_group[] = {
        NATIVE_F(pin_group_##postfix, vendor_data_length),               \
        ARG2(NATIVE_O(pin_group_##postfix, vendor_data)))
 
-static struct uacpi_resource_convert_instruction convert_pin_group_function[] = {
+static const struct uacpi_resource_convert_instruction
+convert_pin_group_function[] = {
     OP(FIELD_8, AML_F(pin_group_function, revision_id),
        NATIVE_F(pin_group_function, revision_id)),
     OP(BIT_FIELD_1, AML_F(pin_group_function, flags),
@@ -955,7 +962,7 @@ static struct uacpi_resource_convert_instruction convert_pin_group_function[] = 
     END(),
 };
 
-static struct uacpi_resource_convert_instruction
+static const struct uacpi_resource_convert_instruction
 convert_pin_group_configuration[] = {
     OP(FIELD_8, AML_F(pin_group_configuration, revision_id),
        NATIVE_F(pin_group_configuration, revision_id)),
@@ -971,7 +978,7 @@ convert_pin_group_configuration[] = {
     END(),
 };
 
-static struct uacpi_resource_convert_instruction
+static const struct uacpi_resource_convert_instruction
 convert_generic_serial_bus[] = {
     OP(FIELD_8, AML_F(serial, revision_id),
        NATIVE_F(serial_bus_common, revision_id)),
@@ -1075,7 +1082,7 @@ convert_generic_serial_bus[] = {
         __VA_ARGS__                                                          \
     }
 
-struct uacpi_resource_spec aml_resources[UACPI_AML_RESOURCE_MAX + 1] = {
+const struct uacpi_resource_spec aml_resources[UACPI_AML_RESOURCE_MAX + 1] = {
     DEFINE_SMALL_AML_RESOURCE(
         UACPI_AML_RESOURCE_IRQ,
         UACPI_RESOURCE_TYPE_IRQ,
@@ -1413,7 +1420,7 @@ uacpi_status uacpi_for_each_aml_resource(
     uacpi_size bytes_left;
     uacpi_u16 resource_size;
     enum uacpi_aml_resource type;
-    struct uacpi_resource_spec *spec;
+    const struct uacpi_resource_spec *spec;
 
     bytes_left = buffer->size;
     data = buffer->data;
@@ -1481,7 +1488,7 @@ uacpi_status uacpi_for_each_aml_resource(
 
 static uacpi_resource_iteration_decision find_end(
     void *opaque, uacpi_u8 *data, uacpi_u16 resource_size,
-    struct uacpi_resource_spec *spec
+    const struct uacpi_resource_spec *spec
 )
 {
     uacpi_u8 **out_ptr = opaque;
@@ -1495,7 +1502,7 @@ static uacpi_resource_iteration_decision find_end(
 }
 
 static uacpi_size native_size_for_aml_resource(
-    uacpi_u8 *data, uacpi_u16 size, struct uacpi_resource_spec *spec
+    uacpi_u8 *data, uacpi_u16 size, const struct uacpi_resource_spec *spec
 )
 {
     uacpi_size final_size = spec->native_size;
@@ -1646,12 +1653,12 @@ static uacpi_resource_type aml_serial_to_native_type(
 
 static uacpi_resource_iteration_decision do_aml_resource_to_native(
     void *opaque, uacpi_u8 *data, uacpi_u16 aml_size,
-    struct uacpi_resource_spec *spec
+    const struct uacpi_resource_spec *spec
 )
 {
     struct resource_conversion_ctx *ctx = opaque;
     uacpi_resource *resource = ctx->buf;
-    struct uacpi_resource_convert_instruction *insns, *insn;
+    const struct uacpi_resource_convert_instruction *insns, *insn;
     uacpi_u8 header_size, pc = 0;
     uacpi_u8 *src, *dst;
     void *resource_end;
@@ -1929,7 +1936,7 @@ static uacpi_status aml_resources_to_native(
 
 static uacpi_resource_iteration_decision accumulate_native_buffer_size(
     void *opaque, uacpi_u8 *data, uacpi_u16 resource_size,
-    struct uacpi_resource_spec *spec
+    const struct uacpi_resource_spec *spec
 )
 {
     struct resource_conversion_ctx *ctx = opaque;
@@ -2091,7 +2098,7 @@ uacpi_status uacpi_for_each_device_resource(
     return ret;
 }
 
-static struct uacpi_resource_spec *resource_spec_from_native(
+static const struct uacpi_resource_spec *resource_spec_from_native(
         uacpi_resource *resource
 )
 {
@@ -2099,7 +2106,7 @@ static struct uacpi_resource_spec *resource_spec_from_native(
 }
 
 static uacpi_size aml_size_for_native_resource(
-        uacpi_resource *resource, struct uacpi_resource_spec *spec
+        uacpi_resource *resource, const struct uacpi_resource_spec *spec
 )
 {
     return spec->size_for_aml ?
@@ -2112,8 +2119,8 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
 )
 {
     struct resource_conversion_ctx *ctx = opaque;
-    struct uacpi_resource_spec *spec;
-    struct uacpi_resource_convert_instruction *insns, *insn;
+    const struct uacpi_resource_spec *spec;
+    const struct uacpi_resource_convert_instruction *insns, *insn;
     uacpi_u8 pc = 0;
     uacpi_u8 *dst_base, *src, *dst;
     uacpi_u32 aml_size, base_aml_size_with_header, accumulator = 0;
@@ -2391,7 +2398,7 @@ static uacpi_resource_iteration_decision accumulate_aml_buffer_size(
 )
 {
     struct resource_conversion_ctx *ctx = opaque;
-    struct uacpi_resource_spec *spec;
+    const struct uacpi_resource_spec *spec;
     uacpi_size size_for_this;
 
     // resource->type is sanitized to be valid here by the iteration function

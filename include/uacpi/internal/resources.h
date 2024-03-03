@@ -286,7 +286,7 @@ struct uacpi_resource_spec {
      * bytes are needed, aka native resources is always the same size.
      */
     uacpi_size (*extra_size_for_native)(
-        struct uacpi_resource_spec*, void*, uacpi_size
+        const struct uacpi_resource_spec*, void*, uacpi_size
     );
 
     /*
@@ -294,17 +294,17 @@ struct uacpi_resource_spec {
      * AML. The 'aml_size' field is used if this is NULL.
      */
     uacpi_size (*size_for_aml)(
-        struct uacpi_resource_spec*, uacpi_resource*
+        const struct uacpi_resource_spec*, uacpi_resource*
     );
 
-    struct uacpi_resource_convert_instruction *to_native;
-    struct uacpi_resource_convert_instruction *to_aml;
+    const struct uacpi_resource_convert_instruction *to_native;
+    const struct uacpi_resource_convert_instruction *to_aml;
 };
 
 typedef uacpi_resource_iteration_decision
 (*uacpi_aml_resource_iteration_callback) (
     void*, uacpi_u8 *data, uacpi_u16 resource_size,
-    struct uacpi_resource_spec*
+    const struct uacpi_resource_spec*
 );
 
 uacpi_status uacpi_for_each_aml_resource(
