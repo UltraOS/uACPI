@@ -228,7 +228,7 @@ static uacpi_size size_for_aml_vendor(
             UACPI_AML_RESOURCE_KIND_LARGE
         ];
 
-        if (uacpi_unlikely(resource->type != UACPI_RESOURCE_TYPE_VENDOR_SMALL)) {
+        if (uacpi_unlikely(resource->type != UACPI_RESOURCE_TYPE_VENDOR_LARGE)) {
             uacpi_warn("vendor data too large for small descriptor (%zu), "
                        "correcting to large\n", size);
             resource->type = UACPI_RESOURCE_TYPE_VENDOR_LARGE;
