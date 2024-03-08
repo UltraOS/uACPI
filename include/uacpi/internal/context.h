@@ -73,7 +73,10 @@ struct uacpi_runtime_context {
      * as DSDT.
      */
     uacpi_bool is_rev1;
+
+#if UACPI_REDUCED_HARDWARE == 0
     uacpi_bool is_hardware_reduced;
+#endif
 
 #define UACPI_INIT_LEVEL_EARLY 0
 #define UACPI_INIT_LEVEL_TABLES_LOADED 1
@@ -94,4 +97,13 @@ static inline uacpi_bool uacpi_rt_params_check(uacpi_u64 flag)
 static inline uacpi_bool uacpi_rt_should_log(enum uacpi_log_level lvl)
 {
     return lvl <= g_uacpi_rt_ctx.params.log_level;
+}
+
+static inline uacpi_bool uacpi_is_hardware_reduced(void)
+{
+#if UACPI_REDUCED_HARDWARE == 0
+    return g_uacpi_rt_ctx.is_hardware_reduced;
+#else
+    return UACPI_TRUE;
+#endif
 }

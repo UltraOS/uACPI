@@ -29,6 +29,16 @@ target_include_directories(
     ${UACPI_INCLUDES}
 )
 
+if (NOT REDUCED_HARDWARE_BUILD)
+    set(REDUCED_HARDWARE_BUILD 0)
+endif()
+
+target_compile_definitions(
+    test-runner
+    PRIVATE
+    -DUACPI_REDUCED_HARDWARE=${REDUCED_HARDWARE_BUILD}
+)
+
 if (MSVC)
     # Address sanitizer on MSVC depends on a dynamic library that is not present in
     # PATH by default. Lets just not enable it here.
