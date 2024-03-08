@@ -59,11 +59,18 @@ struct uacpi_params {
 struct uacpi_init_params {
     uacpi_phys_addr rsdp;
     struct uacpi_params rt_params;
+
+    /*
+     * If this is set, ACPI mode is not entered during the call to
+     * uacpi_initialize. The caller is expected to enter it later at thier own
+     * discretion by using uacpi_enter_acpi_mode().
+     */
+    uacpi_bool no_acpi_mode;
 };
 
 /*
  * Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT
- * tables.
+ * tables. Enters ACPI mode.
  */
 uacpi_status uacpi_initialize(struct uacpi_init_params*);
 
@@ -95,6 +102,17 @@ uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
     uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
 );
+
+/*
+ * Helpers for entering & leaving ACPI mode. Note that ACPI mode is entered
+ * automatically during the call to uacpi_initialize().
+ */
+UACPI_ALWAYS_OK_FOR_REDUCED_HARDWARE(
+    uacpi_status uacpi_enter_acpi_mode(void)
+)
+UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
+    uacpi_status uacpi_leave_acpi_mode(void)
+)
 
 #ifdef __cplusplus
 }

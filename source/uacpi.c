@@ -8,6 +8,7 @@
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/opregion.h>
+#include <uacpi/internal/registers.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -69,6 +70,115 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "<invalid status>";
     }
 }
+
+#if UACPI_REDUCED_HARDWARE == 0
+enum hw_mode {
+    HW_MODE_ACPI = 0,
+    HW_MODE_LEGACY = 1,
+};
+
+static enum hw_mode read_mode(void)
+{
+    uacpi_status ret;
+    uacpi_u64 raw_value;
+    struct acpi_fadt *fadt = &g_uacpi_rt_ctx.fadt;
+
+    if (!fadt->smi_cmd)
+        return HW_MODE_ACPI;
+
+    ret = uacpi_read_register_field(UACPI_REGISTER_FIELD_SCI_EN, &raw_value);
+    if (uacpi_unlikely_error(ret))
+        return HW_MODE_LEGACY;
+
+    return raw_value ? HW_MODE_ACPI : HW_MODE_LEGACY;
+}
+
+static uacpi_status set_mode(enum hw_mode mode)
+{
+    uacpi_status ret;
+    uacpi_u64 raw_value, stalled_time = 0;
+    struct acpi_fadt *fadt = &g_uacpi_rt_ctx.fadt;
+
+    if (uacpi_unlikely(!fadt->smi_cmd)) {
+        uacpi_error("SMI_CMD is not implemented by the firmware\n");
+        return UACPI_STATUS_NOT_FOUND;
+    }
+
+    if (uacpi_unlikely(!fadt->acpi_enable && !fadt->acpi_disable)) {
+        uacpi_error("mode transition is not implemented by the hardware\n");
+        return UACPI_STATUS_NOT_FOUND;
+    }
+
+    switch (mode) {
+    case HW_MODE_ACPI:
+        raw_value = fadt->acpi_enable;
+        break;
+    case HW_MODE_LEGACY:
+        raw_value = fadt->acpi_disable;
+        break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    ret = uacpi_write_register(UACPI_REGISTER_SMI_CMD, raw_value);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    // Allow up to 5 seconds for the hardware to enter the desired mode
+    while (stalled_time < (5 * 1000 * 1000)) {
+        if (read_mode() == mode)
+            return UACPI_STATUS_OK;
+
+        uacpi_kernel_stall(100);
+        stalled_time += 100;
+    }
+
+    uacpi_error("hardware time out while changing modes\n");
+    return UACPI_STATUS_HARDWARE_TIMEOUT;
+}
+
+static uacpi_status enter_mode(enum hw_mode mode)
+{
+    uacpi_status ret;
+    const uacpi_char *mode_str;
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_TABLES_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    if (uacpi_is_hardware_reduced())
+        return UACPI_STATUS_OK;
+
+    mode_str = mode == HW_MODE_LEGACY ? "legacy" : "acpi";
+
+    if (read_mode() == mode) {
+        uacpi_trace("%s mode already enabled\n", mode_str);
+        return UACPI_STATUS_OK;
+    }
+
+    ret = set_mode(mode);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_error(
+            "unable to enter %s mode: %s\n",
+            mode_str, uacpi_status_to_string(ret)
+        );
+        return ret;
+    }
+
+    uacpi_trace("entered %s mode\n", mode_str);
+    return ret;
+}
+
+uacpi_status uacpi_enter_acpi_mode(void)
+{
+    return enter_mode(HW_MODE_ACPI);
+}
+
+uacpi_status uacpi_leave_acpi_mode(void)
+{
+    return enter_mode(HW_MODE_LEGACY);
+}
+#endif
 
 UACPI_PACKED(struct uacpi_rxsdt {
     struct acpi_sdt_hdr hdr;
@@ -181,7 +291,10 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
 
     uacpi_install_default_address_space_handlers();
 
-    return UACPI_STATUS_OK;
+    if (params->no_acpi_mode)
+        return UACPI_STATUS_OK;
+
+    return uacpi_enter_acpi_mode();
 }
 
 uacpi_status uacpi_namespace_load(void)
