@@ -240,6 +240,7 @@ static uacpi_status enter_hw_reduced_sleep_state(uacpi_u8 state)
 
 static uacpi_status enter_sleep_state(uacpi_u8 state)
 {
+#if UACPI_REDUCED_HARDWARE == 0
     uacpi_status ret;
     uacpi_u64 wake_status, pm1a, pm1b;
 
@@ -308,6 +309,10 @@ static uacpi_status enter_sleep_state(uacpi_u8 state)
     } while (wake_status != 1);
 
     return UACPI_STATUS_OK;
+#else
+    UACPI_UNUSED(state);
+    return UACPI_STATUS_COMPILED_OUT;
+#endif
 }
 
 uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
@@ -328,7 +333,7 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
-    if (g_uacpi_rt_ctx.is_hardware_reduced)
+    if (uacpi_is_hardware_reduced())
         return enter_hw_reduced_sleep_state(state);
 
     return enter_sleep_state(state);

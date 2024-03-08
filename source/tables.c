@@ -499,7 +499,10 @@ static uacpi_status initialize_fadt(struct uacpi_table *tbl)
 
     uacpi_memcpy(fadt, tbl->hdr, UACPI_MIN(sizeof(*fadt), tbl->hdr->length));
 
+#if UACPI_REDUCED_HARDWARE == 0
     g_uacpi_rt_ctx.is_hardware_reduced = fadt->flags & ACPI_HW_REDUCED_ACPI;
+#endif
+
     fadt_ensure_correct_revision(fadt);
 
     /*
@@ -519,7 +522,7 @@ static uacpi_status initialize_fadt(struct uacpi_table *tbl)
     if (fadt->x_dsdt)
         uacpi_table_append(fadt->x_dsdt, UACPI_NULL);
 
-    if (!g_uacpi_rt_ctx.is_hardware_reduced) {
+    if (!uacpi_is_hardware_reduced()) {
         convert_registers_to_gas();
         split_event_blocks();
 
