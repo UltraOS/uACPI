@@ -107,7 +107,8 @@ static void run_test(
 
     uacpi_init_params params = {
         reinterpret_cast<uacpi_phys_addr>(&rsdp),
-        { UACPI_LOG_TRACE, 0 }
+        { UACPI_LOG_TRACE, 0 },
+        UACPI_TRUE, // don't attempt to enter ACPI mode in userspace
     };
 
     auto ensure_ok_status = [] (uacpi_status st) {
