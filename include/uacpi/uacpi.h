@@ -76,6 +76,7 @@ uacpi_status uacpi_initialize(struct uacpi_init_params*);
 
 /*
  * Parses & executes all of the DSDT/SSDT tables.
+ * Initializes the event subsystem.
  */
 uacpi_status uacpi_namespace_load(void);
 

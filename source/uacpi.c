@@ -9,6 +9,7 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/registers.h>
+#include <uacpi/internal/event.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -331,6 +332,9 @@ uacpi_status uacpi_namespace_load(void)
 out:
     if (ret == UACPI_STATUS_NOT_FOUND)
         ret = UACPI_STATUS_OK;
+
+    if (uacpi_likely_success(ret))
+        ret = uacpi_initialize_events();
 
     if (uacpi_likely_success(ret))
         g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_LOADED;
