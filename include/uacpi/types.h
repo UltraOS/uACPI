@@ -420,6 +420,12 @@ typedef struct uacpi_firmware_request {
     };
 } uacpi_firmware_request;
 
+#define UACPI_INTERRUPT_NOT_HANDLED 0
+#define UACPI_INTERRUPT_HANDLED 1
+typedef uacpi_u32 uacpi_interrupt_ret;
+
+typedef uacpi_interrupt_ret (*uacpi_interrupt_handler)(uacpi_handle);
+
 uacpi_object *uacpi_create_object(uacpi_object_type type);
 
 void uacpi_object_ref(uacpi_object *obj);

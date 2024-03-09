@@ -382,3 +382,18 @@ uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request* req)
 
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_kernel_install_interrupt_handler(
+    uacpi_u32, uacpi_interrupt_handler, uacpi_handle,
+    uacpi_handle*
+)
+{
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_uninstall_interrupt_handler(
+    uacpi_interrupt_handler, uacpi_handle
+)
+{
+    return UACPI_STATUS_OK;
+}

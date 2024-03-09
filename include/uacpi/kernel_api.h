@@ -136,6 +136,26 @@ void uacpi_kernel_reset_event(uacpi_handle);
  */
 uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request*);
 
+/*
+ * Install an interrupt handler at 'irq', 'ctx' is passed to the provided
+ * handler for every invocation.
+ *
+ * 'out_irq_handle' is set to a kernel-implemented value that can be used to
+ * refer to this handler from other API.
+ */
+uacpi_status uacpi_kernel_install_interrupt_handler(
+    uacpi_u32 irq, uacpi_interrupt_handler, uacpi_handle ctx,
+    uacpi_handle *out_irq_handle
+);
+
+/*
+ * Uninstall an interrupt handler. 'irq_handle' is the value returned via
+ * 'out_irq_handle' during installation.
+ */
+uacpi_status uacpi_kernel_uninstall_interrupt_handler(
+    uacpi_interrupt_handler, uacpi_handle irq_handle
+);
+
 #ifdef __cplusplus
 }
 #endif
