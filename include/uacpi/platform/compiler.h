@@ -34,11 +34,21 @@
     #endif
 
     #define UACPI_MAYBE_UNUSED __attribute__ ((unused))
+
+    #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_BEGIN             \
+        _Pragma("GCC diagnostic push")                           \
+        _Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")
+
+    #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_END \
+        _Pragma("GCC diagnostic pop")
 #else
     #define uacpi_unlikely(expr) expr
     #define uacpi_likely(expr)   expr
 
     #define UACPI_MAYBE_UNUSED
+
+    #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_BEGIN
+    #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_END
 #endif
 
 #ifndef UACPI_FALLTHROUGH
