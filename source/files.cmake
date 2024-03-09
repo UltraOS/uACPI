@@ -15,4 +15,5 @@ uacpi_add_sources(
     sleep.c
     registers.c
     resources.c
+    event.c
 )

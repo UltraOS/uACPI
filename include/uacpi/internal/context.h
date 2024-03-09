@@ -76,6 +76,8 @@ struct uacpi_runtime_context {
 
 #if UACPI_REDUCED_HARDWARE == 0
     uacpi_bool is_hardware_reduced;
+    uacpi_bool has_global_lock;
+    uacpi_handle sci_handle;
 #endif
 
 #define UACPI_INIT_LEVEL_EARLY 0

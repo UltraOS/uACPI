@@ -14,6 +14,7 @@
 #include <uacpi/internal/io.h>
 #include <uacpi/internal/notify.h>
 #include <uacpi/internal/resources.h>
+#include <uacpi/internal/event.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -1193,6 +1194,7 @@ static uacpi_status do_load_table(
 )
 {
     struct uacpi_control_method method = { 0 };
+    uacpi_status ret;
     struct acpi_dsdt *dsdt;
     enum uacpi_log_level log_level = UACPI_LOG_TRACE;
     const uacpi_char *log_prefix = "Load of";
@@ -1219,7 +1221,20 @@ static uacpi_status do_load_table(
 
     table->flags |= UACPI_TABLE_LOADED;
 
-    return uacpi_execute_control_method(parent, &method, NULL, NULL);
+    ret = uacpi_execute_control_method(parent, &method, NULL, NULL);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    /*
+     * NOTE:
+     * This will need to run if we define public API for loading additional
+     * SSDTs. Add a condition to run gpe match code for the new LOAD_CAUSE
+     * in that case.
+     */
+    if (cause != TABLE_LOAD_CAUSE_API)
+        ret = uacpi_events_match_post_dynamic_table_load();
+
+    return ret;
 }
 
 static uacpi_status handle_load_table(struct execution_context *ctx)
