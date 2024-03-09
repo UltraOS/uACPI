@@ -47,6 +47,8 @@ const char *uacpi_status_to_string(uacpi_status st)
         return "resource template without an end tag";
     case UACPI_STATUS_COMPILED_OUT:
         return "this functionality has been compiled out of this build";
+    case UACPI_STATUS_HARDWARE_TIMEOUT:
+        return "timed out waiting for hardware response";
 
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";

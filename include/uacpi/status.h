@@ -25,6 +25,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_NO_HANDLER = 14,
     UACPI_STATUS_NO_RESOURCE_END_TAG = 15,
     UACPI_STATUS_COMPILED_OUT = 16,
+    UACPI_STATUS_HARDWARE_TIMEOUT = 17,
 
     // All errors that have bytecode-related origin should go here
     UACPI_STATUS_AML_UNDEFINED_REFERENCE = 0x0EFF0000,

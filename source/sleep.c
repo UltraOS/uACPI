@@ -297,7 +297,7 @@ static uacpi_status enter_sleep_state(uacpi_u8 state)
             return ret;
 
         // Nothing we can do here, give up
-        return UACPI_STATUS_INTERNAL_ERROR;
+        return UACPI_STATUS_HARDWARE_TIMEOUT;
     }
 
     do {
@@ -405,7 +405,7 @@ uacpi_status uacpi_reboot(void)
         }
 
         uacpi_error("reset timeout\n");
-        return UACPI_STATUS_INTERNAL_ERROR;
+        return UACPI_STATUS_HARDWARE_TIMEOUT;
     }
 
     return ret;
