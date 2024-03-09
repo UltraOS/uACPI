@@ -48,5 +48,13 @@ jobs:
         run: |
           choco install python3 iasl cmake llvm
           python3 -m pip install pytest
+
+      - name: Ensure reduced-hardware build compiles
+        run: |
+          cd ${{ github.workspace}}/tests/runner
+          mkdir reduced-hw-build && cd reduced-hw-build
+          cmake .. -DREDUCED_HARDWARE_BUILD=1
+          cmake --build .
+
       - name: Run tests
         run: python3 ${{ github.workspace }}/tests/run_tests.py
