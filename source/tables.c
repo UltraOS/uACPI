@@ -542,3 +542,13 @@ static uacpi_status initialize_fadt(struct uacpi_table *tbl)
 
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_table_fadt(struct acpi_fadt **out_fadt)
+{
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
+                       UACPI_INIT_LEVEL_TABLES_LOADED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+
+    *out_fadt = &g_uacpi_rt_ctx.fadt;
+    return UACPI_STATUS_OK;
+}
