@@ -46,3 +46,11 @@ uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table);
 uacpi_status
 uacpi_table_find(struct uacpi_table_identifiers *id,
                  struct uacpi_table **out_table);
+
+/*
+ * Returns the pointer to a sanitized internal version of FADT.
+ *
+ * The revision is guaranteed to be correct. All of the registers are converted
+ * to GAS format. Fields that might contain garbage are cleared.
+ */
+uacpi_status uacpi_table_fadt(struct acpi_fadt**);
