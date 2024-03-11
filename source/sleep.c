@@ -13,6 +13,9 @@
 #define CALL_SLEEP_FN(name, state) name##_hw_reduced(state);
 #endif
 
+static uacpi_status eval_wak(uacpi_u8 state);
+static uacpi_status eval_sst(uacpi_u8 value);
+
 #if UACPI_REDUCED_HARDWARE == 0
 static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
 {
@@ -82,6 +85,57 @@ static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
         if (uacpi_unlikely_error(ret))
             return ret;
     } while (wake_status != 1);
+
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status prepare_for_wake_from_sleep_state_hw_full(uacpi_u8 state)
+{
+    uacpi_status ret;
+    uacpi_u64 pm1a, pm1b;
+    UACPI_UNUSED(state);
+
+    /*
+     * Some hardware apparently relies on S0 values being written to the PM1
+     * control register on wake, so do this here.
+     */
+
+    if (g_uacpi_rt_ctx.s0_sleep_typ_a == UACPI_SLEEP_TYP_INVALID)
+        goto out;
+
+    ret = uacpi_read_register(UACPI_REGISTER_PM1_CNT, &pm1a);
+    if (uacpi_unlikely_error(ret))
+        goto out;
+
+    pm1a &= ~((uacpi_u64)(ACPI_PM1_CNT_SLP_TYP_MASK | ACPI_PM1_CNT_SLP_EN_MASK));
+    pm1b = pm1a;
+
+    pm1a |= g_uacpi_rt_ctx.s0_sleep_typ_a << ACPI_PM1_CNT_SLP_TYP_IDX;
+    pm1b |= g_uacpi_rt_ctx.s0_sleep_typ_b << ACPI_PM1_CNT_SLP_TYP_IDX;
+
+    uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
+out:
+    // Errors ignored intentionally, we don't want to abort because of this
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status wake_from_sleep_state_hw_full(uacpi_u8 state)
+{
+    g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
+    g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+
+    // Set the status to 2 (waking) while we execute the wake method.
+    eval_sst(2);
+
+    eval_wak(state);
+
+    // Apparently some BIOSes expect us to clear this, so do it
+    uacpi_write_register_field(
+        UACPI_REGISTER_FIELD_WAK_STS, ACPI_PM1_STS_CLEAR
+    );
+
+    // Now that we're awake set the status to 1 (running)
+    eval_sst(1);
 
     return UACPI_STATUS_OK;
 }
@@ -201,6 +255,19 @@ static uacpi_status eval_pts(uacpi_u8 state)
     return eval_sleep_helper(uacpi_namespace_root(), "_PTS", state);
 }
 
+static uacpi_status eval_wak(uacpi_u8 state)
+{
+    return eval_sleep_helper(uacpi_namespace_root(), "_WAK", state);
+}
+
+static uacpi_status eval_sst(uacpi_u8 value)
+{
+    return eval_sleep_helper(
+        uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SI),
+        "_SST", value
+    );
+}
+
 static uacpi_status eval_sst_for_state(enum uacpi_sleep_state state)
 {
     uacpi_u8 arg;
@@ -235,10 +302,7 @@ static uacpi_status eval_sst_for_state(enum uacpi_sleep_state state)
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    return eval_sleep_helper(
-        uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SI),
-        "_SST", arg
-    );
+    return eval_sst(arg);
 }
 
 uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state state_enum)
@@ -274,11 +338,11 @@ uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state state_enum)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_u8 make_hw_reduced_sleep_control(void)
+static uacpi_u8 make_hw_reduced_sleep_control(uacpi_u8 slp_typ)
 {
     uacpi_u8 value;
 
-    value = (g_uacpi_rt_ctx.last_sleep_typ_a << ACPI_SLP_CNT_SLP_TYP_IDX);
+    value = (slp_typ << ACPI_SLP_CNT_SLP_TYP_IDX);
     value &= ACPI_SLP_CNT_SLP_TYP_MASK;
     value |= ACPI_SLP_CNT_SLP_EN_MASK;
 
@@ -302,7 +366,9 @@ static uacpi_status enter_sleep_state_hw_reduced(uacpi_u8 state)
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    sleep_control = make_hw_reduced_sleep_control();
+    sleep_control = make_hw_reduced_sleep_control(
+        g_uacpi_rt_ctx.last_sleep_typ_a
+    );
 
     if (state < UACPI_SLEEP_STATE_S4)
         UACPI_ARCH_FLUSH_CPU_CACHE();
@@ -332,6 +398,44 @@ static uacpi_status enter_sleep_state_hw_reduced(uacpi_u8 state)
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status prepare_for_wake_from_sleep_state_hw_reduced(uacpi_u8 state)
+{
+    uacpi_u8 sleep_control;
+    UACPI_UNUSED(state);
+
+    if (g_uacpi_rt_ctx.s0_sleep_typ_a == UACPI_SLEEP_TYP_INVALID)
+        goto out;
+
+    sleep_control = make_hw_reduced_sleep_control(
+        g_uacpi_rt_ctx.s0_sleep_typ_a
+    );
+    uacpi_write_register(UACPI_REGISTER_SLP_CNT, sleep_control);
+
+out:
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status wake_from_sleep_state_hw_reduced(uacpi_u8 state)
+{
+    g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
+    g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+
+    // Set the status to 2 (waking) while we execute the wake method.
+    eval_sst(2);
+
+    eval_wak(state);
+
+    // Apparently some BIOSes expect us to clear this, so do it
+    uacpi_write_register_field(
+        UACPI_REGISTER_FIELD_HWR_WAK_STS, ACPI_SLP_STS_CLEAR
+    );
+
+    // Now that we're awake set the status to 1 (running)
+    eval_sst(1);
+
+    return UACPI_STATUS_OK;
+}
+
 uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
 {
     uacpi_u8 state = state_enum;
@@ -351,6 +455,36 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
     }
 
     return CALL_SLEEP_FN(enter_sleep_state, state);
+}
+
+uacpi_status uacpi_prepare_for_wake_from_sleep_state(
+    uacpi_sleep_state state_enum
+)
+{
+    uacpi_u8 state = state_enum;
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
+                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    if (uacpi_unlikely(state > UACPI_SLEEP_STATE_MAX))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    return CALL_SLEEP_FN(prepare_for_wake_from_sleep_state, state);
+}
+
+uacpi_status uacpi_wake_from_sleep_state(
+    uacpi_sleep_state state_enum
+)
+{
+    uacpi_u8 state = state_enum;
+
+    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
+                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
+        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    if (uacpi_unlikely(state > UACPI_SLEEP_STATE_MAX))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    return CALL_SLEEP_FN(wake_from_sleep_state, state);
 }
 
 uacpi_status uacpi_reboot(void)
