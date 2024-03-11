@@ -17,6 +17,30 @@ static uacpi_status eval_wak(uacpi_u8 state);
 static uacpi_status eval_sst(uacpi_u8 value);
 
 #if UACPI_REDUCED_HARDWARE == 0
+uacpi_status uacpi_set_waking_vector(
+    uacpi_phys_addr addr32, uacpi_phys_addr addr64
+)
+{
+    struct acpi_facs *facs = g_uacpi_rt_ctx.facs;
+
+    if (facs == UACPI_NULL)
+        return UACPI_STATUS_OK;
+
+    facs->firmware_waking_vector = addr32;
+
+    // The 64-bit wake vector doesn't exist, we're done
+    if (facs->length < 32)
+        return UACPI_STATUS_OK;
+
+    // Only allow 64-bit wake vector on 1.0 and above FACS
+    if (facs->version >= 1)
+        facs->x_firmware_waking_vector = addr64;
+    else
+        facs->x_firmware_waking_vector = 0;
+
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
 {
     uacpi_status ret;

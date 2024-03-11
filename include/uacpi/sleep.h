@@ -2,10 +2,22 @@
 
 #include <uacpi/types.h>
 #include <uacpi/status.h>
+#include <uacpi/uacpi.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Set the firmware waking vector in FACS.
+ *
+ * 'addr32' is the real mode entry-point address
+ * 'addr64' is the protected mode entry-point address
+ */
+UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
+uacpi_status uacpi_set_waking_vector(
+    uacpi_phys_addr addr32, uacpi_phys_addr addr64
+))
 
 typedef enum uacpi_sleep_state {
     UACPI_SLEEP_STATE_S0 = 0,
