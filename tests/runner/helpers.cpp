@@ -25,6 +25,22 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.hdr.length = sizeof(fadt);
     fadt.hdr.revision = 6;
 
+    fadt.pm1a_cnt_blk = 0xFFEE;
+    fadt.pm1_cnt_len = 2;
+
+    fadt.pm1a_evt_blk = 0xDEAD;
+    fadt.pm1_evt_len = 4;
+
+    fadt.pm2_cnt_blk = 0xCCDD;
+    fadt.pm2_cnt_len = 1;
+
+    fadt.gpe0_blk_len = 0x20;
+    fadt.gpe0_blk = 0xDEAD;
+
+    fadt.gpe1_base = 128;
+    fadt.gpe1_blk = 0xBEEF;
+    fadt.gpe1_blk_len = 0x20;
+
     auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
     // Always force the signature to DSDT as that's what we're building
     memcpy(dsdt->hdr.signature, ACPI_DSDT_SIGNATURE,

@@ -24,31 +24,33 @@
 #include <uacpi/kernel_api.h>
 
 uacpi_status uacpi_kernel_raw_memory_read(
-    uacpi_phys_addr, uacpi_u8, uacpi_u64*
+    uacpi_phys_addr, uacpi_u8, uacpi_u64 *ret
 )
 {
-    return UACPI_STATUS_UNIMPLEMENTED;
+    *ret = 0;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_raw_memory_write(
     uacpi_phys_addr, uacpi_u8, uacpi_u64
 )
 {
-    return UACPI_STATUS_UNIMPLEMENTED;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_raw_io_read(
-    uacpi_io_addr, uacpi_u8, uacpi_u64*
+    uacpi_io_addr, uacpi_u8, uacpi_u64 *ret
 )
 {
-    return UACPI_STATUS_UNIMPLEMENTED;
+    *ret = 0xFFFFFFFFFFFFFFFF;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_raw_io_write(
     uacpi_io_addr, uacpi_u8, uacpi_u64
 )
 {
-    return UACPI_STATUS_UNIMPLEMENTED;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr, uacpi_size,
