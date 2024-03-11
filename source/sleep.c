@@ -87,7 +87,9 @@ static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
 }
 #endif
 
-static uacpi_status get_slp_type_for_state(uacpi_u8 state)
+static uacpi_status get_slp_type_for_state(
+    uacpi_u8 state, uacpi_u8 *a, uacpi_u8 *b
+)
 {
     uacpi_char path[] = "_S0";
     uacpi_status ret;
@@ -126,8 +128,8 @@ static uacpi_status get_slp_type_for_state(uacpi_u8 state)
             goto out;
         }
 
-        g_uacpi_rt_ctx.last_sleep_typ_a = obj0->integer;
-        g_uacpi_rt_ctx.last_sleep_typ_b = obj0->integer >> 8;
+        *a = obj0->integer;
+        *b = obj0->integer >> 8;
         break;
 
     default:
@@ -146,15 +148,15 @@ static uacpi_status get_slp_type_for_state(uacpi_u8 state)
             goto out;
         }
 
-        g_uacpi_rt_ctx.last_sleep_typ_a = obj0->integer;
-        g_uacpi_rt_ctx.last_sleep_typ_b = obj1->integer;
+        *a = obj0->integer;
+        *b = obj1->integer;
         break;
     }
 
 out:
     if (ret != UACPI_STATUS_OK) {
-        g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
-        g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+        *a = UACPI_SLEEP_TYP_INVALID;
+        *b = UACPI_SLEEP_TYP_INVALID;
     }
 
     uacpi_object_unref(ret_obj);
@@ -250,7 +252,11 @@ uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state state_enum)
     if (uacpi_unlikely(state > UACPI_SLEEP_STATE_S5))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    ret = get_slp_type_for_state(state);
+    ret = get_slp_type_for_state(
+        state,
+        &g_uacpi_rt_ctx.last_sleep_typ_a,
+        &g_uacpi_rt_ctx.last_sleep_typ_b
+    );
     if (ret != UACPI_STATUS_OK)
         return ret;
 
