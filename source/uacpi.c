@@ -258,6 +258,8 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
     g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+    g_uacpi_rt_ctx.s0_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
+    g_uacpi_rt_ctx.s0_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
 
     uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
                  sizeof(params->rt_params));
