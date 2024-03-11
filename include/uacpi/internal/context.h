@@ -31,6 +31,9 @@ struct uacpi_runtime_context {
     uacpi_u8 last_sleep_typ_a;
     uacpi_u8 last_sleep_typ_b;
 
+    uacpi_u8 s0_sleep_typ_a;
+    uacpi_u8 s0_sleep_typ_b;
+
     /*
      * This is a per-table value but we mimic the NT implementation:
      * treat all other definition blocks as if they were the same revision
