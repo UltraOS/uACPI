@@ -5,6 +5,88 @@
 #include <uacpi/internal/registers.h>
 #include <uacpi/platform/arch_helpers.h>
 
+#if UACPI_REDUCED_HARDWARE == 0
+#define CALL_SLEEP_FN(name, state)                       \
+    (uacpi_is_hardware_reduced() ?                       \
+        name##_hw_reduced(state) : name##_hw_full(state))
+#else
+#define CALL_SLEEP_FN(name, state) name##_hw_reduced(state);
+#endif
+
+#if UACPI_REDUCED_HARDWARE == 0
+static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
+{
+    uacpi_status ret;
+    uacpi_u64 wake_status, pm1a, pm1b;
+
+    ret = uacpi_write_register_field(
+        UACPI_REGISTER_FIELD_WAK_STS, ACPI_PM1_STS_CLEAR
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_read_register(UACPI_REGISTER_PM1_CNT, &pm1a);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    pm1a &= ~((uacpi_u64)(ACPI_PM1_CNT_SLP_TYP_MASK | ACPI_PM1_CNT_SLP_EN_MASK));
+    pm1b = pm1a;
+
+    pm1a |= g_uacpi_rt_ctx.last_sleep_typ_a << ACPI_PM1_CNT_SLP_TYP_IDX;
+    pm1b |= g_uacpi_rt_ctx.last_sleep_typ_b << ACPI_PM1_CNT_SLP_TYP_IDX;
+
+    /*
+     * Just like ACPICA, split writing SLP_TYP and SLP_EN to work around
+     * buggy firmware that can't handle both written at the same time.
+     */
+    ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    pm1a |= ACPI_PM1_CNT_SLP_EN_MASK;
+    pm1b |= ACPI_PM1_CNT_SLP_EN_MASK;
+
+    if (state < UACPI_SLEEP_STATE_S4)
+        UACPI_ARCH_FLUSH_CPU_CACHE();
+
+    ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    if (state > UACPI_SLEEP_STATE_S3) {
+        /*
+         * We're still here, this is a bug or very slow firmware.
+         * Just try spinning for a bit.
+         */
+        uacpi_u64 stalled_time = 0;
+
+        // 10 seconds max
+        while (stalled_time < (10 * 1000 * 1000)) {
+            uacpi_kernel_stall(100);
+            stalled_time += 100;
+        }
+
+        // Try one more time
+        ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        // Nothing we can do here, give up
+        return UACPI_STATUS_HARDWARE_TIMEOUT;
+    }
+
+    do {
+        ret = uacpi_read_register_field(
+            UACPI_REGISTER_FIELD_WAK_STS, &wake_status
+        );
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    } while (wake_status != 1);
+
+    return UACPI_STATUS_OK;
+}
+#endif
+
 static uacpi_status get_slp_type_for_state(uacpi_u8 state)
 {
     uacpi_char path[] = "_S0";
@@ -191,7 +273,7 @@ static uacpi_u8 make_hw_reduced_sleep_control(void)
     return value;
 }
 
-static uacpi_status enter_hw_reduced_sleep_state(uacpi_u8 state)
+static uacpi_status enter_sleep_state_hw_reduced(uacpi_u8 state)
 {
     uacpi_status ret;
     uacpi_u8 sleep_control;
@@ -238,83 +320,6 @@ static uacpi_status enter_hw_reduced_sleep_state(uacpi_u8 state)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status enter_sleep_state(uacpi_u8 state)
-{
-#if UACPI_REDUCED_HARDWARE == 0
-    uacpi_status ret;
-    uacpi_u64 wake_status, pm1a, pm1b;
-
-    ret = uacpi_write_register_field(
-        UACPI_REGISTER_FIELD_WAK_STS, ACPI_PM1_STS_CLEAR
-    );
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    ret = uacpi_read_register(UACPI_REGISTER_PM1_CNT, &pm1a);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    pm1a &= ~((uacpi_u64)(ACPI_PM1_CNT_SLP_TYP_MASK | ACPI_PM1_CNT_SLP_EN_MASK));
-    pm1b = pm1a;
-
-    pm1a |= g_uacpi_rt_ctx.last_sleep_typ_a << ACPI_PM1_CNT_SLP_TYP_IDX;
-    pm1b |= g_uacpi_rt_ctx.last_sleep_typ_b << ACPI_PM1_CNT_SLP_TYP_IDX;
-
-    /*
-     * Just like ACPICA, split writing SLP_TYP and SLP_EN to work around
-     * buggy firmware that can't handle both written at the same time.
-     */
-    ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    pm1a |= ACPI_PM1_CNT_SLP_EN_MASK;
-    pm1b |= ACPI_PM1_CNT_SLP_EN_MASK;
-
-    if (state < UACPI_SLEEP_STATE_S4)
-        UACPI_ARCH_FLUSH_CPU_CACHE();
-
-    ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    if (state > UACPI_SLEEP_STATE_S3) {
-        /*
-         * We're still here, this is a bug or very slow firmware.
-         * Just try spinning for a bit.
-         */
-        uacpi_u64 stalled_time = 0;
-
-        // 10 seconds max
-        while (stalled_time < (10 * 1000 * 1000)) {
-            uacpi_kernel_stall(100);
-            stalled_time += 100;
-        }
-
-        // Try one more time
-        ret = uacpi_write_registers(UACPI_REGISTER_PM1_CNT, pm1a, pm1b);
-        if (uacpi_unlikely_error(ret))
-            return ret;
-
-        // Nothing we can do here, give up
-        return UACPI_STATUS_HARDWARE_TIMEOUT;
-    }
-
-    do {
-        ret = uacpi_read_register_field(
-            UACPI_REGISTER_FIELD_WAK_STS, &wake_status
-        );
-        if (uacpi_unlikely_error(ret))
-            return ret;
-    } while (wake_status != 1);
-
-    return UACPI_STATUS_OK;
-#else
-    UACPI_UNUSED(state);
-    return UACPI_STATUS_COMPILED_OUT;
-#endif
-}
-
 uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
 {
     uacpi_u8 state = state_enum;
@@ -333,10 +338,7 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
-    if (uacpi_is_hardware_reduced())
-        return enter_hw_reduced_sleep_state(state);
-
-    return enter_sleep_state(state);
+    return CALL_SLEEP_FN(enter_sleep_state, state);
 }
 
 uacpi_status uacpi_reboot(void)
