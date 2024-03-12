@@ -179,6 +179,31 @@ void uacpi_kernel_free_spinlock(uacpi_handle);
 uacpi_cpu_flags uacpi_kernel_spinlock_lock(uacpi_handle);
 void uacpi_kernel_spinlock_unlock(uacpi_handle, uacpi_cpu_flags);
 
+typedef enum uacpi_work_type {
+    /*
+     * Schedule a GPE handler method for execution.
+     * This should be scheduled to run on CPU0 to avoid potential SMI-related
+     * firmware bugs.
+     */
+    UACPI_WORK_GPE_EXECUTION,
+
+    /*
+     * Schedule a Notify(device) firmware request for execution.
+     * This can run on any CPU.
+     */
+    UACPI_WORK_NOTIFICATION,
+} uacpi_work_type;
+
+typedef void (*uacpi_work_handler)(uacpi_handle);
+
+/*
+ * Schedules deferred work for execution.
+ * Might be invoked from an interrupt context.
+ */
+uacpi_status uacpi_kernel_schedule_work(
+    uacpi_work_type, uacpi_work_handler, uacpi_handle ctx
+);
+
 #ifdef __cplusplus
 }
 #endif
