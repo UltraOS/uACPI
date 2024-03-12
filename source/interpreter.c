@@ -3423,27 +3423,19 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 
 static uacpi_status handle_notify(struct execution_context *ctx)
 {
+    uacpi_status ret;
     struct op_context *op_ctx = ctx->cur_op_ctx;
     struct uacpi_namespace_node *node;
-    uacpi_bool did_notify = UACPI_FALSE;
     uacpi_u64 value;
-    uacpi_handlers *handlers;
 
     node = item_array_at(&op_ctx->items, 0)->node;
     value = item_array_at(&op_ctx->items, 1)->obj->integer;
 
-    handlers = uacpi_node_get_handlers(node);
-    if (uacpi_unlikely(handlers == UACPI_NULL)) {
-        uacpi_error("Notify() called on an invalid object %.4s\n",
-                    node->name.text);
-        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
-    }
-    did_notify |= uacpi_notify_all(node, value, handlers->notify_head);
+    ret = uacpi_notify_all(node, value);
+    if (uacpi_likely_success(ret))
+        return ret;
 
-    handlers = uacpi_node_get_handlers(uacpi_namespace_root());
-    did_notify |= uacpi_notify_all(node, value, handlers->notify_head);
-
-    if (!did_notify) {
+    if (ret == UACPI_STATUS_NO_HANDLER) {
         const uacpi_char *path;
 
         path = uacpi_namespace_node_generate_absolute_path(node);
@@ -3452,9 +3444,17 @@ static uacpi_status handle_notify(struct execution_context *ctx)
             path, value
         );
         uacpi_kernel_free((void*)path);
+
+        return UACPI_STATUS_OK;
     }
 
-    return UACPI_STATUS_OK;
+    if (ret == UACPI_STATUS_INVALID_ARGUMENT) {
+        uacpi_error("Notify() called on an invalid object %.4s\n",
+                    node->name.text);
+        return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
+    }
+
+    return ret;
 }
 
 static uacpi_status handle_firmware_request(struct execution_context *ctx)

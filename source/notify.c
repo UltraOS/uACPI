@@ -1,5 +1,7 @@
 #include <uacpi/internal/notify.h>
+#include <uacpi/internal/shareable.h>
 #include <uacpi/internal/namespace.h>
+#include <uacpi/internal/log.h>
 #include <uacpi/kernel_api.h>
 
 uacpi_handlers *uacpi_node_get_handlers(
@@ -30,26 +32,76 @@ uacpi_handlers *uacpi_node_get_handlers(
     }
 }
 
-/*
- * FIXME: this should probably queue the notification to be dispatched in the
- *        kernel later instead of doing it right away. On the other hand we
- *        could delegate the "dispatching" work to the kernel directly and
- *        instead keep uACPI more simple.
- */
-uacpi_bool uacpi_notify_all(
-    uacpi_namespace_node *node, uacpi_u64 value,
-    uacpi_device_notify_handler *handler
-)
-{
-    uacpi_bool did_notify = UACPI_FALSE;
+struct notification_ctx {
+    uacpi_namespace_node *node;
+    uacpi_u64 value;
+    uacpi_device_notify_handler *node_handlers, *root_handlers;
+};
 
-    while (handler) {
-        handler->callback(handler->user_context, node, value);
+static void do_notify(uacpi_handle opaque)
+{
+    struct notification_ctx *ctx = opaque;
+    uacpi_device_notify_handler *handler;
+    uacpi_bool did_notify_root = UACPI_FALSE;
+
+    handler = ctx->node_handlers;
+
+    for (;;) {
+        if (handler == UACPI_NULL) {
+            if (did_notify_root) {
+                uacpi_namespace_node_unref(ctx->node);
+                uacpi_kernel_free(ctx);
+                return;
+            }
+
+            handler = ctx->root_handlers;
+            did_notify_root = UACPI_TRUE;
+            continue;
+        }
+
+        handler->callback(handler->user_context, ctx->node, ctx->value);
         handler = handler->next;
-        did_notify = UACPI_TRUE;
+    }
+}
+
+uacpi_status uacpi_notify_all(uacpi_namespace_node *node, uacpi_u64 value)
+{
+    uacpi_status ret;
+    struct notification_ctx *ctx;
+    uacpi_handlers *node_handlers, *root_handlers;
+
+    node_handlers = uacpi_node_get_handlers(node);
+    if (uacpi_unlikely(node_handlers == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    root_handlers = uacpi_node_get_handlers(uacpi_namespace_root());
+
+    if (node_handlers->notify_head == UACPI_NULL &&
+        root_handlers->notify_head == UACPI_NULL)
+        return UACPI_STATUS_NO_HANDLER;
+
+    ctx = uacpi_kernel_alloc(sizeof(*ctx));
+    if (uacpi_unlikely(ctx == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    ctx->node = node;
+    // In case this node goes out of scope
+    uacpi_shareable_ref(node);
+
+    ctx->value = value;
+    ctx->node_handlers = node_handlers->notify_head;
+    ctx->root_handlers = root_handlers->notify_head;
+
+    ret = uacpi_kernel_schedule_work(UACPI_WORK_NOTIFICATION, do_notify, ctx);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_warn("unable to schedule notification work: %s\n",
+                   uacpi_status_to_string(ret));
+        uacpi_namespace_node_unref(node);
+        uacpi_kernel_free(ctx);
+        return ret;
     }
 
-    return did_notify;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_device_notify_handler *handler_container(
