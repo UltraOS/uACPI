@@ -1,6 +1,7 @@
 #pragma once
 
 #include <uacpi/types.h>
+#include <uacpi/platform/arch_helpers.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -121,6 +122,8 @@ uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16);
 
 /*
  * Signal the event object by incrementing its internal counter by 1.
+ *
+ * This function may be used in interrupt contexts.
  */
 void uacpi_kernel_signal_event(uacpi_handle);
 
@@ -155,6 +158,26 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
 uacpi_status uacpi_kernel_uninstall_interrupt_handler(
     uacpi_interrupt_handler, uacpi_handle irq_handle
 );
+
+/*
+ * Create/free a kernel spinlock object.
+ *
+ * Unlike other types of locks, spinlocks may be used in interrupt contexts.
+ */
+uacpi_handle uacpi_kernel_create_spinlock(void);
+void uacpi_kernel_free_spinlock(uacpi_handle);
+
+/*
+ * Lock/unlock helpers for spinlocks.
+ *
+ * These are expected to disable interrupts, returning the previous state of cpu
+ * flags, that can be used to possibly re-enable interrupts if they were enabled
+ * before.
+ *
+ * Note that lock is infalliable.
+ */
+uacpi_cpu_flags uacpi_kernel_spinlock_lock(uacpi_handle);
+void uacpi_kernel_spinlock_unlock(uacpi_handle, uacpi_cpu_flags);
 
 #ifdef __cplusplus
 }
