@@ -2,6 +2,24 @@
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/stdlib.h>
 
+#define UACPI_STATIC_TABLE_ARRAY_LEN 16
+
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
+    table_array, uacpi_table, UACPI_STATIC_TABLE_ARRAY_LEN
+)
+DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
+
+// FADT + DSDT have a hardcoded index in the array
+#define UACPI_BASE_TABLE_COUNT 2
+
+static struct table_array tables;
+
+uacpi_status uacpi_initialize_tables(void)
+{
+    tables.size_including_inline = UACPI_BASE_TABLE_COUNT;
+    return UACPI_STATUS_OK;
+}
+
 static uacpi_status initialize_fadt(struct uacpi_table*);
 
 static uacpi_object_name fadt_signature = {
@@ -16,12 +34,10 @@ static uacpi_object_name facs_signature = {
     .text = { ACPI_FACS_SIGNATURE },
 };
 
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(table_array, struct uacpi_table,)
-
 // TODO: thread safety/locking
 static uacpi_status table_do_alloc_slot(struct uacpi_table **out_table)
 {
-    *out_table = table_array_calloc(&g_uacpi_rt_ctx.tables);
+    *out_table = table_array_calloc(&tables);
     if (*out_table == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
@@ -34,7 +50,7 @@ get_table_for_type(enum uacpi_table_type type)
     switch (type) {
     case UACPI_TABLE_TYPE_FADT:
     case UACPI_TABLE_TYPE_DSDT:
-        return table_array_at(&g_uacpi_rt_ctx.tables, type);
+        return table_array_at(&tables, type);
     default:
         break;
     }
@@ -207,10 +223,10 @@ static uacpi_status do_search(struct uacpi_table_identifiers *id,
     uacpi_size idx;
     struct uacpi_table *found_table = UACPI_NULL;
 
-    for (idx = base_idx; idx < table_array_size(&g_uacpi_rt_ctx.tables); ++idx) {
+    for (idx = base_idx; idx < table_array_size(&tables); ++idx) {
         struct uacpi_table *table;
 
-        table = table_array_at(&g_uacpi_rt_ctx.tables, idx);
+        table = table_array_at(&tables, idx);
 
         if (!is_valid_table(table))
             continue;
@@ -315,7 +331,7 @@ uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
     if (get_table_for_signature(id.signature))
         return UACPI_STATUS_NOT_FOUND;
 
-    base_idx = table_array_index_of(&g_uacpi_rt_ctx.tables, *in_out_table);
+    base_idx = table_array_index_of(&tables, *in_out_table);
     if (base_idx == 0)
         return UACPI_STATUS_INVALID_ARGUMENT;
 

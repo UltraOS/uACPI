@@ -6,43 +6,7 @@
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/shareable.h>
 
- /*
-  * Table is valid and may be used
-  */
-#define UACPI_TABLE_VALID (1 << 0)
-
-/*
- * Table is already mapped and 'virt_addr' may be used to read it
- */
-#define UACPI_TABLE_MAPPED (1 << 1)
-
-/*
- * (Only relevant for definition blocks)
- * The table has already been executed by the interpreter.
- */
-#define UACPI_TABLE_LOADED (1 << 2)
-
-struct uacpi_table {
-    struct uacpi_shareable shareable;
-    uacpi_object_name signature;
-    uacpi_phys_addr phys_addr;
-    union {
-        uacpi_virt_addr virt_addr;
-        struct acpi_sdt_hdr *hdr;
-    };
-    uacpi_u32 length;
-    uacpi_u8 flags;
-};
-
-#define UACPI_STATIC_TABLE_ARRAY_LEN 16
-
-DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
-    table_array, struct uacpi_table, UACPI_STATIC_TABLE_ARRAY_LEN
-)
-
 struct uacpi_runtime_context {
-    struct table_array tables;
-
     /*
      * A local copy of FADT that has been verified & converted to most optimal
      * format for faster access to the registers.
