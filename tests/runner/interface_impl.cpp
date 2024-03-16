@@ -428,3 +428,8 @@ uacpi_status uacpi_kernel_schedule_work(
     handler(ctx);
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_kernel_wait_for_work_completion()
+{
+    return UACPI_STATUS_OK;
+}
