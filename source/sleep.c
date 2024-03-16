@@ -3,6 +3,7 @@
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/io.h>
 #include <uacpi/internal/registers.h>
+#include <uacpi/internal/event.h>
 #include <uacpi/platform/arch_helpers.h>
 
 #if UACPI_REDUCED_HARDWARE == 0
@@ -49,6 +50,18 @@ static uacpi_status enter_sleep_state_hw_full(uacpi_u8 state)
     ret = uacpi_write_register_field(
         UACPI_REGISTER_FIELD_WAK_STS, ACPI_PM1_STS_CLEAR
     );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_disable_all_gpes();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_clear_all_events();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_enable_all_wake_gpes();
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -145,11 +158,20 @@ out:
 
 static uacpi_status wake_from_sleep_state_hw_full(uacpi_u8 state)
 {
+    uacpi_status ret;
     g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
 
     // Set the status to 2 (waking) while we execute the wake method.
     eval_sst(2);
+
+    ret = uacpi_disable_all_gpes();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_enable_all_runtime_gpes();
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     eval_wak(state);
 
