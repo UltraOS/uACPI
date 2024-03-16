@@ -200,7 +200,7 @@ typedef struct uacpi_handlers {
     uacpi_device_notify_handler *notify_head;
 } uacpi_handlers;
 
-enum uacpi_address_space {
+typedef enum uacpi_address_space {
     UACPI_ADDRESS_SPACE_SYSTEM_MEMORY = 0,
     UACPI_ADDRESS_SPACE_SYSTEM_IO = 1,
     UACPI_ADDRESS_SPACE_PCI_CONFIG = 2,
@@ -215,10 +215,8 @@ enum uacpi_address_space {
 
     // Internal type
     UACPI_ADDRESS_SPACE_TABLE_DATA = 0xFE,
-};
-const uacpi_char *uacpi_address_space_to_string(
-    enum uacpi_address_space space
-);
+} uacpi_address_space;
+const uacpi_char *uacpi_address_space_to_string(uacpi_address_space space);
 
 // This region has a corresponding _REG method that was succesfully executed
 #define UACPI_OP_REGION_STATE_REG_EXECUTED (1 << 0)
