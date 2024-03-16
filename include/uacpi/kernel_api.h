@@ -204,6 +204,11 @@ uacpi_status uacpi_kernel_schedule_work(
     uacpi_work_type, uacpi_work_handler, uacpi_handle ctx
 );
 
+/*
+ * Blocks until all scheduled work is complete and the work queue becomes empty.
+ */
+uacpi_status uacpi_kernel_wait_for_work_completion(void);
+
 #ifdef __cplusplus
 }
 #endif
