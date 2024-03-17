@@ -39,13 +39,13 @@ class TestHeaderFooter:
         self.hdr = "{:=^80}".format(" " + text + " ")
 
     def __enter__(self) -> None:
-        print(self.hdr)
+        print(self.hdr, flush=True)
 
     def __exit__(
         self, exc_type: Optional[type[BaseException]],
         ex: Optional[BaseException], traceback: Optional[TracebackType]
     ) -> Optional[bool]:
-        print("=" * len(self.hdr))
+        print("=" * len(self.hdr), flush=True)
         return None
 
 
@@ -80,7 +80,7 @@ def run_tests(
             # one comes with Ubuntu 22.04, so hardcode it.
             if "20200925" in out:
                 skipped_count += 1
-                print("SKIPPED (bugged iASL)")
+                print("SKIPPED (bugged iASL)", flush=True)
                 continue
 
         compiled_case = ASLSource.compile(case, compiler, bin_dir)
@@ -91,12 +91,12 @@ def run_tests(
         try:
             stdout, stderr = proc.communicate(timeout=10)
             if proc.returncode == 0:
-                print("OK")
+                print("OK", flush=True)
                 continue
         except subprocess.TimeoutExpired:
-            print("TIMEOUT")
+            print("TIMEOUT", flush=True)
         else:
-            print("FAIL")
+            print("FAIL", flush=True)
 
         fail_count += 1
         output = ""
@@ -116,16 +116,17 @@ def run_tests(
         output += format_output("stderr", stderr)
 
         if output:
-            print("TEST OUTPUT:")
-            print(output)
+            print("TEST OUTPUT:", flush=True)
+            print(output, flush=True)
         else:
-            print("NO OUTPUT FROM TEST")
+            print("NO OUTPUT FROM TEST", flush=True)
 
     skipped_str = f", {skipped_count} SKIPPED" if skipped_count else ""
     pass_count = len(cases) - fail_count - skipped_count
     print(
         f"SUMMARY: {pass_count}/{len(cases)} "
-        f"({fail_count} FAILED{skipped_str})"
+        f"({fail_count} FAILED{skipped_str})",
+        flush=True
     )
     return fail_count
 
