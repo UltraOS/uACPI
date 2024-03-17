@@ -95,6 +95,8 @@ def run_tests(
                 continue
         except subprocess.TimeoutExpired:
             print("TIMEOUT", flush=True)
+            proc.kill()
+            stdout, stderr = proc.communicate()
         else:
             print("FAIL", flush=True)
 
