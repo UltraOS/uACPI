@@ -38,6 +38,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install python3 python3-pytest acpica-tools cmake
+          # https://github.com/actions/runner-images/issues/9491#issuecomment-1989718917
+          sudo sysctl vm.mmap_rnd_bits=28
       - if: ${{ matrix.os == 'macos-latest' }}
         name: Install tools & libraries (MacOS)
         run: |
