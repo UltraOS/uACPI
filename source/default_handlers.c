@@ -14,13 +14,12 @@ static uacpi_namespace_node *find_pci_root(uacpi_namespace_node *node)
     static const uacpi_char *pci_root_ids[] = {
         PCI_ROOT_PNP_ID,
         PCI_EXPRESS_ROOT_PNP_ID,
+        UACPI_NULL
     };
     uacpi_namespace_node *parent = node->parent;
 
     while (parent != uacpi_namespace_root()) {
-        if (uacpi_device_matches_pnp_id(
-                parent, pci_root_ids, UACPI_ARRAY_SIZE(pci_root_ids))
-        ) {
+        if (uacpi_device_matches_pnp_id(parent, pci_root_ids)) {
             uacpi_trace(
                 "found a PCI root node %.4s controlling region %.4s\n",
                 parent->name.text, node->name.text
