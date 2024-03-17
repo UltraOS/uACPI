@@ -470,9 +470,9 @@ uacpi_status uacpi_get_pci_routing_table(
                 parent, elem_obj->buffer->text
             );
             if (uacpi_unlikely(entry->source == UACPI_NULL)) {
-                // Just warn here, don't error out
-                uacpi_warn("unable to lookup _PRT source: %s\n",
-                           elem_obj->buffer->text);
+                uacpi_error("unable to lookup _PRT source: %s\n",
+                            elem_obj->buffer->text);
+                goto out_bad_encoding;
             }
             break;
         case UACPI_OBJECT_INTEGER:
