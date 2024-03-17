@@ -105,6 +105,14 @@ uacpi_status uacpi_eval_typed(
 );
 
 /*
+ * A shorthand for uacpi_eval_typed with UACPI_OBJECT_INTEGER_BIT.
+ */
+uacpi_status uacpi_eval_integer(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_args *args, uacpi_u64 *out_value
+);
+
+/*
  * Helpers for entering & leaving ACPI mode. Note that ACPI mode is entered
  * automatically during the call to uacpi_initialize().
  */
