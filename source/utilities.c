@@ -255,12 +255,12 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
 }
 
 static uacpi_bool matches_any(
-    const uacpi_char *hid, const uacpi_char **ids, uacpi_size num_entries
+    const uacpi_char *hid, const uacpi_char **ids
 )
 {
     uacpi_size i;
 
-    for (i = 0; i < num_entries; ++i) {
+    for (i = 0; ids[i]; ++i) {
         if (uacpi_strcmp(hid, ids[i]) == 0)
             return UACPI_TRUE;
     }
@@ -269,7 +269,7 @@ static uacpi_bool matches_any(
 }
 
 uacpi_bool uacpi_device_matches_pnp_id(
-    uacpi_namespace_node *node, const uacpi_char **ids, uacpi_size num_entries
+    uacpi_namespace_node *node, const uacpi_char **ids
 )
 {
     uacpi_status st;
@@ -278,7 +278,7 @@ uacpi_bool uacpi_device_matches_pnp_id(
     uacpi_pnp_id_list id_list = { 0 };
 
     st = uacpi_eval_hid(node, &id);
-    if (st == UACPI_STATUS_OK && matches_any(id, ids, num_entries)) {
+    if (st == UACPI_STATUS_OK && matches_any(id, ids)) {
         ret = UACPI_TRUE;
         goto out;
     }
@@ -288,7 +288,7 @@ uacpi_bool uacpi_device_matches_pnp_id(
         uacpi_size i;
 
         for (i = 0; i < id_list.num_entries; ++i) {
-            if (matches_any(id_list.ids[i], ids, num_entries)) {
+            if (matches_any(id_list.ids[i], ids)) {
                 ret = UACPI_TRUE;
                 goto out;
             }
@@ -302,7 +302,7 @@ out:
 }
 
 struct device_find_ctx {
-    const uacpi_char *target_hid;
+    const uacpi_char **target_hids;
     void *user;
     uacpi_iteration_callback cb;
 };
@@ -322,7 +322,7 @@ enum uacpi_ns_iteration_decision find_one_device(
     if (obj->type != UACPI_OBJECT_DEVICE)
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
-    if (!uacpi_device_matches_pnp_id(node, &ctx->target_hid, 1))
+    if (!uacpi_device_matches_pnp_id(node, ctx->target_hids))
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
     ret = uacpi_eval_sta(node, &flags);
@@ -336,26 +336,35 @@ enum uacpi_ns_iteration_decision find_one_device(
     return ctx->cb(ctx->user, node);
 }
 
-uacpi_status uacpi_find_devices(
-    const uacpi_char *hid,
-    uacpi_iteration_callback cb,
-    void *user
+
+uacpi_status uacpi_find_devices_at(
+    uacpi_namespace_node *parent, const uacpi_char **hids,
+    uacpi_iteration_callback cb, void *user
 )
 {
-    struct device_find_ctx ctx = {
-        .target_hid = hid,
-        .user = user,
-        .cb = cb,
-    };
-
     if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
                        UACPI_INIT_LEVEL_NAMESPACE_LOADED))
         return UACPI_STATUS_INIT_LEVEL_MISMATCH;
 
-    uacpi_namespace_for_each_node_depth_first(
-        uacpi_namespace_root(), find_one_device, &ctx
-    );
+    struct device_find_ctx ctx = {
+        .target_hids = hids,
+        .user = user,
+        .cb = cb,
+    };
+
+    uacpi_namespace_for_each_node_depth_first(parent, find_one_device, &ctx);
     return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_find_devices(
+    const uacpi_char *hid, uacpi_iteration_callback cb, void *user
+)
+{
+    const uacpi_char *hids[] = {
+        hid, UACPI_NULL
+    };
+
+    return uacpi_find_devices_at(uacpi_namespace_root(), hids, cb, user);
 }
 
 uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
