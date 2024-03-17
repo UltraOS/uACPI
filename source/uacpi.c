@@ -583,3 +583,23 @@ uacpi_status uacpi_eval_typed(
 
     return st;
 }
+
+uacpi_status uacpi_eval_integer(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_args *args, uacpi_u64 *out_value
+)
+{
+    uacpi_object *int_obj;
+    uacpi_status ret;
+
+    ret = uacpi_eval_typed(
+        parent, path, args, UACPI_OBJECT_INTEGER_BIT, &int_obj
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    *out_value = int_obj->integer;
+    uacpi_object_unref(int_obj);
+
+    return UACPI_STATUS_OK;
+}
