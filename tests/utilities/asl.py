@@ -193,13 +193,18 @@ class ASLSource:
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
         proc = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
                                 universal_newlines=True)
 
         proc.wait(10)
+
         stdout = proc.stdout
         assert stdout
+        stderr = proc.stderr
+        assert stderr
 
         if proc.returncode != 0:
-            raise RuntimeError(f"Compiler error: {stdout.read()}")
+            raise RuntimeError(f"Compiler error:\nstdout:\n{stdout.read()}"
+                               f"\nstderr:\n{stderr.read()}")
 
         return out_case
