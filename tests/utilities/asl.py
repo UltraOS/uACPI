@@ -172,6 +172,23 @@ class ASLSource:
 
             # Static OperationRegion should be declared outside control method
             "-vw", "3175",
+
+            # Missing dependency
+            # (for some reason it has two different error codes)
+            "-vw", "3141",
+            "-vw", "6141",
+
+            # Name already exists in scope
+            "-vw", "6074",
+
+            # Object not found or not accessible from current scope
+            "-vw", "6085",
+
+            # Legacy Processor() keyword detected. Use Device() keyword instead
+            "-vw", "3168",
+
+            #  Local or Arg used outside a control method
+            "-vw", "2067",
         ]
 
         args = [compiler, *ignored_warnings, "-oa", "-p", out_case, path]
