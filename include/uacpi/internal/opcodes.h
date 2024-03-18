@@ -18,8 +18,11 @@ typedef uacpi_u16 uacpi_aml_op;
 enum uacpi_parse_op {
     UACPI_PARSE_OP_END = 0,
 
-    // End the execution of the current instruction with a warning
-    UACPI_PARSE_OP_SKIP_WITH_WARN,
+    /*
+     * End the execution of the current instruction with a warning if the item
+     * at decode_ops[pc + 1] is NULL.
+     */
+    UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL,
 
     // SimpleName := NameString | ArgObj | LocalObj
     UACPI_PARSE_OP_SIMPLE_NAME,
@@ -75,6 +78,12 @@ enum uacpi_parse_op {
      * Note that this errors out if last nameseg already exists.
      */
     UACPI_PARSE_OP_CREATE_NAMESTRING,
+
+    /*
+     * same as UACPI_PARSE_OP_CREATE_NAMESTRING, but attempting to create an
+     * already existing object is not fatal if currently loading a table.
+     */
+    UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,
 
     /*
      * Parse a NameString and put the node into the ready parts array.
@@ -376,7 +385,8 @@ UACPI_OP(                                                             \
         UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,                \
         UACPI_PARSE_OP_OPERAND,                                       \
         __VA_ARGS__                                                   \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                             \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,             \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, node_idx,              \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER_FIELD, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                                \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, node_idx,              \
@@ -464,8 +474,10 @@ UACPI_BAD_OPCODE(0x05)                                           \
 UACPI_OP(                                                        \
     AliasOp, 0x06,                                               \
     {                                                            \
-        UACPI_PARSE_OP_EXISTING_NAMESTRING,                      \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD,      \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,        \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,                \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 1,                \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
     }                                                            \
@@ -474,8 +486,9 @@ UACPI_BAD_OPCODE(0x07)                                           \
 UACPI_OP(                                                        \
     NameOp, 0x08,                                                \
     {                                                            \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,        \
         UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                 \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,                \
         UACPI_PARSE_OP_OBJECT_CONVERT_TO_DEEP_COPY,              \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,                \
@@ -501,8 +514,7 @@ UACPI_OP(                                                        \
     {                                                            \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
         UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD,      \
-        UACPI_PARSE_OP_IF_NULL, 1, 1,                            \
-            UACPI_PARSE_OP_SKIP_WITH_WARN,                       \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 1,                \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
@@ -530,8 +542,9 @@ UACPI_OP(                                                        \
     MethodOp, 0x14,                                              \
     {                                                            \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,        \
         UACPI_PARSE_OP_LOAD_IMM, 1,                              \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 1,                \
         UACPI_PARSE_OP_RECORD_AML_PC,                            \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_METHOD,  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
@@ -734,8 +747,9 @@ UACPI_OP(                                                        \
     /* inspecting about 500 AML dumps. Spec says this is a   */  \
     /* SuperName that must evaluate to Device/ThermalZone or */  \
     /* Processor, just ignore for now.                       */  \
-        UACPI_PARSE_OP_EXISTING_NAMESTRING,                      \
+        UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD,      \
         UACPI_PARSE_OP_OPERAND,                                  \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,                \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
@@ -1044,9 +1058,10 @@ extern uacpi_u8 uacpi_bank_field_op_decode_ops[];
 UACPI_OP(                                                        \
     name##Op, UACPI_EXT_OP(code),                                \
     {                                                            \
-        UACPI_PARSE_OP_PKGLEN,                                   \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                        \
+        UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,        \
         __VA_ARGS__                                              \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 1,                \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, type,                 \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
@@ -1078,8 +1093,9 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     MutexOp, UACPI_EXT_OP(0x01),                            \
     {                                                       \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,   \
         UACPI_PARSE_OP_LOAD_IMM, 1,                         \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,           \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
             UACPI_OBJECT_MUTEX,                             \
         UACPI_PARSE_OP_INVOKE_HANDLER,                      \
@@ -1089,7 +1105,8 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     EventOp, UACPI_EXT_OP(0x02),                            \
     {                                                       \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,   \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,           \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
             UACPI_OBJECT_EVENT,                             \
         UACPI_PARSE_OP_INVOKE_HANDLER,                      \
@@ -1245,10 +1262,11 @@ UACPI_OP(                                                   \
 UACPI_OP(                                                   \
     OpRegionOp, UACPI_EXT_OP(0x80),                         \
     {                                                       \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,   \
         UACPI_PARSE_OP_LOAD_IMM, 1,                         \
         UACPI_PARSE_OP_OPERAND,                             \
         UACPI_PARSE_OP_OPERAND,                             \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,           \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
             UACPI_OBJECT_OPERATION_REGION,                  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                      \
@@ -1290,10 +1308,11 @@ UACPI_OUT_OF_LINE_OP(                                       \
 UACPI_OP(                                                   \
     DataRegionOp, UACPI_EXT_OP(0x88),                       \
     {                                                       \
-        UACPI_PARSE_OP_CREATE_NAMESTRING,                   \
+        UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,   \
         UACPI_PARSE_OP_STRING,                              \
         UACPI_PARSE_OP_STRING,                              \
         UACPI_PARSE_OP_STRING,                              \
+        UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 0,           \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED,                  \
             UACPI_OBJECT_OPERATION_REGION,                  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                      \
