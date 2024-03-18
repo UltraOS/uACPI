@@ -562,8 +562,11 @@ static uacpi_status resolve_name_string(
         switch (behavior) {
         case RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS:
             if (namesegs == 1) {
-                if (cur_node)
-                    return UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS;
+                if (cur_node) {
+                    cur_node = UACPI_NULL;
+                    ret = UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS;
+                    goto out;
+                }
 
                 // Create the node and link to parent but don't install YET
                 cur_node = uacpi_namespace_node_alloc(name);
@@ -1846,13 +1849,13 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         block->type = CODE_BLOCK_WHILE;
         break;
     case UACPI_AML_OP_ScopeOp:
-        // Disarm the tracked package so that we don't skip the Scope
-        op_ctx->tracked_pkg_idx = 0;
-        UACPI_FALLTHROUGH;
     case UACPI_AML_OP_DeviceOp:
     case UACPI_AML_OP_ProcessorOp:
     case UACPI_AML_OP_PowerResOp:
     case UACPI_AML_OP_ThermalZoneOp:
+        // Disarm the tracked package so that we don't skip the Scope
+        op_ctx->tracked_pkg_idx = 0;
+
         block->type = CODE_BLOCK_SCOPE;
         block->node = item_array_at(&op_ctx->items, 1)->node;
         break;
@@ -4174,6 +4177,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_PKGLEN] = ITEM_PACKAGE_LENGTH,
     [UACPI_PARSE_OP_TRACKED_PKGLEN] = ITEM_PACKAGE_LENGTH,
     [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE_METHOD_LOCAL,
+    [UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE_METHOD_LOCAL,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE,
@@ -4266,6 +4270,17 @@ static uacpi_bool op_allows_unresolved(enum uacpi_parse_op op)
     case UACPI_PARSE_OP_SUPERNAME_OR_UNRESOLVED:
     case UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED:
     case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL:
+        return UACPI_TRUE;
+    default:
+        return UACPI_FALSE;
+    }
+}
+
+static uacpi_bool op_allows_unresolved_if_load(enum uacpi_parse_op op)
+{
+    switch (op) {
+    case UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD:
+    case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD:
         return UACPI_TRUE;
     default:
         return UACPI_FALSE;
@@ -4389,8 +4404,12 @@ static void trace_named_object_lookup_or_creation_failure(
     const uacpi_char *prefix_path = UACPI_NULL;
     uacpi_char *requested_path = UACPI_NULL;
     uacpi_size length;
+    uacpi_bool is_create;
 
-    if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
+    is_create = op == UACPI_PARSE_OP_CREATE_NAMESTRING ||
+                op == UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD;
+
+    if (is_create)
         action = "create";
     else
         action = "lookup";
@@ -4423,7 +4442,7 @@ static void trace_named_object_lookup_or_creation_failure(
     if (middle_part == UACPI_NULL)
         middle_part = empty_string;
 
-    if (length == 5 && op != UACPI_PARSE_OP_CREATE_NAMESTRING) {
+    if (length == 5 && !is_create) {
         uacpi_log_lvl(
             level,
             "Unable to %s named object '%s' within (or above) "
@@ -4765,9 +4784,16 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         switch (op) {
         case UACPI_PARSE_OP_END:
-        case UACPI_PARSE_OP_SKIP_WITH_WARN: {
-            if (op == UACPI_PARSE_OP_SKIP_WITH_WARN)
+        case UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL: {
+            if (op == UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL) {
+                uacpi_u8 idx;
+
+                idx = op_decode_byte(op_ctx);
+                if (item_array_at(&op_ctx->items, idx)->handle != UACPI_NULL)
+                    break;
+
                 EXEC_OP_WARN("skipping due to previous errors");
+            }
 
             if (op_ctx->tracked_pkg_idx) {
                 item = item_array_at(&op_ctx->items, op_ctx->tracked_pkg_idx - 1);
@@ -4952,13 +4978,15 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         case UACPI_PARSE_OP_CREATE_NAMESTRING:
+        case UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL:
         case UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD: {
             uacpi_size offset = frame->code_offset;
             enum resolve_behavior behavior;
 
-            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING)
+            if (op == UACPI_PARSE_OP_CREATE_NAMESTRING ||
+                op == UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD)
                 behavior = RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS;
             else
                 behavior = RESOLVE_FAIL_IF_DOESNT_EXIST;
@@ -4984,11 +5012,17 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 enum uacpi_log_level lvl = UACPI_LOG_ERROR;
                 uacpi_status trace_ret = ret;
 
-                if (op == UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD &&
-                    ctx->cur_frame->method->named_objects_persist &&
-                    ret == UACPI_STATUS_NOT_FOUND) {
-                    lvl = UACPI_LOG_WARN;
-                    ret = UACPI_STATUS_OK;
+                if (ctx->cur_frame->method->named_objects_persist) {
+                    uacpi_bool is_ok;
+
+                    is_ok = op_allows_unresolved_if_load(op);
+                    is_ok &= ret == UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS ||
+                             ret == UACPI_STATUS_NOT_FOUND;
+
+                    if (is_ok) {
+                        lvl = UACPI_LOG_WARN;
+                        ret = UACPI_STATUS_OK;
+                    }
                 }
 
                 trace_named_object_lookup_or_creation_failure(
