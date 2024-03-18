@@ -388,6 +388,9 @@ uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
     ret = uacpi_eval(uacpi_namespace_root(), "_PIC", &args, UACPI_NULL);
     uacpi_object_unref(arg);
 
+    if (ret == UACPI_STATUS_NOT_FOUND)
+        ret = UACPI_STATUS_OK;
+
     return ret;
 }
 
