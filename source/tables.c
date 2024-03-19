@@ -199,6 +199,7 @@ uacpi_table_append_mapped(uacpi_virt_addr virt_addr, struct uacpi_table **out_ta
     table->virt_addr = virt_addr;
     table->flags = UACPI_TABLE_MAPPED;
     table->length = hdr->length;
+    table->signature = signature;
 
     ret = uacpi_verify_table_checksum_with_warn(hdr, table->length);
     if (uacpi_unlikely_error(ret))
