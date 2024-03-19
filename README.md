@@ -30,6 +30,18 @@ target_include_directories(
 )
 ```
 
+#### If you're using Meson
+Add the following lines to your meson.build:
+```meson
+uacpi = subproject('uacpi')
+
+uacpi_sources = uacpi.get_variable('sources')
+my_kernel_sources += uacpi_sources
+
+uacpi_includes = uacpi.get_variable('includes')
+my_kernel_includes += uacpi_includes
+```
+
 #### Any other build system
 - Add all .c files from [source](source) into your target sources
 - Add [include](include) into your target include directories
