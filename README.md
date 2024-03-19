@@ -176,13 +176,13 @@ What works:
 - The operation region subsystem. This includes public API for registering handlers, as well as builtin handlers for most common address space types
 - Notify handlers including public API
 - The resource subsystem. Every resource defined by ACPI 6.5 (last release) is supported
-- Sleep API, allowing S0->S5 transition and reset, other states are currently unsupported due to missing wake support
+- Sleep API, allowing transition to any sleep state, wake vector programming API
+- Fairly advanced event subsystem, supporting GPE/fixed events, wake, implicit notify, AML handlers
 - GAS read/write API, FADT register read/write all implemented
 - PCI routing table retrieval & interrupt model API
 - Device search API
 
 What's missing or doesn't work:
-- No SCI/GPE/Event subsystem. This means wake from shallow sleep states is not possible
 - ACPI global lock is not implemented
 - No locking. This means all of the currently defined public API is not thread safe
 - A lot of general utility API is missing and/or is currently internal-only
