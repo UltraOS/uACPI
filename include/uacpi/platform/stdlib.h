@@ -27,7 +27,6 @@
 #define uacpi_memmove memmove
 #define uacpi_strnlen strnlen
 #define uacpi_strlen strlen
-#define uacpi_strtoull strtoull
 #define uacpi_snprintf snprintf
 
 #define uacpi_offsetof offsetof
