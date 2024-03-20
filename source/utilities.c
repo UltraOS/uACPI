@@ -102,6 +102,293 @@ void uacpi_eisa_id_to_string(uacpi_u32 id, uacpi_char *out_string)
     out_string[7] = '\0';
 }
 
+enum char_type {
+    CHAR_TYPE_CONTROL = 1 << 0,
+    CHAR_TYPE_SPACE = 1 << 1,
+    CHAR_TYPE_BLANK = 1 << 2,
+    CHAR_TYPE_PUNCTUATION = 1 << 3,
+    CHAR_TYPE_LOWER = 1 << 4,
+    CHAR_TYPE_UPPER = 1 << 5,
+    CHAR_TYPE_DIGIT = 1 << 6,
+    CHAR_TYPE_HEX_DIGIT  = 1 << 7,
+    CHAR_TYPE_ALPHA = CHAR_TYPE_LOWER | CHAR_TYPE_UPPER,
+    CHAR_TYPE_ALHEX = CHAR_TYPE_ALPHA | CHAR_TYPE_HEX_DIGIT,
+    CHAR_TYPE_ALNUM = CHAR_TYPE_ALPHA | CHAR_TYPE_DIGIT,
+};
+
+static const uacpi_u8 ascii_map[256] = {
+    CHAR_TYPE_CONTROL, // 0
+    CHAR_TYPE_CONTROL, // 1
+    CHAR_TYPE_CONTROL, // 2
+    CHAR_TYPE_CONTROL, // 3
+    CHAR_TYPE_CONTROL, // 4
+    CHAR_TYPE_CONTROL, // 5
+    CHAR_TYPE_CONTROL, // 6
+    CHAR_TYPE_CONTROL, // 7
+    CHAR_TYPE_CONTROL, // -> 8 control codes
+
+    CHAR_TYPE_CONTROL | CHAR_TYPE_SPACE | CHAR_TYPE_BLANK, // 9 tab
+
+    CHAR_TYPE_CONTROL | CHAR_TYPE_SPACE, // 10
+    CHAR_TYPE_CONTROL | CHAR_TYPE_SPACE, // 11
+    CHAR_TYPE_CONTROL | CHAR_TYPE_SPACE, // 12
+    CHAR_TYPE_CONTROL | CHAR_TYPE_SPACE, // -> 13 whitespaces
+
+    CHAR_TYPE_CONTROL, // 14
+    CHAR_TYPE_CONTROL, // 15
+    CHAR_TYPE_CONTROL, // 16
+    CHAR_TYPE_CONTROL, // 17
+    CHAR_TYPE_CONTROL, // 18
+    CHAR_TYPE_CONTROL, // 19
+    CHAR_TYPE_CONTROL, // 20
+    CHAR_TYPE_CONTROL, // 21
+    CHAR_TYPE_CONTROL, // 22
+    CHAR_TYPE_CONTROL, // 23
+    CHAR_TYPE_CONTROL, // 24
+    CHAR_TYPE_CONTROL, // 25
+    CHAR_TYPE_CONTROL, // 26
+    CHAR_TYPE_CONTROL, // 27
+    CHAR_TYPE_CONTROL, // 28
+    CHAR_TYPE_CONTROL, // 29
+    CHAR_TYPE_CONTROL, // 30
+    CHAR_TYPE_CONTROL, // -> 31 control codes
+
+    CHAR_TYPE_SPACE | CHAR_TYPE_BLANK, // 32 space
+
+    CHAR_TYPE_PUNCTUATION, // 33
+    CHAR_TYPE_PUNCTUATION, // 34
+    CHAR_TYPE_PUNCTUATION, // 35
+    CHAR_TYPE_PUNCTUATION, // 36
+    CHAR_TYPE_PUNCTUATION, // 37
+    CHAR_TYPE_PUNCTUATION, // 38
+    CHAR_TYPE_PUNCTUATION, // 39
+    CHAR_TYPE_PUNCTUATION, // 40
+    CHAR_TYPE_PUNCTUATION, // 41
+    CHAR_TYPE_PUNCTUATION, // 42
+    CHAR_TYPE_PUNCTUATION, // 43
+    CHAR_TYPE_PUNCTUATION, // 44
+    CHAR_TYPE_PUNCTUATION, // 45
+    CHAR_TYPE_PUNCTUATION, // 46
+    CHAR_TYPE_PUNCTUATION, // -> 47 punctuation
+
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 48
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 49
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 50
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 51
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 52
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 53
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 54
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 55
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // 56
+    CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT, // -> 57 digits
+
+    CHAR_TYPE_PUNCTUATION, // 58
+    CHAR_TYPE_PUNCTUATION, // 59
+    CHAR_TYPE_PUNCTUATION, // 60
+    CHAR_TYPE_PUNCTUATION, // 61
+    CHAR_TYPE_PUNCTUATION, // 62
+    CHAR_TYPE_PUNCTUATION, // 63
+    CHAR_TYPE_PUNCTUATION, // -> 64 punctuation
+
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // 65
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // 66
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // 67
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // 68
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // 69
+    CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT, // -> 70 ABCDEF
+
+    CHAR_TYPE_UPPER, // 71
+    CHAR_TYPE_UPPER, // 72
+    CHAR_TYPE_UPPER, // 73
+    CHAR_TYPE_UPPER, // 74
+    CHAR_TYPE_UPPER, // 75
+    CHAR_TYPE_UPPER, // 76
+    CHAR_TYPE_UPPER, // 77
+    CHAR_TYPE_UPPER, // 78
+    CHAR_TYPE_UPPER, // 79
+    CHAR_TYPE_UPPER, // 80
+    CHAR_TYPE_UPPER, // 81
+    CHAR_TYPE_UPPER, // 82
+    CHAR_TYPE_UPPER, // 83
+    CHAR_TYPE_UPPER, // 84
+    CHAR_TYPE_UPPER, // 85
+    CHAR_TYPE_UPPER, // 86
+    CHAR_TYPE_UPPER, // 87
+    CHAR_TYPE_UPPER, // 88
+    CHAR_TYPE_UPPER, // 89
+    CHAR_TYPE_UPPER, // -> 90 the rest of UPPERCASE alphabet
+
+    CHAR_TYPE_PUNCTUATION, // 91
+    CHAR_TYPE_PUNCTUATION, // 92
+    CHAR_TYPE_PUNCTUATION, // 93
+    CHAR_TYPE_PUNCTUATION, // 94
+    CHAR_TYPE_PUNCTUATION, // 95
+    CHAR_TYPE_PUNCTUATION, // -> 96 punctuation
+
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // 97
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // 98
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // 99
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // 100
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // 101
+    CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT, // -> 102 abcdef
+
+    CHAR_TYPE_LOWER, // 103
+    CHAR_TYPE_LOWER, // 104
+    CHAR_TYPE_LOWER, // 105
+    CHAR_TYPE_LOWER, // 106
+    CHAR_TYPE_LOWER, // 107
+    CHAR_TYPE_LOWER, // 108
+    CHAR_TYPE_LOWER, // 109
+    CHAR_TYPE_LOWER, // 110
+    CHAR_TYPE_LOWER, // 111
+    CHAR_TYPE_LOWER, // 112
+    CHAR_TYPE_LOWER, // 113
+    CHAR_TYPE_LOWER, // 114
+    CHAR_TYPE_LOWER, // 115
+    CHAR_TYPE_LOWER, // 116
+    CHAR_TYPE_LOWER, // 117
+    CHAR_TYPE_LOWER, // 118
+    CHAR_TYPE_LOWER, // 119
+    CHAR_TYPE_LOWER, // 120
+    CHAR_TYPE_LOWER, // 121
+    CHAR_TYPE_LOWER, // -> 122 the rest of UPPERCASE alphabet
+
+    CHAR_TYPE_PUNCTUATION, // 123
+    CHAR_TYPE_PUNCTUATION, // 124
+    CHAR_TYPE_PUNCTUATION, // 125
+    CHAR_TYPE_PUNCTUATION, // -> 126 punctuation
+
+    CHAR_TYPE_CONTROL // 127 backspace
+};
+
+static uacpi_bool is_char(uacpi_char c, enum char_type type)
+{
+    return (ascii_map[(uacpi_u8)c] & type) == type;
+}
+
+static uacpi_char to_lower(uacpi_char c)
+{
+    if (is_char(c, CHAR_TYPE_UPPER))
+        return c + ('a' - 'A');
+
+    return c;
+}
+
+static uacpi_bool peek_one(
+    const uacpi_char **str, uacpi_size *size, uacpi_char *out_char
+)
+{
+    if (*size == 0)
+        return UACPI_FALSE;
+
+    *out_char = **str;
+    return UACPI_TRUE;
+}
+
+static uacpi_bool consume_one(
+    const uacpi_char **str, uacpi_size *size, uacpi_char *out_char
+)
+{
+    if (!peek_one(str, size, out_char))
+        return UACPI_FALSE;
+
+    *str += 1;
+    *size -= 1;
+    return UACPI_TRUE;
+}
+
+static uacpi_bool consume_if(
+    const uacpi_char **str, uacpi_size *size, enum char_type type
+)
+{
+    uacpi_char c;
+
+    if (!peek_one(str, size, &c) || !is_char(c, type))
+        return UACPI_FALSE;
+
+    *str += 1;
+    *size -= 1;
+    return UACPI_TRUE;
+}
+
+static uacpi_bool consume_if_equals(
+    const uacpi_char **str, uacpi_size *size, uacpi_char c
+)
+{
+    uacpi_char c1;
+
+    if (!peek_one(str, size, &c1) || to_lower(c1) != c)
+        return UACPI_FALSE;
+
+    *str += 1;
+    *size -= 1;
+    return UACPI_TRUE;
+}
+
+uacpi_status uacpi_string_to_integer(
+    const uacpi_char *str, uacpi_size max_chars, enum uacpi_base base,
+    uacpi_u64 *out_value
+)
+{
+    uacpi_status ret = UACPI_STATUS_INVALID_ARGUMENT;
+    uacpi_bool negative = UACPI_FALSE;
+    uacpi_u64 next, value = 0;
+    uacpi_char c = '\0';
+
+    while (consume_if(&str, &max_chars, CHAR_TYPE_SPACE));
+
+    if (consume_if_equals(&str, &max_chars, '-'))
+        negative = UACPI_TRUE;
+    else
+        consume_if_equals(&str, &max_chars, '+');
+
+    if (base == UACPI_BASE_AUTO) {
+        base = UACPI_BASE_DEC;
+
+        if (consume_if_equals(&str, &max_chars, '0')) {
+            base = UACPI_BASE_OCT;
+            if (consume_if_equals(&str, &max_chars, 'x'))
+                base = UACPI_BASE_HEX;
+        }
+    }
+
+    while (consume_one(&str, &max_chars, &c)) {
+        switch (ascii_map[(uacpi_u8)c] & (CHAR_TYPE_DIGIT | CHAR_TYPE_ALHEX)) {
+        case CHAR_TYPE_DIGIT | CHAR_TYPE_HEX_DIGIT:
+            next = c - '0';
+            if (base == UACPI_BASE_OCT && next > 7)
+                goto out;
+            break;
+        case CHAR_TYPE_LOWER | CHAR_TYPE_HEX_DIGIT:
+        case CHAR_TYPE_UPPER | CHAR_TYPE_HEX_DIGIT:
+            if (base != UACPI_BASE_HEX)
+                goto out;
+            next = 10 + (to_lower(c) - 'a');
+            break;
+        default:
+            goto out;
+        }
+
+        next = (value * base) + next;
+        if ((next / base) != value) {
+            value = 0xFFFFFFFFFFFFFFFF;
+            goto out;
+        }
+
+        value = next;
+    }
+
+out:
+    if (negative)
+        value = -((uacpi_i64)value);
+
+    *out_value = value;
+    if (max_chars == 0 || c == '\0')
+        ret = UACPI_STATUS_OK;
+
+    return ret;
+}
+
 static uacpi_char *steal_or_copy_string(uacpi_object *obj)
 {
     uacpi_char *ret;
