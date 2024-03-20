@@ -2426,7 +2426,9 @@ static uacpi_u64 object_to_integer(const uacpi_object *obj,
         break;
     }
     case UACPI_OBJECT_STRING:
-        dst = uacpi_strtoull(obj->buffer->text, UACPI_NULL, 0);
+        uacpi_string_to_integer(
+            obj->buffer->text, obj->buffer->size, UACPI_BASE_AUTO, &dst
+        );
         break;
     default:
         dst = 0;
