@@ -6,6 +6,7 @@
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/notify.h>
+#include <uacpi/internal/utilities.h>
 #include <uacpi/acpi.h>
 
 #define UACPI_EVENT_DISABLED 0
@@ -747,22 +748,21 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
     uacpi_handle opaque, uacpi_namespace_node *node
 )
 {
+    uacpi_status ret;
     struct gpe_match_ctx *ctx = opaque;
     struct gp_event *event;
-    uacpi_char name[sizeof(uacpi_object_name) + 1], *end_ptr;
     uacpi_object *object;
-    uacpi_u8 triggering, idx;
+    uacpi_u8 triggering;
+    uacpi_u64 idx;
 
     object = uacpi_namespace_node_get_object(node);
     if (object->type != UACPI_OBJECT_METHOD)
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
-    uacpi_memcpy_zerout(name, &node->name, sizeof(name), sizeof(node->name));
-
-    if (name[0] != '_')
+    if (node->name.text[0] != '_')
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
-    switch (name[1]) {
+    switch (node->name.text[1]) {
     case 'L':
         triggering = UACPI_GPE_TRIGGERING_LEVEL;
         break;
@@ -773,9 +773,9 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
-    idx = uacpi_strtoull(name + 2, &end_ptr, 16);
-    if (end_ptr != (name + sizeof(uacpi_object_name))) {
-        uacpi_trace("invalid GPE method name %s, ignored\n", name);
+    ret = uacpi_string_to_integer(&node->name.text[2], 2, UACPI_BASE_HEX, &idx);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_trace("invalid GPE method name %.4s, ignored\n", node->name.text);
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
@@ -801,8 +801,8 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
         // This is okay, since we're re-running the detection code
         if (!ctx->post_dynamic_table_load) {
             uacpi_warn(
-                "GPE %02X already matched %.4s, skipping %s\n",
-                idx, event->aml_handler->name.text, name
+                "GPE %02X already matched %.4s, skipping %.4s\n",
+                idx, event->aml_handler->name.text, node->name.text
             );
         }
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
@@ -810,15 +810,15 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
     case GPE_HANDLER_TYPE_NATIVE_HANDLER:
     case GPE_HANDLER_TYPE_NATIVE_HANDLER_RAW:
         uacpi_trace(
-            "not assigning GPE %02X to %s, override installed by user\n",
-            idx, name
+            "not assigning GPE %02X to %.4s, override installed by user\n",
+            idx, node->name.text
         );
         UACPI_FALLTHROUGH;
     default:
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
-    uacpi_trace("assigned GPE(%02X) -> %s\n", idx, name);
+    uacpi_trace("assigned GPE(%02X) -> %.4s\n", idx, node->name.text);
     event->triggering = triggering;
     ctx->matched_count++;
 
