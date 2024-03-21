@@ -371,7 +371,7 @@ uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state state_enum)
         return ret;
 
     ret = get_slp_type_for_state(
-        state,
+        0,
         &g_uacpi_rt_ctx.s0_sleep_typ_a,
         &g_uacpi_rt_ctx.s0_sleep_typ_b
     );
