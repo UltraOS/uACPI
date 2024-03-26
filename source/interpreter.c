@@ -287,6 +287,20 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
     call_frame_array, struct call_frame, static
 )
 
+static struct call_frame *call_frame_array_one_before_last(
+    struct call_frame_array *arr
+)
+{
+    uacpi_size size;
+
+    size = call_frame_array_size(arr);
+
+    if (size < 2)
+        return UACPI_NULL;
+
+    return call_frame_array_at(arr, size - 2);
+}
+
 // NOTE: Try to keep size under 2 pages
 struct execution_context {
     uacpi_object *ret;
@@ -3899,8 +3913,7 @@ static uacpi_status push_new_frame(struct execution_context *ctx,
      * execution_context members might now be pointing to freed memory.
      * Refresh them here.
      */
-    prev_frame = call_frame_array_at(call_stack,
-                                     call_frame_array_size(call_stack) - 2);
+    prev_frame = call_frame_array_one_before_last(call_stack);
     ctx->cur_frame = prev_frame;
     refresh_ctx_pointers(ctx);
 
