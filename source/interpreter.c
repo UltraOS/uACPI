@@ -5416,27 +5416,28 @@ static void execution_context_release(struct execution_context *ctx)
     uacpi_kernel_free(ctx);
 }
 
-uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
-                                          uacpi_control_method *method,
-                                          uacpi_args *args, uacpi_object **ret)
+uacpi_status uacpi_execute_control_method(
+    uacpi_namespace_node *scope, uacpi_control_method *method,
+    uacpi_args *args, uacpi_object **out_obj
+)
 {
-    uacpi_status st = UACPI_STATUS_OK;
+    uacpi_status ret = UACPI_STATUS_OK;
     struct execution_context *ctx;
 
     ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
     if (ctx == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    if (ret != UACPI_NULL) {
+    if (out_obj != UACPI_NULL) {
         ctx->ret = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
         if (uacpi_unlikely(ctx->ret == UACPI_NULL)) {
-            st = UACPI_STATUS_OUT_OF_MEMORY;
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
             goto out;
         }
     }
 
-    st = prepare_method_call(ctx, scope, method, METHOD_CALL_NATIVE, args);
-    if (uacpi_unlikely_error(st))
+    ret = prepare_method_call(ctx, scope, method, METHOD_CALL_NATIVE, args);
+    if (uacpi_unlikely_error(ret))
         goto out;
 
     for (;;) {
@@ -5452,27 +5453,27 @@ uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
                 continue;
             }
 
-            st = get_op(ctx);
-            if (uacpi_unlikely_error(st))
+            ret = get_op(ctx);
+            if (uacpi_unlikely_error(ret))
                 goto out;
 
             trace_op(ctx->cur_op);
         }
 
-        st = exec_op(ctx);
-        if (uacpi_unlikely_error(st))
+        ret = exec_op(ctx);
+        if (uacpi_unlikely_error(ret))
             goto out;
 
         ctx->skip_else = UACPI_FALSE;
     }
 
 out:
-    if (ret && ctx->ret->type != UACPI_OBJECT_UNINITIALIZED) {
+    if (out_obj && ctx->ret->type != UACPI_OBJECT_UNINITIALIZED) {
         uacpi_object_ref(ctx->ret);
-        *ret = ctx->ret;
+        *out_obj = ctx->ret;
     }
     execution_context_release(ctx);
-    return st;
+    return ret;
 }
 
 // TODO: make this dynamically configurable
