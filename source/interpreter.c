@@ -4733,6 +4733,82 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
     [EXT_OP_IDX(UACPI_AML_OP_FatalOp)] = OP_HANDLER_FIRMWARE_REQUEST,
 };
 
+enum method_call_type {
+    METHOD_CALL_NATIVE,
+    METHOD_CALL_AML,
+};
+
+static uacpi_status prepare_method_call(
+    struct execution_context *ctx, uacpi_namespace_node *node,
+    uacpi_control_method *method, enum method_call_type type, uacpi_args *args
+)
+{
+    uacpi_status ret;
+    struct call_frame *frame;
+
+    ret = push_new_frame(ctx, &frame);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = enter_method(ctx, frame, method);
+    if (uacpi_unlikely_error(ret))
+        goto method_dispatch_error;
+
+    if (type == METHOD_CALL_NATIVE) {
+        uacpi_u8 arg_count;
+
+        arg_count = args ? args->count : 0;
+        if (uacpi_unlikely(arg_count != method->args)) {
+            uacpi_warn(
+                "invalid number of arguments %d to call %.4s, expected %d\n",
+                args ? args->count : 0, node->name.text, method->args
+            );
+
+            ret = UACPI_STATUS_INVALID_ARGUMENT;
+            goto method_dispatch_error;
+        }
+
+        if (args != UACPI_NULL) {
+            uacpi_u8 i;
+
+            for (i = 0; i < method->args; ++i) {
+                frame->args[i] = args->objects[i];
+                uacpi_object_ref(args->objects[i]);
+            }
+        }
+    } else {
+        ret = frame_push_args(frame, ctx->cur_op_ctx);
+        if (uacpi_unlikely_error(ret))
+            goto method_dispatch_error;
+    }
+
+    ret = frame_setup_base_scope(frame, node, method);
+    if (uacpi_unlikely_error(ret))
+        goto method_dispatch_error;
+
+    ctx->cur_frame = frame;
+    ctx->cur_op_ctx = UACPI_NULL;
+    ctx->prev_op_ctx = UACPI_NULL;
+    ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
+
+    if (method->native_call) {
+        uacpi_object *retval;
+
+        ret = method_get_ret_object(ctx, &retval);
+        if (uacpi_unlikely_error(ret))
+            goto method_dispatch_error;
+
+        return method->handler(ctx, retval);
+    }
+
+    return UACPI_STATUS_OK;
+
+method_dispatch_error:
+    call_frame_clear(frame);
+    call_frame_array_pop(&ctx->call_stack);
+    return ret;
+}
+
 static uacpi_status exec_op(struct execution_context *ctx)
 {
     uacpi_status ret = UACPI_STATUS_OK;
@@ -5185,42 +5261,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
             node = item_array_at(&op_ctx->items, 0)->node;
             method = uacpi_namespace_node_get_object(node)->method;
 
-            ret = push_new_frame(ctx, &frame);
-            if (uacpi_unlikely_error(ret))
-                return ret;
-
-            ret = enter_method(ctx, frame, method);
-            if (uacpi_unlikely_error(ret))
-                goto method_dispatch_error;
-
-            ret = frame_push_args(frame, ctx->cur_op_ctx);
-            if (uacpi_unlikely_error(ret))
-                goto method_dispatch_error;
-
-            ret = frame_setup_base_scope(frame, node, method);
-            if (uacpi_unlikely_error(ret))
-                goto method_dispatch_error;
-
-            ctx->cur_frame = frame;
-            ctx->cur_op_ctx = UACPI_NULL;
-            ctx->prev_op_ctx = UACPI_NULL;
-            ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
-
-            if (method->native_call) {
-                uacpi_object *retval;
-
-                ret = method_get_ret_object(ctx, &retval);
-                if (uacpi_unlikely_error(ret))
-                    goto method_dispatch_error;
-
-                return method->handler(ctx, retval);
-            }
-
-            return UACPI_STATUS_OK;
-
-        method_dispatch_error:
-            call_frame_clear(frame);
-            call_frame_array_pop(&ctx->call_stack);
+            ret = prepare_method_call(
+                ctx, node, method, METHOD_CALL_AML, UACPI_NULL
+            );
             return ret;
         }
 
@@ -5392,35 +5435,9 @@ uacpi_status uacpi_execute_control_method(uacpi_namespace_node *scope,
         }
     }
 
-    ctx->cur_frame = call_frame_array_calloc(&ctx->call_stack);
-    if (uacpi_unlikely(ctx->cur_frame == UACPI_NULL)) {
-        st = UACPI_STATUS_OUT_OF_MEMORY;
-        goto out;
-    }
-
-    st = enter_method(ctx, ctx->cur_frame, method);
+    st = prepare_method_call(ctx, scope, method, METHOD_CALL_NATIVE, args);
     if (uacpi_unlikely_error(st))
         goto out;
-
-    if (args != UACPI_NULL) {
-        uacpi_u8 i;
-
-        if (args->count != method->args) {
-            st = UACPI_STATUS_INVALID_ARGUMENT;
-            goto out;
-        }
-
-        for (i = 0; i < method->args; ++i) {
-            ctx->cur_frame->args[i] = args->objects[i];
-            uacpi_object_ref(args->objects[i]);
-        }
-    } else if (method->args) {
-        st = UACPI_STATUS_INVALID_ARGUMENT;
-        goto out;
-    }
-
-    frame_setup_base_scope(ctx->cur_frame, scope, method);
-    ctx->cur_block = code_block_array_last(&ctx->cur_frame->code_blocks);
 
     for (;;) {
         if (!ctx_has_non_preempted_op(ctx)) {
