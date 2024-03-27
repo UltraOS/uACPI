@@ -190,7 +190,7 @@ static uacpi_status held_mutexes_array_remove_and_release(
     if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
                        force != FORCE_RELEASE_YES)) {
         uacpi_warn(
-            "Ignoring mutex @%p release due to sync level mismatch: %d vs %d\n",
+            "ignoring mutex @%p release due to sync level mismatch: %d vs %d\n",
             mutex, mutex->sync_level, item->sync_level
         );
 
@@ -654,7 +654,7 @@ static uacpi_status get_op(struct execution_context *ctx)
     ctx->cur_op = uacpi_get_op_spec(op);
     if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
         uacpi_error(
-            "Invalid opcode '%s' encountered in bytestream\n",
+            "invalid opcode '%s' encountered in bytestream\n",
             ctx->cur_op->name
         );
         return UACPI_STATUS_AML_INVALID_OPCODE;
@@ -1406,7 +1406,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
     if (uacpi_unlikely(src_table->length > declared_size)) {
         uacpi_error(
-            "Load: table size %u is larger than the declared size %zu",
+            "Load: table size %u is larger than the declared size %zu\n",
             src_table->length, declared_size
         );
         goto return_false;
