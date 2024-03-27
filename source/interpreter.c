@@ -190,7 +190,7 @@ static uacpi_status held_mutexes_array_remove_and_release(
     if (uacpi_unlikely(item->sync_level != mutex->sync_level &&
                        force != FORCE_RELEASE_YES)) {
         uacpi_warn(
-            "Ignoring mutex @%p release due to sync level mismatch: %d vs %d\n",
+            "ignoring mutex @%p release due to sync level mismatch: %d vs %d\n",
             mutex, mutex->sync_level, item->sync_level
         );
 
@@ -654,7 +654,7 @@ static uacpi_status get_op(struct execution_context *ctx)
     ctx->cur_op = uacpi_get_op_spec(op);
     if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
         uacpi_error(
-            "Invalid opcode '%s' encountered in bytestream\n",
+            "invalid opcode '%s' encountered in bytestream\n",
             ctx->cur_op->name
         );
         return UACPI_STATUS_AML_INVALID_OPCODE;
@@ -1096,7 +1096,7 @@ static uacpi_status table_id_error(
     uacpi_buffer *str
 )
 {
-    uacpi_error("%s: Invalid %s '%s'\n", opcode, arg, str->text);
+    uacpi_error("%s: invalid %s '%s'\n", opcode, arg, str->text);
     return UACPI_STATUS_AML_BAD_ENCODING;
 }
 
@@ -1106,7 +1106,7 @@ static void report_table_id_find_error(
 )
 {
     uacpi_error(
-        "%s: Unable to find table '%.4s' (OEM ID '%.6s', "
+        "%s: unable to find table '%.4s' (OEM ID '%.6s', "
         "OEM Table ID '%.8s'): %s\n",
         opcode, id->signature.text, id->oemid, id->oem_table_id,
         uacpi_status_to_string(ret)
@@ -1214,13 +1214,13 @@ static uacpi_status do_load_table(
     uacpi_status ret;
     struct acpi_dsdt *dsdt;
     enum uacpi_log_level log_level = UACPI_LOG_TRACE;
-    const uacpi_char *log_prefix = "Load of";
+    const uacpi_char *log_prefix = "load of";
 
     if (table->flags & UACPI_TABLE_LOADED)
         return UACPI_STATUS_OK;
 
     if (cause != TABLE_LOAD_CAUSE_API) {
-        log_prefix = "Dynamic load of";
+        log_prefix = "dynamic load of";
         log_level = UACPI_LOG_INFO;
     }
 
@@ -1406,7 +1406,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
     if (uacpi_unlikely(src_table->length > declared_size)) {
         uacpi_error(
-            "Load: table size %u is larger than the declared size %zu",
+            "Load: table size %u is larger than the declared size %zu\n",
             src_table->length, declared_size
         );
         goto return_false;

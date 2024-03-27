@@ -382,7 +382,7 @@ static void do_account_sta_ini(
     }
 
     uacpi_warn(
-        "Aborted execution of '%s.%s' due to an error: %s\n",
+        "aborted execution of '%s.%s' due to an error: %s\n",
         absolute_path, method, uacpi_status_to_string(ret)
     );
 
@@ -520,7 +520,7 @@ uacpi_status uacpi_namespace_initialize(void)
     uacpi_namespace_for_each_node_depth_first(root, do_sta_ini, &ctx);
 
     uacpi_info(
-        "Namespace initialization done: "
+        "namespace initialization done: "
         "%zu devices, %zu thermal zones, %zu processors\n",
         ctx.devices, ctx.thermal_zones, ctx.processors
     );
