@@ -116,3 +116,75 @@ uacpi_u8 uacpi_index_field_op_decode_ops[] = {
     UACPI_PARSE_OP_LOAD_IMM, 1,
     PARSE_FIELD_ELEMENTS(5),
 };
+
+uacpi_u8 uacpi_load_op_decode_ops[] = {
+    // Storage for the scope pointer, this is left as 0 in case of errors
+    UACPI_PARSE_OP_LOAD_ZERO_IMM,
+    UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_METHOD,
+    UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
+    UACPI_PARSE_OP_TARGET,
+
+    /*
+     * Invoke the handler here to initialize the table. If this fails, it's
+     * expected to keep the item 0 as NULL, which is checked below to return
+     * false to the caller of Load.
+     */
+    UACPI_PARSE_OP_INVOKE_HANDLER,
+    UACPI_PARSE_OP_IF_NULL, 0, 3,
+        UACPI_PARSE_OP_LOAD_FALSE_OBJECT,
+        UACPI_PARSE_OP_JMP, 15,
+
+    UACPI_PARSE_OP_LOAD_TRUE_OBJECT,
+    UACPI_PARSE_OP_DISPATCH_TABLE_LOAD,
+
+    /*
+     * Invoke the handler a second time to initialize any AML GPE handlers that
+     * might've been loaded from this table.
+     */
+    UACPI_PARSE_OP_INVOKE_HANDLER,
+    UACPI_PARSE_OP_STORE_TO_TARGET, 3,
+    UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,
+    UACPI_PARSE_OP_END,
+};
+
+uacpi_u8 uacpi_load_table_op_decode_ops[] = {
+    // Storage for the scope pointer, this is left as 0 in case of errors
+    UACPI_PARSE_OP_LOAD_ZERO_IMM,
+    UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_METHOD,
+    // Storage for the target pointer, this is left as 0 if none was requested
+    UACPI_PARSE_OP_LOAD_ZERO_IMM,
+
+    UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, 5,
+    UACPI_PARSE_OP_IF_NOT_NULL, 3, 5,
+        UACPI_PARSE_OP_STRING,
+        UACPI_PARSE_OP_IMM_DECREMENT, 3,
+        UACPI_PARSE_OP_JMP, 7,
+    UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
+
+    /*
+     * Invoke the handler here to initialize the table. If this fails, it's
+     * expected to keep the item 0 as NULL, which is checked below to return
+     * false to the caller of Load.
+     */
+    UACPI_PARSE_OP_INVOKE_HANDLER,
+    UACPI_PARSE_OP_IF_NULL, 0, 3,
+        UACPI_PARSE_OP_LOAD_FALSE_OBJECT,
+        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,
+        UACPI_PARSE_OP_END,
+
+    UACPI_PARSE_OP_LOAD_TRUE_OBJECT,
+    UACPI_PARSE_OP_DISPATCH_TABLE_LOAD,
+
+    /*
+     * Invoke the handler a second time to block the store to target in case
+     * the load above failed, as well as do any AML GPE handler initialization.
+     */
+    UACPI_PARSE_OP_INVOKE_HANDLER,
+
+    // If we were given a target to store to, do the store
+    UACPI_PARSE_OP_IF_NOT_NULL, 2, 3,
+        UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT, 2, 9,
+
+    UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,
+    UACPI_PARSE_OP_END,
+};
