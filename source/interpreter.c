@@ -1216,8 +1216,12 @@ static uacpi_status do_load_table(
     enum uacpi_log_level log_level = UACPI_LOG_TRACE;
     const uacpi_char *log_prefix = "load of";
 
-    if (table->flags & UACPI_TABLE_LOADED)
-        return UACPI_STATUS_OK;
+    /*
+     * Duplicate table loads are only disallowed for API loads. AML can load
+     * the same table multiple times, since this is allowed by NT.
+     */
+    if ((table->flags & UACPI_TABLE_LOADED) && cause == TABLE_LOAD_CAUSE_API)
+        return UACPI_STATUS_ALREADY_EXISTS;
 
     if (cause != TABLE_LOAD_CAUSE_API) {
         log_prefix = "dynamic load of";
