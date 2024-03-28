@@ -130,6 +130,9 @@ enum uacpi_parse_op {
     // Load a decode_ops[pc + 1] byte imm at decode_ops[pc + 2]
     UACPI_PARSE_OP_LOAD_INLINE_IMM,
 
+    // Load a QWORD zero immediate
+    UACPI_PARSE_OP_LOAD_ZERO_IMM,
+
     // Load a decode_ops[pc + 1] byte imm from the instructions stream
     UACPI_PARSE_OP_LOAD_IMM,
 
