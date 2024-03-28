@@ -195,6 +195,13 @@ enum uacpi_parse_op {
     UACPI_PARSE_OP_DISPATCH_METHOD_CALL,
 
     /*
+     * Dispatch a table load with scope node at items[0] and method at items[1].
+     * The last item is expected to be an integer object that is set to 0 in
+     * case load fails.
+     */
+    UACPI_PARSE_OP_DISPATCH_TABLE_LOAD,
+
+    /*
      * Convert the current resolved namestring to either a method call
      * or a named object reference.
      */
@@ -1056,6 +1063,8 @@ UACPI_OP(                                                        \
 extern uacpi_u8 uacpi_field_op_decode_ops[];
 extern uacpi_u8 uacpi_index_field_op_decode_ops[];
 extern uacpi_u8 uacpi_bank_field_op_decode_ops[];
+extern uacpi_u8 uacpi_load_op_decode_ops[];
+extern uacpi_u8 uacpi_load_table_op_decode_ops[];
 
 #define UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(name, code, type, ...) \
 UACPI_OP(                                                        \
@@ -1137,32 +1146,17 @@ UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
     Create, UACPI_EXT_OP(0x13), 3,                          \
     UACPI_PARSE_OP_OPERAND,                                 \
 )                                                           \
-UACPI_OP(                                                   \
+UACPI_OUT_OF_LINE_OP(                                       \
     LoadTableOp, UACPI_EXT_OP(0x1F),                        \
-    {                                                       \
-        UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, 5,               \
-        UACPI_PARSE_OP_IF_NOT_NULL, 0, 5,                   \
-            UACPI_PARSE_OP_STRING,                          \
-            UACPI_PARSE_OP_IMM_DECREMENT, 0,                \
-            UACPI_PARSE_OP_JMP, 3,                          \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
-        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
-    },                                                      \
-    UACPI_OP_PROPERTY_TERM_ARG                              \
+    uacpi_load_table_op_decode_ops,                         \
+    UACPI_OP_PROPERTY_TERM_ARG |                            \
+    UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
-UACPI_OP(                                                   \
+UACPI_OUT_OF_LINE_OP(                                       \
     LoadOp, UACPI_EXT_OP(0x20),                             \
-    {                                                       \
-        UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,            \
-        UACPI_PARSE_OP_TARGET,                              \
-        UACPI_PARSE_OP_LOAD_TRUE_OBJECT,                    \
-        UACPI_PARSE_OP_INVOKE_HANDLER,                      \
-        UACPI_PARSE_OP_STORE_TO_TARGET, 1,                  \
-        UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,             \
-    },                                                      \
-    UACPI_OP_PROPERTY_TERM_ARG                              \
+    uacpi_load_op_decode_ops,                               \
+    UACPI_OP_PROPERTY_TERM_ARG |                            \
+    UACPI_OP_PROPERTY_OUT_OF_LINE                           \
 )                                                           \
 UACPI_OP(                                                   \
     StallOp, UACPI_EXT_OP(0x21),                            \

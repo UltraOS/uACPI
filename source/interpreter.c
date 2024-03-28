@@ -265,6 +265,9 @@ struct call_frame {
 
     // Only used if the method is serialized
     uacpi_u8 prev_sync_level;
+
+    uacpi_u8 base_mutex_array_size;
+    uacpi_bool is_table_load;
 };
 
 static void *call_frame_cursor(struct call_frame *frame)
@@ -1197,21 +1200,11 @@ enum table_load_cause {
     TABLE_LOAD_CAUSE_API
 };
 
-/*
- * TODO:
- * I don't like that we're loading this with an entirely new execution context,
- * thus doubling the stack & memory usage. There's really no reason to do this
- * recursively, and we could pretend that this is a simple method call with a
- * few extra rules, like not propagating the return value, and not aborting on
- * error, etc.
- */
-static uacpi_status do_load_table(
-    uacpi_namespace_node *parent, struct uacpi_table *table,
-    enum table_load_cause cause
+static uacpi_status prepare_table_load(
+    struct uacpi_table *table,
+    enum table_load_cause cause, uacpi_control_method *in_method
 )
 {
-    struct uacpi_control_method method = { 0 };
-    uacpi_status ret;
     struct acpi_dsdt *dsdt;
     enum uacpi_log_level log_level = UACPI_LOG_TRACE;
     const uacpi_char *log_prefix = "Load of";
@@ -1236,11 +1229,29 @@ static uacpi_status do_load_table(
     );
 
     dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
-    method.code = dsdt->definition_block;
-    method.size = table->length - sizeof(dsdt->hdr);
-    method.named_objects_persist = UACPI_TRUE;
+    in_method->code = dsdt->definition_block;
+    in_method->size = table->length - sizeof(dsdt->hdr);
+    in_method->named_objects_persist = UACPI_TRUE;
 
     table->flags |= UACPI_TABLE_LOADED;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status do_load_table(
+    uacpi_namespace_node *parent, struct uacpi_table *table,
+    enum table_load_cause cause
+)
+{
+    struct uacpi_control_method method = { 0 };
+    uacpi_status ret;
+
+    ret = prepare_table_load(table, cause, &method);
+    if (uacpi_unlikely_error(ret)) {
+        if (ret == UACPI_STATUS_ALREADY_EXISTS)
+            ret = UACPI_STATUS_OK;
+
+        return ret;
+    }
 
     ret = uacpi_execute_control_method(parent, &method, NULL, NULL);
     if (uacpi_unlikely_error(ret))
@@ -1265,71 +1276,86 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     struct uacpi_table_identifiers table_id;
     struct uacpi_table *table;
     uacpi_buffer *root_path, *param_path;
+    uacpi_control_method *method;
     uacpi_namespace_node *root_node, *param_node = UACPI_NULL;
-    uacpi_object *param_value, *ret_obj;
+
+    /*
+     * If we already have the last true/false object loaded, this is a second
+     * invocation of this handler. For the second invocation we want to detect
+     * new AML GPE handlers that might've been loaded, as well as potentially
+     * remove the target.
+     */
+    if (item_array_size(items) == 10) {
+        /*
+         * If this load failed, remove the target that was provided via
+         * ParameterPathString so that it doesn't get stored to.
+         */
+        if (uacpi_unlikely(item_array_at(items, 9)->obj->integer == 0)) {
+            uacpi_object *target;
+
+            target = item_array_at(items, 2)->obj;
+            if (target != UACPI_NULL) {
+                uacpi_object_unref(target);
+                item_array_at(items, 2)->obj = UACPI_NULL;
+            }
+
+            return UACPI_STATUS_OK;
+        }
+
+        uacpi_events_match_post_dynamic_table_load();
+        return UACPI_STATUS_OK;
+    }
 
     ret = build_table_id(
         "LoadTable", &table_id,
-        item_array_at(items, 1)->obj->buffer,
-        item_array_at(items, 2)->obj->buffer,
-        item_array_at(items, 3)->obj->buffer
+        item_array_at(items, 3)->obj->buffer,
+        item_array_at(items, 4)->obj->buffer,
+        item_array_at(items, 5)->obj->buffer
     );
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    root_path = item_array_at(items, 4)->obj->buffer;
-    param_path = item_array_at(items, 5)->obj->buffer;
-    param_value = item_array_at(items, 6)->obj;
-    ret_obj = item_array_at(items, 7)->obj;
+    root_path = item_array_at(items, 6)->obj->buffer;
+    param_path = item_array_at(items, 7)->obj->buffer;
 
     if (root_path->size > 1) {
         root_node = uacpi_namespace_node_resolve_from_aml_namepath(
             ctx->cur_frame->cur_scope, root_path->text
         );
+        if (uacpi_unlikely(root_node == UACPI_NULL))
+            return table_id_error("LoadTable", "RootPathString", root_path);
     } else {
         root_node = uacpi_namespace_root();
     }
 
-    if (uacpi_unlikely(root_node == UACPI_NULL)) {
-        table_id_error("LoadTable", "RootPathString", root_path);
-        goto return_false;
-    }
-
     if (param_path->size > 1) {
+        uacpi_object *param_obj;
+        struct item *param_item;
+
         param_node = uacpi_namespace_node_resolve_from_aml_namepath(
             root_node, param_path->text
         );
         if (uacpi_unlikely(param_node == UACPI_NULL)) {
-            table_id_error("LoadTable", "ParameterPathString", root_path);
-            goto return_false;
+            return table_id_error(
+                "LoadTable", "ParameterPathString", root_path
+            );
         }
+
+        param_obj = uacpi_namespace_node_get_object(param_node);
+        param_item = item_array_at(items, 2);
+        uacpi_object_ref(param_obj);
+        param_item->obj = param_obj;
+        param_item->type = ITEM_OBJECT;
     }
 
     ret = uacpi_table_find(&table_id, &table);
     if (uacpi_unlikely_error(ret)) {
         report_table_id_find_error("LoadTable", &table_id, ret);
-        goto return_false;
+        return UACPI_STATUS_OK;
     }
 
-    ret = do_load_table(root_node, table, TABLE_LOAD_CAUSE_LOAD_TABLE_OP);
-    if (uacpi_unlikely_error(ret))
-        goto return_false;
-
-    if (param_node != UACPI_NULL) {
-        ret = uacpi_object_assign(
-            uacpi_namespace_node_get_object(param_node),
-            param_value,
-            UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
-        );
-        if (uacpi_unlikely_error(ret))
-            return ret;
-    }
-
-    return UACPI_STATUS_OK;
-
-return_false:
-    ret_obj->integer = 0;
-    return UACPI_STATUS_OK;
+    method = item_array_at(items, 1)->obj->method;
+    return prepare_table_load(table, TABLE_LOAD_CAUSE_LOAD_TABLE_OP, method);
 }
 
 static uacpi_status handle_load(struct execution_context *ctx)
@@ -1337,15 +1363,26 @@ static uacpi_status handle_load(struct execution_context *ctx)
     uacpi_status ret;
     struct item_array *items = &ctx->cur_op_ctx->items;
     struct uacpi_table *table;
+    uacpi_control_method *method;
     uacpi_object *src;
-    uacpi_object *ret_obj;
     struct acpi_sdt_hdr *src_table;
     void *table_buffer;
     uacpi_size declared_size;
     uacpi_bool unmap_src = UACPI_FALSE;
 
-    src = item_array_at(items, 0)->obj;
-    ret_obj = item_array_at(items, 2)->obj;
+    /*
+     * If we already have the last true/false object loaded, this is a second
+     * invocation of this handler. For the second invocation we simply want to
+     * detect new AML GPE handlers that might've been loaded.
+     * We do this only if table load was successful though.
+     */
+    if (item_array_size(items) == 5) {
+        if (item_array_at(items, 4)->obj->integer != 0)
+            uacpi_events_match_post_dynamic_table_load();
+        return UACPI_STATUS_OK;
+    }
+
+    src = item_array_at(items, 2)->obj;
 
     switch (src->type) {
     case UACPI_OBJECT_OPERATION_REGION: {
@@ -1356,7 +1393,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
             op_region->space != UACPI_ADDRESS_SPACE_SYSTEM_MEMORY
         )) {
             uacpi_error("Load: operation region is not SystemMemory\n");
-            goto return_false;
+            goto error_out;
         }
 
         if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
@@ -1364,7 +1401,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
                 "Load: operation region is too small: %zu\n",
                 op_region->length
             );
-            goto return_false;
+            goto error_out;
         }
 
         src_table = uacpi_kernel_map(op_region->offset, op_region->length);
@@ -1374,7 +1411,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
                 "0x%016"PRIX64" -> 0x%016"PRIX64"\n",
                 op_region->offset, op_region->offset + op_region->length
             );
-            goto return_false;
+            goto error_out;
         }
 
         unmap_src = UACPI_TRUE;
@@ -1391,7 +1428,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
                 "Load: buffer is too small: %zu\n",
                 buffer->size
             );
-            goto return_false;
+            goto error_out;
         }
 
         src_table = buffer->data;
@@ -1405,7 +1442,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
             "Buffer/Field/OperationRegion\n",
             uacpi_object_type_to_string(src->type)
         );
-        goto return_false;
+        goto error_out;
     }
 
     if (uacpi_unlikely(src_table->length > declared_size)) {
@@ -1413,12 +1450,20 @@ static uacpi_status handle_load(struct execution_context *ctx)
             "Load: table size %u is larger than the declared size %zu\n",
             src_table->length, declared_size
         );
-        goto return_false;
+        goto error_out;
+    }
+
+    if (uacpi_unlikely(src_table->length < sizeof(struct acpi_sdt_hdr))) {
+        uacpi_error(
+            "Load: table size %u is too small\n", src_table->length,
+            declared_size
+        );
+        goto error_out;
     }
 
     table_buffer = uacpi_kernel_alloc(src_table->length);
     if (uacpi_unlikely(table_buffer == UACPI_NULL))
-        goto return_false;
+        goto error_out;
 
     uacpi_memcpy(table_buffer, src_table, src_table->length);
 
@@ -1431,20 +1476,17 @@ static uacpi_status handle_load(struct execution_context *ctx)
                                     &table);
     if (uacpi_unlikely_error(ret)) {
         uacpi_kernel_free(table_buffer);
-        goto return_false;
+        goto error_out;
     }
 
-    ret = do_load_table(
-        uacpi_namespace_root(), table,
-        TABLE_LOAD_CAUSE_LOAD_OP
-    );
-    if (uacpi_unlikely_error(ret))
-        goto return_false;
+    item_array_at(items, 0)->node = uacpi_namespace_root();
+
+    method = item_array_at(items, 1)->obj->method;
+    prepare_table_load(table, TABLE_LOAD_CAUSE_LOAD_OP, method);
 
     return UACPI_STATUS_OK;
 
-return_false:
-    ret_obj->integer = 0;
+error_out:
     if (unmap_src && src_table)
         uacpi_kernel_unmap(src_table, declared_size);
     return UACPI_STATUS_OK;
@@ -1785,7 +1827,7 @@ static uacpi_status method_get_ret_target(struct execution_context *ctx,
         depth = op_context_array_size(&frame->pending_ops);
 
         // Ok, no one wants the return value at call site. Discard it.
-        if (!depth) {
+        if (!depth || frame->is_table_load) {
             *out_operand = UACPI_NULL;
             return UACPI_STATUS_OK;
         }
@@ -4741,6 +4783,7 @@ static uacpi_u8 handler_idx_of_ext_op[0x100] = {
 enum method_call_type {
     METHOD_CALL_NATIVE,
     METHOD_CALL_AML,
+    METHOD_CALL_TABLE_LOAD,
 };
 
 static uacpi_status prepare_method_call(
@@ -4781,7 +4824,7 @@ static uacpi_status prepare_method_call(
                 uacpi_object_ref(args->objects[i]);
             }
         }
-    } else {
+    } else if (type == METHOD_CALL_AML) {
         ret = frame_push_args(frame, ctx->cur_op_ctx);
         if (uacpi_unlikely_error(ret))
             goto method_dispatch_error;
@@ -4791,6 +4834,7 @@ static uacpi_status prepare_method_call(
     if (uacpi_unlikely_error(ret))
         goto method_dispatch_error;
 
+    frame->base_mutex_array_size = held_mutexes_array_size(&ctx->held_mutexes);
     ctx->cur_frame = frame;
     ctx->cur_op_ctx = UACPI_NULL;
     ctx->prev_op_ctx = UACPI_NULL;
@@ -5276,6 +5320,19 @@ static uacpi_status exec_op(struct execution_context *ctx)
             return ret;
         }
 
+        case UACPI_PARSE_OP_DISPATCH_TABLE_LOAD: {
+            struct uacpi_namespace_node *node;
+            struct uacpi_control_method *method;
+
+            node = item_array_at(&op_ctx->items, 0)->node;
+            method = item_array_at(&op_ctx->items, 1)->obj->method;
+
+            ret = prepare_method_call(
+                ctx, node, method, METHOD_CALL_TABLE_LOAD, UACPI_NULL
+            );
+            return ret;
+        }
+
         case UACPI_PARSE_OP_CONVERT_NAMESTRING: {
             uacpi_aml_op new_op = UACPI_AML_OP_InternalOpNamedObject;
             uacpi_object *obj;
@@ -5383,42 +5440,74 @@ static void trace_method_abort(struct code_block *block, uacpi_size depth)
         uacpi_kernel_free((void*)absolute_path);
 }
 
-static void execution_context_release(struct execution_context *ctx)
+static void force_release_mutexes(
+    struct held_mutexes_array *held_mutexes, uacpi_size target_count
+)
+{
+    while (held_mutexes_array_size(held_mutexes) > target_count) {
+        held_mutexes_array_remove_and_release(
+            held_mutexes, *held_mutexes_array_last(held_mutexes),
+            FORCE_RELEASE_YES
+        );
+    }
+}
+
+enum unwind_type {
+    UNWIND_TYPE_THIS_TABLE,
+    UNWIND_TYPE_ALL,
+};
+
+enum trace_unwind {
+    TRACE_UNWIND_NO,
+    TRACE_UNWIND_YES,
+};
+
+static void stack_unwind(
+    struct execution_context *ctx, enum unwind_type type,
+    enum trace_unwind trace
+)
 {
     uacpi_size depth;
-
-    if (ctx->ret)
-        uacpi_object_unref(ctx->ret);
-
-    depth = call_frame_array_size(&ctx->call_stack);
+    uacpi_bool should_stop;
 
     /*
      * Non-empty call stack here means the execution was aborted at some point,
      * probably due to a bytecode error.
      */
+    depth = call_frame_array_size(&ctx->call_stack);
+
     if (depth != 0) {
         uacpi_size idx = 0;
-        uacpi_error("Aborting execution due to previous errors:\n");
 
         do {
             while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
                 pop_op(ctx);
 
-            trace_method_abort(
-                code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx++
+            if (trace == TRACE_UNWIND_YES) {
+                trace_method_abort(
+                    code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx++
+                );
+            }
+
+            force_release_mutexes(
+                &ctx->held_mutexes, ctx->cur_frame->base_mutex_array_size
             );
 
-            ctx_reload_post_ret(ctx);
-        } while (--depth);
-    }
+            should_stop = ctx->cur_frame->method->named_objects_persist;
+            should_stop &= type == UNWIND_TYPE_THIS_TABLE;
 
-    while (held_mutexes_array_size(&ctx->held_mutexes) != 0) {
-        held_mutexes_array_remove_and_release(
-            &ctx->held_mutexes,
-            *held_mutexes_array_last(&ctx->held_mutexes),
-            FORCE_RELEASE_YES
-        );
+            ctx_reload_post_ret(ctx);
+        } while (--depth && !should_stop);
     }
+}
+
+static void execution_context_release(struct execution_context *ctx)
+{
+    if (ctx->ret)
+        uacpi_object_unref(ctx->ret);
+
+    stack_unwind(ctx, UNWIND_TYPE_ALL, TRACE_UNWIND_NO);
+    force_release_mutexes(&ctx->held_mutexes, 0);
 
     call_frame_array_clear(&ctx->call_stack);
     held_mutexes_array_clear(&ctx->held_mutexes);
@@ -5464,16 +5553,35 @@ uacpi_status uacpi_execute_control_method(
 
             ret = get_op(ctx);
             if (uacpi_unlikely_error(ret))
-                goto out;
+                goto handle_method_abort;
 
             trace_op(ctx->cur_op);
         }
 
         ret = exec_op(ctx);
         if (uacpi_unlikely_error(ret))
-            goto out;
+            goto handle_method_abort;
 
         ctx->skip_else = UACPI_FALSE;
+        continue;
+
+    handle_method_abort:
+        uacpi_error("aborting execution due to previous error: %s\n",
+                    uacpi_status_to_string(ret));
+        stack_unwind(ctx, UNWIND_TYPE_THIS_TABLE, TRACE_UNWIND_YES);
+
+        /*
+         * Having a frame here implies that we just aborted a dynamic table
+         * load. Signal to the caller that it failed by setting the return
+         * value to false.
+         */
+        if (ctx->cur_frame) {
+            struct item *it;
+
+            it = item_array_last(&ctx->cur_op_ctx->items);
+            if (it != UACPI_NULL && it->obj != UACPI_NULL)
+                it->obj->integer = 0;
+        }
     }
 
 out:
