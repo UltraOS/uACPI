@@ -496,7 +496,7 @@ static uacpi_interrupt_ret dispatch_gpe(
         );
         if (uacpi_unlikely_error(ret)) {
             uacpi_warn(
-                "unable to schedule GPE(%02X) for execution: %s",
+                "unable to schedule GPE(%02X) for execution: %s\n",
                 event->idx, uacpi_status_to_string(ret)
             );
         }
@@ -1123,7 +1123,7 @@ static uacpi_status do_install_gpe_handler(
         if (uacpi_unlikely(event->triggering != triggering)) {
             uacpi_warn(
                 "GPE(%02X) user handler claims %s triggering, originally "
-                "configured as %s", idx,
+                "configured as %s\n", idx,
                 uacpi_gpe_triggering_to_string(triggering),
                 uacpi_gpe_triggering_to_string(event->triggering)
             );

@@ -6,7 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <condition_variable>
-#include <unordered_set>
+#include <unordered_map>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -132,13 +132,24 @@ static bool is_physical_address(uacpi_phys_addr addr, uacpi_size size)
 #endif
 }
 
-static std::unordered_set<void*> fake_phys_mappings;
+static
+std::unordered_map<void*, std::pair<uacpi_phys_addr, size_t>>
+virt_to_phys_and_refcount;
+
+static std::unordered_map<uacpi_phys_addr, void*> phys_to_virt;
 
 void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size size)
 {
     if (is_physical_address(addr, size)) {
+        auto it = phys_to_virt.find(addr);
+        if (it != phys_to_virt.end()) {
+            virt_to_phys_and_refcount[it->second].second++;
+            return it->second;
+        }
+
         void *virt = std::calloc(size, 1);
-        fake_phys_mappings.emplace(virt);
+        virt_to_phys_and_refcount[virt] = { addr, 1 };
+        phys_to_virt[addr] = virt;
         return virt;
     }
 
@@ -147,10 +158,16 @@ void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size size)
 
 void uacpi_kernel_unmap(void* addr, uacpi_size)
 {
-    if (fake_phys_mappings.count(addr)) {
-        fake_phys_mappings.erase(addr);
-        std::free(addr);
-    }
+    auto it = virt_to_phys_and_refcount.find(addr);
+    if (it == virt_to_phys_and_refcount.end())
+        return;
+
+    if (--it->second.second > 0)
+        return;
+
+    phys_to_virt.erase(it->second.first);
+    std::free(it->first);
+    virt_to_phys_and_refcount.erase(it);
 }
 
 void* uacpi_kernel_alloc(uacpi_size size) { return malloc(size); }
