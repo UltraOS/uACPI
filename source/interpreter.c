@@ -4198,6 +4198,7 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_INLINE_IMM] = ITEM_IMMEDIATE,
+    [UACPI_PARSE_OP_LOAD_ZERO_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM] = ITEM_IMMEDIATE,
     [UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT] = ITEM_OBJECT,
     [UACPI_PARSE_OP_LOAD_FALSE_OBJECT] = ITEM_OBJECT,
@@ -4947,6 +4948,10 @@ static uacpi_status exec_op(struct execution_context *ctx)
             op_ctx->pc += src_width;
             break;
         }
+
+        case UACPI_PARSE_OP_LOAD_ZERO_IMM:
+            item->immediate = 0;
+            break;
 
         case UACPI_PARSE_OP_LOAD_IMM:
         case UACPI_PARSE_OP_LOAD_IMM_AS_OBJECT: {
