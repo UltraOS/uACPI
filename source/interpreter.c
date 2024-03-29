@@ -4030,6 +4030,8 @@ static uacpi_status store_to_target(uacpi_object *dst, uacpi_object *src)
         }
         UACPI_FALLTHROUGH;
     default:
+        uacpi_error("attempted to store to an invalid target: %s\n",
+                    uacpi_object_type_to_string(dst->type));
         ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
