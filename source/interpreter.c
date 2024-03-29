@@ -937,7 +937,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
     ret = get_object_storage(src, &src_buf, UACPI_FALSE);
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out_bad_cast;
 
     switch (dst->type) {
     case UACPI_OBJECT_INTEGER:
@@ -947,7 +947,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
         ret = get_object_storage(dst, &dst_buf, UACPI_FALSE);
         if (uacpi_unlikely_error(ret))
-            return ret;
+            goto out_bad_cast;
 
         uacpi_memcpy_zerout(dst_buf.ptr, src_buf.ptr, dst_buf.len, src_buf.len);
         break;
@@ -968,9 +968,17 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
     default:
         ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
-        break;
+        goto out_bad_cast;
     }
 
+    return ret;
+
+out_bad_cast:
+    uacpi_error(
+        "attempted to perform an invalid implicit cast (%s -> %s)\n",
+        uacpi_object_type_to_string(src->type),
+        uacpi_object_type_to_string(dst->type)
+    );
     return ret;
 }
 
