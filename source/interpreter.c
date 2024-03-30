@@ -5434,7 +5434,7 @@ uacpi_status uacpi_execute_control_method(
     struct execution_context *ctx;
 
     ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
-    if (ctx == UACPI_NULL)
+    if (uacpi_unlikely(ctx == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     if (out_obj != UACPI_NULL) {
