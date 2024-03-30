@@ -36,7 +36,8 @@ Whilst ACPICA is an old and battle-tested project, it still has some fundumental
 - Much better compatibility with the Windows NT object implicit-cast semantics than ACPICA
 - AML reference semantics 100% compatbile with the Windows AML interpreter, **including edge cases**.
 - A more sophisticated and safe object lifetime tracking without extra overhead (**AML that would crash the NT interpreter works just fine!**)
-- unlike ACPICA, uACPI doesn't try to work around AML code designed for the Windows NT ACPI driver, instead, it embraces it
+- No recursion when doing dynamic table loads from AML (`Load`/`LoadTable`)
+- Unlike ACPICA, uACPI doesn't try to work around AML code designed for the Windows NT ACPI driver, instead, it embraces it
 - No design flaws preventing true multi-threaded uses without the global interpreter lock
 
 ### More detailed overview
