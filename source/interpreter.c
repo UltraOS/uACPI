@@ -1413,7 +1413,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
         if (uacpi_unlikely(src_table == UACPI_NULL)) {
             uacpi_error(
                 "Load: failed to map operation region "
-                "0x%016"PRIX64" -> 0x%016"PRIX64"\n",
+                "0x%016"UACPI_PRIX64" -> 0x%016"UACPI_PRIX64"\n",
                 op_region->offset, op_region->offset + op_region->length
             );
             goto error_out;
@@ -3537,8 +3537,8 @@ static uacpi_status handle_notify(struct execution_context *ctx)
 
         path = uacpi_namespace_node_generate_absolute_path(node);
         uacpi_warn(
-            "ignoring firmware Notify(%s, 0x%"PRIX64") request, no listeners\n",
-            path, value
+            "ignoring firmware Notify(%s, 0x%"UACPI_PRIX64") request, "
+            "no listeners\n", path, value
         );
         uacpi_kernel_free((void*)path);
 
