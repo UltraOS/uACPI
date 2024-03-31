@@ -721,16 +721,17 @@ uacpi_status handle_string(struct execution_context *ctx)
     struct call_frame *frame = ctx->cur_frame;
     uacpi_object *obj;
 
-    char *string;
-    size_t length;
+    uacpi_char *string;
+    uacpi_size length, max_bytes;
 
     obj = item_array_last(&ctx->cur_op_ctx->items)->obj;
     string = call_frame_cursor(frame);
 
     // TODO: sanitize string for valid UTF-8
-    length = uacpi_strnlen(string, call_frame_code_bytes_left(frame));
+    max_bytes = call_frame_code_bytes_left(frame);
+    length = uacpi_strnlen(string, max_bytes);
 
-    if (string[length++] != 0x00)
+    if (uacpi_unlikely((length == max_bytes) || (string[length++] != 0x00)))
         return UACPI_STATUS_AML_BAD_ENCODING;
 
     obj->buffer->text = uacpi_kernel_alloc(length);
