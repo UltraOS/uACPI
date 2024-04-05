@@ -414,7 +414,13 @@ static uacpi_status name_string_to_path(
     case UACPI_MULTI_NAME_PREFIX:
         if (uacpi_unlikely(bytes_left == 0))
             return UACPI_STATUS_AML_INVALID_NAMESTRING;
+
         namesegs = *(uacpi_u8*)cursor;
+        if (uacpi_unlikely(namesegs == 0)) {
+            uacpi_error("MultiNamePrefix but SegCount is 0\n");
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
+        }
+
         cursor++;
         bytes_left--;
         break;
@@ -540,7 +546,13 @@ static uacpi_status resolve_name_string(
     case UACPI_MULTI_NAME_PREFIX:
         if (uacpi_unlikely(bytes_left == 0))
             return UACPI_STATUS_AML_INVALID_NAMESTRING;
+
         namesegs = *cursor;
+        if (uacpi_unlikely(namesegs == 0)) {
+            uacpi_error("MultiNamePrefix but SegCount is 0\n");
+            return UACPI_STATUS_AML_INVALID_NAMESTRING;
+        }
+
         cursor++;
         bytes_left--;
         just_one_nameseg = UACPI_FALSE;
