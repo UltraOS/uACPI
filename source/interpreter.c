@@ -3777,6 +3777,14 @@ static uacpi_status handle_control_flow(struct execution_context *ctx)
     struct call_frame *frame = ctx->cur_frame;
     struct op_context *op_ctx = ctx->cur_op_ctx;
 
+    if (uacpi_unlikely(frame->last_while == UACPI_NULL)) {
+        uacpi_warn(
+            "attempting to %s outside of a While block\n",
+            op_ctx->op->code == UACPI_AML_OP_BreakOp ? "Break" : "Continue"
+        );
+        return UACPI_STATUS_AML_BAD_ENCODING;
+    }
+
     for (;;) {
         if (ctx->cur_block != frame->last_while) {
             frame_reset_post_end_block(ctx, ctx->cur_block->type);
