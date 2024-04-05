@@ -5045,7 +5045,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         case UACPI_PARSE_OP_LOAD_ZERO_IMM:
-            item->immediate = 0;
             break;
 
         case UACPI_PARSE_OP_LOAD_IMM:
@@ -5062,7 +5061,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 item->obj->integer = 0;
                 dst = &item->obj->integer;
             } else {
-                item->immediate = 0;
                 dst = item->immediate_bytes;
             }
 
