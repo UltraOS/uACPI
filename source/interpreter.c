@@ -2288,9 +2288,11 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
-                           uacpi_object *tgt0, uacpi_object *tgt1,
-                           uacpi_aml_op op)
+static uacpi_status do_binary_math(
+    uacpi_object *arg0, uacpi_object *arg1,
+    uacpi_object *tgt0, uacpi_object *tgt1,
+    uacpi_aml_op op
+)
 {
     uacpi_u64 lhs, rhs, res;
     uacpi_bool should_negate = UACPI_FALSE;
@@ -2336,11 +2338,9 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
         res = rhs ^ lhs;
         break;
     case UACPI_AML_OP_DivideOp:
-        if (uacpi_likely(rhs > 0)) {
-            tgt1->integer = lhs / rhs;
-        } else {
-            uacpi_warn("Attempted division by zero!\n");
-            tgt1->integer = 0;
+        if (uacpi_unlikely(rhs == 0)) {
+            uacpi_error("attempted to divide by zero\n");
+            return UACPI_STATUS_AML_BAD_ENCODING;
         }
         UACPI_FALLTHROUGH;
     case UACPI_AML_OP_ModOp:
@@ -2354,6 +2354,7 @@ static void do_binary_math(uacpi_object *arg0, uacpi_object *arg1,
         res = ~res;
 
     tgt0->integer = res;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status handle_binary_math(struct execution_context *ctx)
@@ -2373,8 +2374,7 @@ static uacpi_status handle_binary_math(struct execution_context *ctx)
         tgt1 = UACPI_NULL;
     }
 
-    do_binary_math(arg0, arg1, tgt0, tgt1, op);
-    return UACPI_STATUS_OK;
+    return do_binary_math(arg0, arg1, tgt0, tgt1, op);
 }
 
 static uacpi_status handle_unary_math(struct execution_context *ctx)
