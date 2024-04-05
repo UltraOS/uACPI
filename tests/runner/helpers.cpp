@@ -21,7 +21,9 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
 void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
                           std::string_view path)
 {
-    auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
+    auto* dsdt = reinterpret_cast<acpi_dsdt*>(
+        read_entire_file(path, sizeof(acpi_sdt_hdr))
+    );
 
     auto& fadt = *new acpi_fadt {};
     fadt.hdr.length = sizeof(fadt);
@@ -82,9 +84,15 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     xsdt.hdr.checksum = gen_checksum(&xsdt, sizeof(xsdt));
 }
 
-void* read_entire_file(std::string_view path)
+void* read_entire_file(std::string_view path, size_t min_size)
 {
     size_t file_size = std::filesystem::file_size(path);
+    if (file_size < min_size) {
+        throw std::runtime_error(
+            std::string("file ") + path.data() + " is too small"
+        );
+    }
+
     std::ifstream file(path.data(), std::ios::binary);
 
     if (!file)

@@ -11,4 +11,4 @@ UACPI_PACKED(struct full_xsdt {
 void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
                           std::string_view path);
 
-void* read_entire_file(std::string_view path);
+void* read_entire_file(std::string_view path, size_t min_size = 0);
