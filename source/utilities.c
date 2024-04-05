@@ -261,6 +261,30 @@ static const uacpi_u8 ascii_map[256] = {
     CHAR_TYPE_CONTROL // 127 backspace
 };
 
+static inline uacpi_bool is_valid_name_byte(uacpi_u8 c)
+{
+    // ‘_’ := 0x5F
+    if (c == 0x5F)
+        return UACPI_TRUE;
+
+    /*
+     * LeadNameChar := ‘A’-‘Z’ | ‘_’
+     * DigitChar := ‘0’ - ‘9’
+     * NameChar := DigitChar | LeadNameChar
+     * ‘A’-‘Z’ := 0x41 - 0x5A
+     * ‘0’-‘9’ := 0x30 - 0x39
+     */
+    return (ascii_map[c] & (CHAR_TYPE_DIGIT | CHAR_TYPE_UPPER)) != 0;
+}
+
+uacpi_bool uacpi_is_valid_nameseg(uacpi_u8 *nameseg)
+{
+    return is_valid_name_byte(nameseg[0]) &&
+           is_valid_name_byte(nameseg[1]) &&
+           is_valid_name_byte(nameseg[2]) &&
+           is_valid_name_byte(nameseg[3]);
+}
+
 static uacpi_bool is_char(uacpi_char c, enum char_type type)
 {
     return (ascii_map[(uacpi_u8)c] & type) == type;

@@ -39,6 +39,8 @@ uacpi_status uacpi_string_to_integer(
     uacpi_u64 *out_value
 );
 
+uacpi_bool uacpi_is_valid_nameseg(uacpi_u8 *nameseg);
+
 uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_char **out_hid);
 uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list *out_list);
 uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
