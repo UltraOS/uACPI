@@ -11,6 +11,11 @@ extern "C" {
  * Raw IO API, this is only used for accessing verified data from
  * "safe" code (aka not indirectly invoked by the AML interpreter),
  * e.g. programming FADT & FACS registers.
+ *
+ * NOTE:
+ * 'byte_width' is ALWAYS one of 1, 2, 4, 8. You are NOT allowed to implement
+ * this in terms of memcpy, as hardware expects accesses to be of the EXACT
+ * width.
  * -------------------------------------------------------------------------
  */
 uacpi_status uacpi_kernel_raw_memory_read(
@@ -20,6 +25,12 @@ uacpi_status uacpi_kernel_raw_memory_write(
     uacpi_phys_addr address, uacpi_u8 byte_width, uacpi_u64 in_value
 );
 
+/*
+ * NOTE:
+ * 'byte_width' is ALWAYS one of 1, 2, 4. You are NOT allowed to break e.g. a
+ * 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
+ * be of the exact width.
+ */
 uacpi_status uacpi_kernel_raw_io_read(
     uacpi_io_addr address, uacpi_u8 byte_width, uacpi_u64 *out_value
 );
@@ -28,6 +39,13 @@ uacpi_status uacpi_kernel_raw_io_write(
 );
 // -------------------------------------------------------------------------
 
+/*
+ * NOTE:
+ * 'byte_width' is ALWAYS one of 1, 2, 4. Since PCI registers are 32 bits wide
+ * this must be able to handle e.g. a 1-byte access by reading at the nearest
+ * 4-byte aligned offset below, then masking the value to select the target
+ * byte.
+ */
 uacpi_status uacpi_kernel_pci_read(
     uacpi_pci_address *address, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 *value
@@ -49,6 +67,11 @@ void uacpi_kernel_io_unmap(uacpi_handle handle);
 /*
  * Read/Write the IO range mapped via uacpi_kernel_io_map
  * at a 0-based 'offset' within the range.
+ *
+ * NOTE:
+ * 'byte_width' is ALWAYS one of 1, 2, 4. You are NOT allowed to break e.g. a
+ * 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
+ * be of the exact width.
  */
 uacpi_status uacpi_kernel_io_read(
     uacpi_handle, uacpi_size offset,
@@ -77,7 +100,8 @@ void uacpi_kernel_log(enum uacpi_log_level, const char*, ...);
 void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
 
 /*
- * Returns the number of 100 nanosecond ticks, strictly monotonic.
+ * Returns the number of 100 nanosecond ticks elapsed since boot,
+ * strictly monotonic.
  */
 uacpi_u64 uacpi_kernel_get_ticks(void);
 
