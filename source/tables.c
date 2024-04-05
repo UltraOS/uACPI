@@ -102,8 +102,10 @@ get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
 
     uacpi_kernel_unmap(hdr, sizeof(struct acpi_sdt_hdr));
 
-    if (*out_len == 0)
+    if (*out_len < sizeof(struct acpi_sdt_hdr)) {
+        uacpi_error("invalid table %.4s size: %u\n", out_sign->text, *out_len);
         return UACPI_STATUS_INVALID_TABLE_LENGTH;
+    }
 
     return UACPI_STATUS_OK;
 }
