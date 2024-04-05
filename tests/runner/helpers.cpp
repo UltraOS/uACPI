@@ -21,6 +21,8 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
 void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
                           std::string_view path)
 {
+    auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
+
     auto& fadt = *new acpi_fadt {};
     fadt.hdr.length = sizeof(fadt);
     fadt.hdr.revision = 6;
@@ -41,7 +43,6 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.gpe1_blk = 0xBEEF;
     fadt.gpe1_blk_len = 0x20;
 
-    auto* dsdt = reinterpret_cast<acpi_dsdt*>(read_entire_file(path));
     // Always force the signature to DSDT as that's what we're building
     memcpy(dsdt->hdr.signature, ACPI_DSDT_SIGNATURE,
            sizeof(ACPI_DSDT_SIGNATURE) - 1);
