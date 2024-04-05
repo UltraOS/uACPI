@@ -12,7 +12,7 @@
  * Map raw AML resource types to the internal enum, this also takes care of type
  * sanitization by returning UACPI_AML_RESOURCE_INVALID for any unknown type.
  */
-static const uacpi_u8 aml_resource_to_type[] = {
+static const uacpi_u8 aml_resource_to_type[256] = {
     // Small items
     [ACPI_RESOURCE_IRQ] = UACPI_AML_RESOURCE_IRQ,
     [ACPI_RESOURCE_DMA] = UACPI_AML_RESOURCE_DMA,
