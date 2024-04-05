@@ -104,6 +104,15 @@ static void run_test(
     full_xsdt xsdt {};
 
     build_xsdt_from_file(xsdt, rsdp, dsdt_path);
+    auto dsdt_delete = ScopeGuard(
+        [&xsdt] {
+            delete[] reinterpret_cast<uint8_t*>(
+                static_cast<uintptr_t>(xsdt.fadt->x_dsdt)
+            );
+
+            delete xsdt.fadt;
+        }
+    );
 
     uacpi_init_params params = {
         reinterpret_cast<uacpi_phys_addr>(&rsdp),
