@@ -319,31 +319,11 @@ struct execution_context {
 
 #define AML_READ(ptr, offset) (*(((uacpi_u8*)(code)) + offset))
 
-/*
- * LeadNameChar := ‘A’-‘Z’ | ‘_’
- * DigitChar := ‘0’ - ‘9’
- * NameChar := DigitChar | LeadNameChar
- * ‘A’-‘Z’ := 0x41 - 0x5A
- * ‘_’ := 0x5F
- * ‘0’-‘9’ := 0x30 - 0x39
- */
 static uacpi_status parse_nameseg(uacpi_u8 *cursor,
                                   uacpi_object_name *out_name)
 {
-    uacpi_size i;
-
-    for (i = 0; i < 4; ++i) {
-        uacpi_char data = cursor[i];
-
-        if (data == '_')
-            continue;
-        if (data >= '0' && data <= '9')
-            continue;
-        if (data >= 'A' && data <= 'Z')
-            continue;
-
+    if (uacpi_unlikely(!uacpi_is_valid_nameseg(cursor)))
         return UACPI_STATUS_AML_INVALID_NAMESTRING;
-    }
 
     uacpi_memcpy(&out_name->id, cursor, 4);
     return UACPI_STATUS_OK;
