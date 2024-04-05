@@ -2342,8 +2342,14 @@ static uacpi_status do_binary_math(
             uacpi_error("attempted to divide by zero\n");
             return UACPI_STATUS_AML_BAD_ENCODING;
         }
-        UACPI_FALLTHROUGH;
+        tgt1->integer = lhs / rhs;
+        res = lhs % rhs;
+        break;
     case UACPI_AML_OP_ModOp:
+        if (uacpi_unlikely(rhs == 0)) {
+            uacpi_error("attempted to calculate modulo of zero\n");
+            return UACPI_STATUS_AML_BAD_ENCODING;
+        }
         res = lhs % rhs;
         break;
     default:
