@@ -3331,20 +3331,32 @@ static void init_method_flags(uacpi_control_method *method, uacpi_u8 flags_byte)
 static uacpi_status handle_create_method(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
-    struct uacpi_control_method *method;
+    struct uacpi_control_method *this_method, *method;
     struct package_length *pkg;
     struct uacpi_namespace_node *node;
     struct uacpi_object *dst;
     uacpi_u32 method_begin_offset;
 
+    this_method = ctx->cur_frame->method;
     pkg = &item_array_at(&op_ctx->items, 0)->pkg;
     node = item_array_at(&op_ctx->items, 1)->node;
+    method_begin_offset = item_array_at(&op_ctx->items, 3)->immediate;
+
+    if (uacpi_unlikely(pkg->end < pkg->begin ||
+                       pkg->end < method_begin_offset ||
+                       pkg->end > this_method->size)) {
+        uacpi_error(
+            "invalid method %.4s bounds [%u..%u] (parent size is %zu)\n",
+            node->name.text, method_begin_offset, pkg->end, this_method->size
+        );
+        return UACPI_STATUS_AML_BAD_ENCODING;
+    }
+
     dst = item_array_at(&op_ctx->items, 4)->obj;
 
     method = dst->method;
     init_method_flags(method, item_array_at(&op_ctx->items, 2)->immediate);
 
-    method_begin_offset = item_array_at(&op_ctx->items, 3)->immediate;
     method->code = ctx->cur_frame->method->code;
     method->code += method_begin_offset;
     method->size = pkg->end - method_begin_offset;
