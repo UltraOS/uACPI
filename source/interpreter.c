@@ -369,7 +369,7 @@ static uacpi_status name_string_to_path(
     uacpi_char **out_string, uacpi_size *out_size
 )
 {
-    uacpi_size bytes_left, prefix_bytes, nameseg_bytes, namesegs;
+    uacpi_size bytes_left, prefix_bytes, nameseg_bytes = 0, namesegs;
     uacpi_char *base_cursor, *cursor;
     uacpi_char prev_char;
 
@@ -434,11 +434,13 @@ static uacpi_status name_string_to_path(
     if (uacpi_unlikely((namesegs * 4) > bytes_left))
         return UACPI_STATUS_AML_INVALID_NAMESTRING;
 
-    // 4 chars per nameseg
-    nameseg_bytes = namesegs * 4;
+    if (namesegs) {
+        // 4 chars per nameseg
+        nameseg_bytes = namesegs * 4;
 
-    // dot separator for every nameseg
-    nameseg_bytes += namesegs - 1;
+        // dot separator for every nameseg
+        nameseg_bytes += namesegs - 1;
+    }
 
     *out_size = nameseg_bytes + prefix_bytes + 1;
 
