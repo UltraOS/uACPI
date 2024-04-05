@@ -21,9 +21,15 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
 void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
                           std::string_view path)
 {
-    auto* dsdt = reinterpret_cast<acpi_dsdt*>(
-        read_entire_file(path, sizeof(acpi_sdt_hdr))
-    );
+    auto [dsdt_ptr, length] = read_entire_file(path, sizeof(acpi_sdt_hdr));
+
+    auto *dsdt = reinterpret_cast<acpi_dsdt*>(dsdt_ptr);
+    if (dsdt->hdr.length > length) {
+        delete[] reinterpret_cast<uint8_t*>(dsdt_ptr);
+        throw std::runtime_error(
+            std::string("DSDT declares that it's bigger than ") + path.data()
+        );
+    }
 
     auto& fadt = *new acpi_fadt {};
     fadt.hdr.length = sizeof(fadt);
@@ -84,7 +90,8 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     xsdt.hdr.checksum = gen_checksum(&xsdt, sizeof(xsdt));
 }
 
-void* read_entire_file(std::string_view path, size_t min_size)
+std::pair<void*, size_t>
+read_entire_file(std::string_view path, size_t min_size)
 {
     size_t file_size = std::filesystem::file_size(path);
     if (file_size < min_size) {
@@ -110,5 +117,5 @@ void* read_entire_file(std::string_view path, size_t min_size)
         );
     }
 
-    return buf;
+    return { buf, file_size };
 }
