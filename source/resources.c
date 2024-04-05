@@ -267,7 +267,7 @@ static uacpi_size size_for_aml_resource_source(
     if (uacpi_unlikely(length && !source->index_present)) {
         uacpi_warn("resource declares no source index with non-empty "
                    "string (%zu bytes), corrected\n", length);
-        source->index_present = true;
+        source->index_present = UACPI_TRUE;
     }
 
     // If index is included in the dynamic resource source, add it to the length
@@ -290,7 +290,7 @@ static uacpi_size size_for_aml_address_or_clock_input(
 )
 {
     uacpi_resource_source *source;
-    bool has_index = true;
+    bool has_index = UACPI_TRUE;
 
     switch (resource->type) {
     case UACPI_RESOURCE_TYPE_ADDRESS16:
@@ -304,7 +304,7 @@ static uacpi_size size_for_aml_address_or_clock_input(
         break;
     case UACPI_RESOURCE_TYPE_CLOCK_INPUT:
         source = &resource->clock_input.source;
-        has_index = false;
+        has_index = UACPI_FALSE;
         break;
     default:
         return 0;
@@ -338,7 +338,7 @@ static uacpi_size size_for_aml_extended_irq(
 
     size = aml_size_with_header(spec);
     size += irq->num_irqs * 4;
-    size += size_for_aml_resource_source(&irq->source, true);
+    size += size_for_aml_resource_source(&irq->source, UACPI_TRUE);
 
     return size;
 }
@@ -1758,11 +1758,11 @@ static uacpi_resource_iteration_decision do_aml_resource_to_native(
             offset += accumulator;
 
             if (insn->code != UACPI_RESOURCE_CONVERT_OPCODE_RESOURCE_LABEL)
-                dst_name.source->index_present = true;
+                dst_name.source->index_present = UACPI_TRUE;
 
             if (offset >= max_offset) {
                 if (insn->code == UACPI_RESOURCE_CONVERT_OPCODE_RESOURCE_SOURCE)
-                    dst_name.source->index_present = false;
+                    dst_name.source->index_present = UACPI_FALSE;
                 break;
             }
 
