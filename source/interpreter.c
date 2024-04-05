@@ -4962,8 +4962,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 item->obj = uacpi_create_object(type);
                 if (uacpi_unlikely(item->obj == UACPI_NULL))
                     return UACPI_STATUS_OUT_OF_MEMORY;
-            } else if (item->type == ITEM_EMPTY_OBJECT) {
-                item->obj = UACPI_NULL;
+            } else {
+                item->handle = UACPI_NULL;
             }
         } else if (item == UACPI_NULL) {
             item = item_array_last(&op_ctx->items);
