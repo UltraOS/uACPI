@@ -44,7 +44,7 @@ struct pci_region_ctx {
 static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
 {
     struct pci_region_ctx *ctx;
-    uacpi_namespace_node *node, *pci_root;
+    uacpi_namespace_node *node, *pci_root, *device;
     uacpi_object *obj;
     uacpi_status ret;
 
@@ -60,15 +60,16 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
      * Find the actual device object that is supposed to be controlling
      * this operation region.
      */
-    while (node) {
-        obj = uacpi_namespace_node_get_object(node);
+    device = node;
+    while (device) {
+        obj = uacpi_namespace_node_get_object(device);
         if (obj && obj->type == UACPI_OBJECT_DEVICE)
             break;
 
-        node = node->parent;
+        device = device->parent;
     }
 
-    if (uacpi_unlikely(node == UACPI_NULL)) {
+    if (uacpi_unlikely(device == UACPI_NULL)) {
         ret = UACPI_STATUS_NOT_FOUND;
         uacpi_trace_region_error(
             node, "unable to find device responsible for", ret
@@ -78,7 +79,7 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
     }
 
     ret = uacpi_eval_typed(
-        node, "_ADR", UACPI_NULL,
+        device, "_ADR", UACPI_NULL,
         UACPI_OBJECT_INTEGER_BIT, &obj
     );
     if (ret == UACPI_STATUS_OK) {
@@ -107,7 +108,7 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
 
     uacpi_trace(
         "detected PCI device %.4s@%04X:%02X:%02X:%01X\n",
-        node->name.text, ctx->address.segment, ctx->address.bus,
+        device->name.text, ctx->address.segment, ctx->address.bus,
         ctx->address.device, ctx->address.function
     );
 
