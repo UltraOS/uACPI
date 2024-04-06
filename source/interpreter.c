@@ -1702,6 +1702,9 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 field->bank_region = field_data.region;
                 uacpi_shareable_ref(field->bank_region);
 
+                field->bank_selection = field_data.field0;
+                uacpi_shareable_ref(field->bank_selection);
+
                 field->bank_value = field_data.value;
                 field->kind = UACPI_FIELD_UNIT_KIND_BANK;
                 break;
