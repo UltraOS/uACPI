@@ -151,7 +151,7 @@ static uacpi_address_space_handler *find_handler(
     return UACPI_NULL;
 }
 
-static uacpi_operation_region *find_region_parent(
+static uacpi_operation_region *find_previous_region_link(
     uacpi_operation_region *region
 )
 {
@@ -218,7 +218,7 @@ static void region_install_handler(uacpi_namespace_node *node,
 void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
 {
     uacpi_address_space_handler *handler;
-    uacpi_operation_region *region, *parent;
+    uacpi_operation_region *region, *link;
 
     region = uacpi_namespace_node_get_object(node)->op_region;
     handler = region->handler;
@@ -226,16 +226,16 @@ void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
     if (handler == UACPI_NULL)
         return;
 
-    parent = find_region_parent(region);
-    if (uacpi_unlikely(parent == UACPI_NULL)) {
+    link = find_previous_region_link(region);
+    if (uacpi_unlikely(link == UACPI_NULL)) {
         uacpi_error("operation region @%p not in the handler@%p list(?)\n",
                     region, handler);
         goto out;
-    } else if (parent == region) {
-        parent = parent->next;
-        handler->regions = parent;
+    } else if (link == region) {
+        link = link->next;
+        handler->regions = link;
     } else {
-        parent->next = region->next;
+        link->next = region->next;
     }
 
 out:
