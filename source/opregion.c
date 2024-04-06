@@ -156,9 +156,10 @@ static uacpi_operation_region *find_previous_region_link(
 )
 {
     uacpi_address_space_handler *handler = region->handler;
-    uacpi_operation_region *parent = region;
+    uacpi_operation_region *parent = handler->regions;
 
-    if (handler->regions == region)
+    if (parent == region)
+        // This is the last attached region, it has no previous link
         return region;
 
     while (parent->next != region) {
