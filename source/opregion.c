@@ -266,7 +266,7 @@ out:
 
 enum opregion_iter_action {
     OPREGION_ITER_ACTION_UNINSTALL,
-    OPRETION_ITER_ACTION_INSTALL,
+    OPREGION_ITER_ACTION_INSTALL,
 };
 
 struct opregion_iter_ctx {
@@ -289,7 +289,7 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
         if (region->space != ctx->handler->space)
             return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
-        if (ctx->action == OPRETION_ITER_ACTION_INSTALL) {
+        if (ctx->action == OPREGION_ITER_ACTION_INSTALL) {
             if (region->handler)
                 uacpi_opregion_uninstall_handler(node);
 
@@ -445,7 +445,7 @@ uacpi_status uacpi_install_address_space_handler(
     handlers->head = new_handler;
 
     iter_ctx.handler = new_handler;
-    iter_ctx.action = OPRETION_ITER_ACTION_INSTALL;
+    iter_ctx.action = OPREGION_ITER_ACTION_INSTALL;
 
     uacpi_namespace_for_each_node_depth_first(
         device_node->child, do_install_or_uninstall_handler, &iter_ctx
