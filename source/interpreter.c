@@ -3146,7 +3146,7 @@ static uacpi_status handle_binary_logic(struct execution_context *ctx)
         // TODO: typecheck at parse time
         if (lhs->type != rhs->type) {
             uacpi_error(
-                "Don't know how to do a logical comparison of '%s' and '%s'\n",
+                "don't know how to do a logical comparison of '%s' and '%s'\n",
                 uacpi_object_type_to_string(lhs->type),
                 uacpi_object_type_to_string(rhs->type)
             );
