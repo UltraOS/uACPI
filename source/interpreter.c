@@ -1123,7 +1123,7 @@ static uacpi_status build_table_id(
     uacpi_buffer *oem_table_id
 )
 {
-    if (uacpi_unlikely(signature->size > (sizeof(uacpi_object_name) + 1)))
+    if (uacpi_unlikely(signature->size != (sizeof(uacpi_object_name) + 1)))
         return table_id_error(opcode, "SignatureString", signature);
 
     uacpi_memcpy(out_id->signature.text, signature->text,
