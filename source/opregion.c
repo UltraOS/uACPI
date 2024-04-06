@@ -441,6 +441,7 @@ uacpi_status uacpi_install_address_space_handler(
     new_handler->space = space;
     new_handler->user_context = handler_context;
     new_handler->callback = handler;
+    new_handler->regions = UACPI_NULL;
     handlers->head = new_handler;
 
     iter_ctx.handler = new_handler;
