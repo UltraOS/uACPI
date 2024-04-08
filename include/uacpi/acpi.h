@@ -64,7 +64,7 @@ UACPI_PACKED(struct acpi_rsdp {
 })
 UACPI_EXPECT_SIZEOF(struct acpi_rsdp, 36);
 
-struct acpi_sdt_hdr {
+UACPI_PACKED(struct acpi_sdt_hdr {
     char signature[4];
     uacpi_u32 length;
     uacpi_u8 revision;
@@ -74,18 +74,18 @@ struct acpi_sdt_hdr {
     uacpi_u32 oem_revision;
     uacpi_u32 creator_id;
     uacpi_u32 creator_revision;
-};
+})
 UACPI_EXPECT_SIZEOF(struct acpi_sdt_hdr, 36);
 
-struct acpi_rsdt {
+UACPI_PACKED(struct acpi_rsdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u32 entries[];
-};
+})
 
-struct acpi_xsdt {
+UACPI_PACKED(struct acpi_xsdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u64 entries[];
-};
+})
 
 // acpi_fdt->iapc_flags
 #define ACPI_IA_PC_LEGACY_DEVS  (1 << 0)
