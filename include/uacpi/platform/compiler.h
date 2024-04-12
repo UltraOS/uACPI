@@ -41,6 +41,14 @@
 
     #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_END \
         _Pragma("GCC diagnostic pop")
+
+    #ifdef __clang__
+        #define UACPI_PRINTF_DECL(fmt_idx, args_idx) \
+            __attribute__((format(printf, fmt_idx, args_idx)))
+    #else
+        #define UACPI_PRINTF_DECL(fmt_idx, args_idx) \
+            __attribute__((format(gnu_printf, fmt_idx, args_idx)))
+    #endif
 #else
     #define uacpi_unlikely(expr) expr
     #define uacpi_likely(expr)   expr
@@ -49,6 +57,8 @@
 
     #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_BEGIN
     #define UACPI_NO_UNUSED_PARAMETER_WARNINGS_END
+
+    #define UACPI_PRINTF_DECL(fmt_idx, args_idx)
 #endif
 
 #ifndef UACPI_FALLTHROUGH

@@ -96,6 +96,7 @@ enum uacpi_log_level {
     UACPI_LOG_ERROR = 0,
 };
 
+UACPI_PRINTF_DECL(2, 3)
 void uacpi_kernel_log(enum uacpi_log_level, const char*, ...);
 void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
 
