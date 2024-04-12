@@ -1073,6 +1073,7 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     uacpi_namespace_node *node;
     uacpi_object *obj;
     uacpi_operation_region *op_region;
+    uacpi_u64 region_end;
 
     node = item_array_at(&ctx->cur_op_ctx->items, 0)->node;
     obj = item_array_at(&ctx->cur_op_ctx->items, 4)->obj;
@@ -1081,6 +1082,19 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     op_region->space = item_array_at(&ctx->cur_op_ctx->items, 1)->immediate;
     op_region->offset = item_array_at(&ctx->cur_op_ctx->items, 2)->obj->integer;
     op_region->length = item_array_at(&ctx->cur_op_ctx->items, 3)->obj->integer;
+    region_end = op_region->offset + op_region->length;
+
+    if (uacpi_unlikely(op_region->length == 0)) {
+        // Don't abort here, as long as it's never accessed we don't care
+        uacpi_warn("unusable/empty operation region %.4s\n", node->name.text);
+    } else if (uacpi_unlikely(op_region->offset > region_end)) {
+        uacpi_error(
+            "invalid operation region %.4s bounds: offset=0x%"PRIX64
+            " length=0x%"PRIX64"\n", node->name.text, op_region->offset,
+            op_region->length
+        );
+        return UACPI_STATUS_AML_BAD_ENCODING;
+    }
 
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED, obj
