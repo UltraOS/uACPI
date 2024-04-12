@@ -365,7 +365,7 @@ static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
         if (uacpi_unlikely(!free_queue_push(queue,
                                             obj->package))) {
             uacpi_warn(
-                "unable to free nested package @p: not enough memory\n",
+                "unable to free nested package @%p: not enough memory\n",
                 obj->package
             );
         }
@@ -533,7 +533,7 @@ static void free_op_region(uacpi_handle handle)
     if (uacpi_unlikely(op_region->handler != UACPI_NULL)) {
         uacpi_warn(
             "BUG: attempting to free an opregion@%p with a handler attached\n",
-            op_region, op_region->handler
+            op_region
         );
     }
 

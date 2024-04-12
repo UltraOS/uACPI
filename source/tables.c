@@ -365,7 +365,7 @@ static void fadt_ensure_correct_revision(struct acpi_fadt *fadt)
 
     if (rev == UACPI_ARRAY_SIZE(fadt_version_sizes)) {
         uacpi_trace(
-            "FADT revision (%d) is likely greater than the last "
+            "FADT revision (%zu) is likely greater than the last "
             "supported, reducing to %zu\n", current_rev, rev
         );
         fadt->hdr.revision = rev;
@@ -376,7 +376,7 @@ static void fadt_ensure_correct_revision(struct acpi_fadt *fadt)
 
     if (current_rev != rev && !(rev == 3 && current_rev == 4)) {
         uacpi_warn(
-            "FADT length %zu doesn't match expected for revision %d, "
+            "FADT length %u doesn't match expected for revision %zu, "
             "assuming version %zu\n", fadt->hdr.length, current_rev,
             rev
         );
