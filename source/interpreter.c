@@ -680,7 +680,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
 
     if (uacpi_unlikely(declared_size->integer > 0xE0000000)) {
         uacpi_error(
-            "buffer is too large (%llu), assuming corrupted bytestream\n",
+            "buffer is too large (%"PRIu64"), assuming corrupted bytestream\n",
             declared_size->integer
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
@@ -760,8 +760,8 @@ static uacpi_status handle_package(struct execution_context *ctx)
         var_num_elements = item_array_at(&op_ctx->items, 1)->obj;
         if (uacpi_unlikely(var_num_elements->integer > 0xE0000000)) {
             uacpi_error(
-                "package is too large (%llu), assuming corrupted bytestream\n",
-                var_num_elements->integer
+                "package is too large (%"PRIu64"), assuming "
+                "corrupted bytestream\n", var_num_elements->integer
             );
             return UACPI_STATUS_AML_BAD_ENCODING;
         }
@@ -1398,7 +1398,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
         if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
             uacpi_error(
-                "Load: operation region is too small: %zu\n",
+                "Load: operation region is too small: %"PRIu64"\n",
                 op_region->length
             );
             goto error_out;
@@ -1454,10 +1454,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
     }
 
     if (uacpi_unlikely(src_table->length < sizeof(struct acpi_sdt_hdr))) {
-        uacpi_error(
-            "Load: table size %u is too small\n", src_table->length,
-            declared_size
-        );
+        uacpi_error("Load: table size %u is too small\n", src_table->length);
         goto error_out;
     }
 
@@ -1977,9 +1974,9 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
-            uacpi_info("%s Integer => 0x%08llX\n", prefix, src->integer);
+            uacpi_info("%s Integer => 0x%08"PRIX64"\n", prefix, src->integer);
         } else {
-            uacpi_info("%s Integer => 0x%016llX\n", prefix, src->integer);
+            uacpi_info("%s Integer => 0x%016"PRIX64"\n", prefix, src->integer);
         }
         break;
     case UACPI_OBJECT_REFERENCE:
@@ -1999,7 +1996,7 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         break;
     case UACPI_OBJECT_OPERATION_REGION:
         uacpi_info(
-            "%s OperationRegion (ASID %d) 0x%016llX -> 0x%016llX\n",
+            "%s OperationRegion (ASID %d) 0x%016"PRIX64" -> 0x%016"PRIX64"\n",
             prefix, src->op_region->space, src->op_region->offset,
             src->op_region->offset + src->op_region->length
         );
@@ -3329,7 +3326,7 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
                        pkg->end < method_begin_offset ||
                        pkg->end > this_method->size)) {
         uacpi_error(
-            "invalid method %.4s bounds [%u..%u] (parent size is %zu)\n",
+            "invalid method %.4s bounds [%u..%u] (parent size is %u)\n",
             node->name.text, method_begin_offset, pkg->end, this_method->size
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
@@ -3460,8 +3457,9 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 
         if (uacpi_unlikely(ctx->sync_level > obj->mutex->sync_level)) {
             uacpi_warn(
-                "Ignoring attempt to acquire mutex @%p with a lower sync level "
-                "(%d < %d)\n", obj->mutex->sync_level, ctx->sync_level
+                "ignoring attempt to acquire mutex @%p with a lower sync level "
+                "(%d < %d)\n", obj->mutex, obj->mutex->sync_level,
+                ctx->sync_level
             );
             break;
         }
@@ -3708,7 +3706,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
 
         if (uacpi_unlikely(!len_obj->integer ||
                             len_obj->integer > 0xFFFFFFFF)) {
-            uacpi_error("invalid bit field length (%llu)\n", field->bit_length);
+            uacpi_error("invalid bit field length (%u)\n", field->bit_length);
             return UACPI_STATUS_AML_BAD_ENCODING;
         }
 
@@ -4851,7 +4849,7 @@ static uacpi_status prepare_method_call(
         arg_count = args ? args->count : 0;
         if (uacpi_unlikely(arg_count != method->args)) {
             uacpi_warn(
-                "invalid number of arguments %d to call %.4s, expected %d\n",
+                "invalid number of arguments %zu to call %.4s, expected %d\n",
                 args ? args->count : 0, node->name.text, method->args
             );
 

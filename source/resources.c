@@ -1622,21 +1622,21 @@ struct resource_conversion_ctx {
 #define NATIVE_FIELD(res, name, field) \
     NATIVE_OFFSET(res, NATIVE_O(name, field))
 
-#define CHECK_AML_OOB(offset, prefix, what)                             \
-    if (uacpi_unlikely(offset > ((uacpi_u32)aml_size + header_size))) { \
-        uacpi_error(prefix what " is OOB: %zu > %zu\n",                 \
-                    offset, aml_size + header_size);                    \
-        ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                    \
-        return UACPI_RESOURCE_ITERATION_ABORT;                          \
+#define CHECK_AML_OOB(offset, prefix, what)                                  \
+    if (uacpi_unlikely(offset > ((uacpi_u32)aml_size + header_size))) {      \
+        uacpi_error(prefix what " is OOB: %zu > %u\n",                       \
+                    (uacpi_size)offset, (uacpi_u32)aml_size + header_size);  \
+        ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                         \
+        return UACPI_RESOURCE_ITERATION_ABORT;                               \
     }
 
-#define CHECK_AML_OFFSET_BASE(offset, what)                               \
-    if (uacpi_unlikely(offset < base_aml_size_with_header)) {             \
-        uacpi_error(                                                      \
-            "invalid " what " offset: %zu, expected at least %zu\n",      \
-            offset, base_aml_size_with_header);                           \
-        ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                      \
-        return UACPI_RESOURCE_ITERATION_ABORT;                            \
+#define CHECK_AML_OFFSET_BASE(offset, what)                             \
+    if (uacpi_unlikely(offset < base_aml_size_with_header)) {           \
+        uacpi_error(                                                    \
+            "invalid " what " offset: %zu, expected at least %u\n",     \
+            (uacpi_size)offset, base_aml_size_with_header);             \
+        ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                    \
+        return UACPI_RESOURCE_ITERATION_ABORT;                          \
     }
 
 #define CHECK_AML_OFFSET(offset, what)     \
@@ -1886,8 +1886,8 @@ static uacpi_resource_iteration_decision do_aml_resource_to_native(
             type_length = serial_bus_common->type_data_length;
             if (uacpi_unlikely(type_length < extra_size)) {
                 uacpi_error(
-                    "invalid type-specific data length: %zu, "
-                    "expected at least %zu\n", type_length, extra_size
+                    "invalid type-specific data length: %d, "
+                    "expected at least %d\n", type_length, extra_size
                 );
                 ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;
                 return UACPI_RESOURCE_ITERATION_ABORT;
@@ -2062,7 +2062,7 @@ uacpi_status uacpi_for_each_resource(
         }
 
         if (uacpi_unlikely(current->length > bytes_left)) {
-            uacpi_error("corrupted resource@%p length %zu (%zu bytes left)\n",
+            uacpi_error("corrupted resource@%p length %u (%zu bytes left)\n",
                         current, current->length, bytes_left);
             return UACPI_STATUS_INVALID_ARGUMENT;
         }
@@ -2269,7 +2269,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
 
                 if (uacpi_unlikely(vendor_data_length != 0)) {
                     uacpi_error(
-                        "vendor_data_length is %zu, but pointer is NULL\n",
+                        "vendor_data_length is %d, but pointer is NULL\n",
                         vendor_data_length
                     );
                     ctx->st = UACPI_STATUS_INVALID_ARGUMENT;

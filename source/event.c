@@ -382,7 +382,8 @@ static void async_run_gpe_handler(uacpi_handle opaque)
         method_obj = uacpi_namespace_node_get_object(event->aml_handler);
         if (uacpi_unlikely(method_obj == UACPI_NULL ||
                            method_obj->type != UACPI_OBJECT_METHOD)) {
-            uacpi_error("GPE(%02X) has invalid or deleted AML handler\n");
+            uacpi_error("GPE(%02X) has invalid or deleted AML handler\n",
+                        event->idx);
             break;
         }
 
@@ -801,7 +802,7 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
         // This is okay, since we're re-running the detection code
         if (!ctx->post_dynamic_table_load) {
             uacpi_warn(
-                "GPE %02X already matched %.4s, skipping %.4s\n",
+                "GPE(%02"PRIX64") already matched %.4s, skipping %.4s\n",
                 idx, event->aml_handler->name.text, node->name.text
             );
         }
@@ -810,15 +811,15 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
     case GPE_HANDLER_TYPE_NATIVE_HANDLER:
     case GPE_HANDLER_TYPE_NATIVE_HANDLER_RAW:
         uacpi_trace(
-            "not assigning GPE %02X to %.4s, override installed by user\n",
-            idx, node->name.text
+            "not assigning GPE(%02"PRIX64") to %.4s, override "
+            "installed by user\n", idx, node->name.text
         );
         UACPI_FALLTHROUGH;
     default:
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
-    uacpi_trace("assigned GPE(%02X) -> %.4s\n", idx, node->name.text);
+    uacpi_trace("assigned GPE(%02"PRIX64") -> %.4s\n", idx, node->name.text);
     event->triggering = triggering;
     ctx->matched_count++;
 

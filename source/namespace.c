@@ -188,8 +188,8 @@ uacpi_status uacpi_node_install(
     if (prev) {
         if (uacpi_unlikely(prev->prev != UACPI_NULL)) {
             uacpi_warn(
-                "while installing node @p: previous node @p already has "
-                " a valid prev link @p\n", node, prev, prev->prev
+                "while installing node @%p: previous node @%p already has "
+                " a valid prev link @%p\n", node, prev, prev->prev
             );
         }
 
@@ -263,7 +263,7 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
 
     if (uacpi_unlikely(node->child)) {
         uacpi_warn(
-            "trying to uninstall a node @p with a valid child link @p\n",
+            "trying to uninstall a node @%p with a valid child link @%p\n",
             node, node->child
         );
     }
