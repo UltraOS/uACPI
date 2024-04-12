@@ -3289,7 +3289,15 @@ static uacpi_status parse_package_length(struct call_frame *frame,
     }
 
     frame->code_offset += marker_length;
+
     out_pkg->end = out_pkg->begin + size;
+    if (uacpi_unlikely(out_pkg->end < out_pkg->begin)) {
+        uacpi_error(
+            "PkgLength overflow: start=%u, size=%u\n", out_pkg->begin, size
+        );
+        return UACPI_STATUS_AML_BAD_ENCODING;
+    }
+
     return UACPI_STATUS_OK;
 }
 
