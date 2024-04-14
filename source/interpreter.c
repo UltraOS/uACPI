@@ -1981,73 +1981,73 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
 {
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
-        uacpi_info("%s Uninitialized\n", prefix);
+        uacpi_trace("%s Uninitialized\n", prefix);
         break;
     case UACPI_OBJECT_STRING:
-        uacpi_info("%s String => \"%s\"\n", prefix, src->buffer->text);
+        uacpi_trace("%s String => \"%s\"\n", prefix, src->buffer->text);
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
-            uacpi_info("%s Integer => 0x%08"PRIX64"\n", prefix, src->integer);
+            uacpi_trace("%s Integer => 0x%08"PRIX64"\n", prefix, src->integer);
         } else {
-            uacpi_info("%s Integer => 0x%016"PRIX64"\n", prefix, src->integer);
+            uacpi_trace("%s Integer => 0x%016"PRIX64"\n", prefix, src->integer);
         }
         break;
     case UACPI_OBJECT_REFERENCE:
-        uacpi_info("%s Reference @%p => %p\n", prefix, src, src->inner_object);
+        uacpi_trace("%s Reference @%p => %p\n", prefix, src, src->inner_object);
         break;
     case UACPI_OBJECT_PACKAGE:
-        uacpi_info(
+        uacpi_trace(
             "%s Package @%p (%p) (%zu elements)\n",
             prefix, src, src->package, src->package->count
         );
         break;
     case UACPI_OBJECT_BUFFER:
-        uacpi_info(
+        uacpi_trace(
             "%s Buffer @%p (%p) (%zu bytes)\n",
             prefix, src, src->buffer, src->buffer->size
         );
         break;
     case UACPI_OBJECT_OPERATION_REGION:
-        uacpi_info(
+        uacpi_trace(
             "%s OperationRegion (ASID %d) 0x%016"PRIX64" -> 0x%016"PRIX64"\n",
             prefix, src->op_region->space, src->op_region->offset,
             src->op_region->offset + src->op_region->length
         );
         break;
     case UACPI_OBJECT_POWER_RESOURCE:
-        uacpi_info(
+        uacpi_trace(
             "%s Power Resource %d %d\n",
             prefix, src->power_resource.system_level,
             src->power_resource.resource_order
         );
         break;
     case UACPI_OBJECT_PROCESSOR:
-        uacpi_info(
+        uacpi_trace(
             "%s Processor[%d] 0x%08X (%d)\n",
             prefix, src->processor->id, src->processor->block_address,
             src->processor->block_length
         );
         break;
     case UACPI_OBJECT_BUFFER_INDEX:
-        uacpi_info(
+        uacpi_trace(
             "%s Buffer Index %p[%zu] => 0x%02X\n",
             prefix, src->buffer_index.buffer->data, src->buffer_index.idx,
             *buffer_index_cursor(&src->buffer_index)
         );
         break;
     case UACPI_OBJECT_MUTEX:
-        uacpi_info(
+        uacpi_trace(
             "%s Mutex @%p (%p => %p) sync level %d (owned by %p)\n",
             prefix, src, src->mutex, src->mutex->handle,
             src->mutex->sync_level, src->mutex->owner
         );
         break;
     case UACPI_OBJECT_METHOD:
-        uacpi_info("%s Method @%p (%p)\n", prefix, src, src->method);
+        uacpi_trace("%s Method @%p (%p)\n", prefix, src, src->method);
         break;
     default:
-        uacpi_info(
+        uacpi_trace(
             "%s %s @%p\n",
             prefix, uacpi_object_type_to_string(src->type), src
         );
@@ -2056,6 +2056,13 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
 
 static uacpi_status debug_store(uacpi_object *src)
 {
+    /*
+     * Don't bother running the body if current log level is not set to trace.
+     * All DebugOp logging is done as TRACE exclusively.
+     */
+    if (!uacpi_rt_should_log(UACPI_LOG_TRACE))
+        return UACPI_STATUS_OK;
+
     src = uacpi_unwrap_internal_reference(src);
 
     debug_store_no_recurse("[AML DEBUG]", src);
