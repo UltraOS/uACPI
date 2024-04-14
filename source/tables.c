@@ -219,41 +219,66 @@ static uacpi_bool is_valid_table(struct uacpi_table *table)
     return table->flags & UACPI_TABLE_VALID;
 }
 
-static uacpi_status do_search(struct uacpi_table_identifiers *id,
-                              uacpi_u32 base_idx,
-                              struct uacpi_table **out_table)
+void uacpi_for_each_table(
+    uacpi_size base_idx, uacpi_table_iteration_callback cb, void *user
+)
 {
     uacpi_size idx;
-    struct uacpi_table *found_table = UACPI_NULL;
+    uacpi_table *table;
+    enum uacpi_table_iteration_decision ret;
 
     for (idx = base_idx; idx < table_array_size(&tables); ++idx) {
-        struct uacpi_table *table;
-
         table = table_array_at(&tables, idx);
 
         if (!is_valid_table(table))
             continue;
 
-        if (id->signature.id != table->signature.id)
-            continue;
-
-        if (id->oemid[0] != '\0' &&
-            uacpi_memcmp(id->oemid, table->hdr->oemid, sizeof(id->oemid)) != 0)
-            continue;
-
-        if (id->oem_table_id[0] != '\0' &&
-            uacpi_memcmp(id->oem_table_id, table->hdr->oem_table_id,
-                         sizeof(id->oem_table_id)) != 0)
-            continue;
-
-        found_table = table;
-        break;
+        ret = cb(user, table);
+        if (ret == UACPI_TABLE_ITERATION_DECISION_BREAK)
+            return;
     }
+}
 
-    if (found_table == UACPI_NULL)
+struct table_search_ctx {
+    struct uacpi_table_identifiers *id;
+    uacpi_table *out_table;
+};
+
+static enum uacpi_table_iteration_decision do_search_tables(
+    void *user, uacpi_table *table
+)
+{
+    struct table_search_ctx *ctx = user;
+    struct uacpi_table_identifiers *id = ctx->id;
+
+    if (id->signature.id != table->signature.id)
+        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+
+    if (id->oemid[0] != '\0' &&
+        uacpi_memcmp(id->oemid, table->hdr->oemid, sizeof(id->oemid)) != 0)
+        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+
+    if (id->oem_table_id[0] != '\0' &&
+        uacpi_memcmp(id->oem_table_id, table->hdr->oem_table_id,
+                     sizeof(id->oem_table_id)) != 0)
+        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+
+    ctx->out_table = table;
+    return UACPI_TABLE_ITERATION_DECISION_BREAK;
+}
+
+static uacpi_status find_table(
+    uacpi_size base_idx, struct uacpi_table_identifiers *id,
+    uacpi_table **out_table
+)
+{
+    struct table_search_ctx ctx = { .id = id };
+
+    uacpi_for_each_table(base_idx, do_search_tables, &ctx);
+    if (ctx.out_table == UACPI_NULL)
         return UACPI_STATUS_NOT_FOUND;
 
-    *out_table = found_table;
+    *out_table = ctx.out_table;
     return UACPI_STATUS_OK;
 }
 
@@ -283,24 +308,24 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
     return UACPI_STATUS_NOT_FOUND;
 }
 
-uacpi_status
-uacpi_table_find_by_signature(uacpi_object_name signature,
-                              struct uacpi_table **out_table)
+uacpi_status uacpi_table_find_by_signature(
+    uacpi_object_name signature, struct uacpi_table **out_table
+)
 {
-    *out_table = get_table_for_signature(signature);
+    struct table_search_ctx ctx = { 0 };
 
-    if (*out_table == UACPI_NULL) {
-        struct uacpi_table_identifiers id = {
-            .signature = signature,
-        };
-
-        return do_search(&id, 0, out_table);
+    ctx.out_table = get_table_for_signature(signature);
+    if (ctx.out_table == UACPI_NULL) {
+        struct uacpi_table_identifiers id = { .signature = signature, };
+        ctx.id = &id;
+        uacpi_for_each_table(0, do_search_tables, &ctx);
     }
 
-    if (is_valid_table(*out_table))
-        return UACPI_STATUS_OK;
+    if (ctx.out_table == UACPI_NULL || !is_valid_table(ctx.out_table))
+        return UACPI_STATUS_NOT_FOUND;
 
-    return UACPI_STATUS_NOT_FOUND;
+    *out_table = ctx.out_table;
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_size table_array_index_of(
@@ -338,14 +363,14 @@ uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
     if (base_idx == 0)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    return do_search(&id, base_idx + 1, in_out_table);
+    return find_table(base_idx + 1, &id, in_out_table);
 }
 
 uacpi_status
 uacpi_table_find(struct uacpi_table_identifiers *id,
                  struct uacpi_table **out_table)
 {
-    return do_search(id, 0, out_table);
+    return find_table(0, id, out_table);
 }
 
 uacpi_u16 fadt_version_sizes[] = {
