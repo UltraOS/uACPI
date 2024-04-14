@@ -287,25 +287,10 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
                          struct uacpi_table **out_table)
 {
     *out_table = get_table_for_type(type);
-    if (*out_table == UACPI_NULL) {
-        struct uacpi_table_identifiers id = { 0 };
+    if (*out_table == UACPI_NULL || !is_valid_table(*out_table))
+        return UACPI_STATUS_NOT_FOUND;
 
-        switch (type) {
-        case UACPI_TABLE_TYPE_SSDT:
-            uacpi_memcpy(&id.signature, ACPI_SSDT_SIGNATURE,
-                         sizeof(id.signature));
-            break;
-        default:
-            return UACPI_STATUS_INVALID_ARGUMENT;
-        }
-
-        return do_search(&id, 0, out_table);
-    }
-
-    if (is_valid_table(*out_table))
-        return UACPI_STATUS_OK;
-
-    return UACPI_STATUS_NOT_FOUND;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_table_find_by_signature(
