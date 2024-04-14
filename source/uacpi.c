@@ -305,45 +305,97 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     return uacpi_enter_acpi_mode();
 }
 
+struct table_load_stats {
+    uacpi_u32 load_counter;
+    uacpi_u32 failure_counter;
+};
+
+static void trace_table_load_failure(
+    uacpi_table *tbl, enum uacpi_log_level lvl, uacpi_status ret
+)
+{
+    uacpi_log_lvl(
+        lvl,
+        "failed to load '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s'): %s\n",
+        tbl->signature.text, tbl->hdr->oemid, tbl->hdr->oem_table_id,
+        uacpi_status_to_string(ret)
+    );
+}
+
+static uacpi_object_name ssdt_signature = {
+    .text = { ACPI_SSDT_SIGNATURE },
+};
+
+static uacpi_object_name psdt_signature = {
+    .text = { ACPI_PSDT_SIGNATURE },
+};
+
+enum uacpi_table_iteration_decision do_load_secondary_tables(
+    void *user, uacpi_table *tbl
+)
+{
+    struct table_load_stats *stats = user;
+    uacpi_status ret;
+
+    if (tbl->signature.id != ssdt_signature.id &&
+        tbl->signature.id != psdt_signature.id)
+        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+
+    ret = uacpi_load_table(tbl);
+    if (uacpi_unlikely_error(ret)) {
+        trace_table_load_failure(tbl, UACPI_LOG_WARN, ret);
+        stats->failure_counter++;
+    }
+    stats->load_counter++;
+
+    return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+}
+
 uacpi_status uacpi_namespace_load(void)
 {
     struct uacpi_table *tbl;
     uacpi_status ret;
+    struct table_load_stats st = { 0 };
 
     if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
                        UACPI_INIT_LEVEL_TABLES_LOADED))
         return UACPI_STATUS_INIT_LEVEL_MISMATCH;
 
     ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
-    if (uacpi_unlikely_error(ret))
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_error("unable to find DSDT: %s\n", uacpi_status_to_string(ret));
         return ret;
+    }
 
     ret = uacpi_load_table(tbl);
-    if (uacpi_unlikely_error(ret))
-        return ret;
+    if (uacpi_unlikely_error(ret)) {
+        trace_table_load_failure(tbl, UACPI_LOG_ERROR, ret);
+        st.failure_counter++;
+    }
+    st.load_counter++;
 
-    ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_SSDT, &tbl);
-    if (ret != UACPI_STATUS_OK)
-        goto out;
+    uacpi_for_each_table(0, do_load_secondary_tables, &st);
 
-    do {
-        ret = uacpi_load_table(tbl);
-        if (uacpi_unlikely_error(ret))
-            return ret;
+    if (uacpi_unlikely(st.failure_counter != 0)) {
+        uacpi_info(
+            "loaded & executed %u AML blob%s (%u error%s)\n", st.load_counter,
+            st.load_counter > 1 ? "s" : "", st.failure_counter,
+            st.failure_counter > 1 ? "s" : ""
+        );
+    } else {
+        uacpi_info(
+            "successfully loaded & executed %u AML blob%s\n", st.load_counter,
+            st.load_counter > 1 ? "s" : ""
+        );
+    }
 
-        ret = uacpi_table_find_next_with_same_signature(&tbl);
-    } while (ret == UACPI_STATUS_OK);
+    ret = uacpi_initialize_events();
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_warn("event initialization failed: %s\n",
+                   uacpi_status_to_string(ret));
+    }
 
-out:
-    if (ret == UACPI_STATUS_NOT_FOUND)
-        ret = UACPI_STATUS_OK;
-
-    if (uacpi_likely_success(ret))
-        ret = uacpi_initialize_events();
-
-    if (uacpi_likely_success(ret))
-        g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_LOADED;
-
+    g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_LOADED;
     return ret;
 }
 

@@ -38,7 +38,6 @@ typedef struct uacpi_table {
 typedef enum uacpi_table_type {
     UACPI_TABLE_TYPE_FADT = 0,
     UACPI_TABLE_TYPE_DSDT = 1,
-    UACPI_TABLE_TYPE_SSDT = 2,
     UACPI_TABLE_TYPE_INVALID = 0xFFFF,
 } uacpi_table_type;
 
