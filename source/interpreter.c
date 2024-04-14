@@ -3517,7 +3517,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
             obj->mutex->owner = ctx;
             obj->mutex->depth = 1;
             ctx->sync_level = obj->mutex->sync_level;
-            item_array_at(&op_ctx->items, 2)->obj->integer = 0;
+            *return_value = 0;
         }
         break;
     }
