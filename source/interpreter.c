@@ -3466,7 +3466,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
     );
     if (uacpi_unlikely(obj->type != UACPI_OBJECT_MUTEX)) {
         uacpi_error(
-            "%s: Invalid argument '%s', expected a Mutex object\n",
+            "%s: invalid argument '%s', expected a Mutex object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
@@ -3527,7 +3527,7 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 
         if (!owned_by_us) {
             uacpi_warn(
-                "Attempted to release not-previously-acquired mutex object "
+                "attempted to release not-previously-acquired mutex object "
                 "@%p (%p)\n", obj->mutex, obj->mutex->handle
             );
             break;
