@@ -146,14 +146,24 @@ def test_runner_binary() -> str:
     return out
 
 
-def build_test_runner() -> str:
-    build_dir = f"build-{platform.system().lower()}"
+def build_test_runner(bitness: int) -> str:
+    build_dir = f"build-{platform.system().lower()}-{bitness}bits"
     runner_build_dir = test_relpath("runner", build_dir)
     runner_exe = os.path.join(runner_build_dir, test_runner_binary())
 
+    cmake_args: List[str] = ["cmake", ".."]
+    if bitness == 32:
+        if platform.system() == "Windows":
+            cmake_args.extend(["-A", "Win32"])
+        else:
+            cmake_args.extend([
+                "-DCMAKE_CXX_FLAGS=-m32",
+                "-DCMAKE_C_FLAGS=-m32"
+            ])
+
     if not os.path.isdir(runner_build_dir):
         os.makedirs(runner_build_dir, exist_ok=True)
-        subprocess.run(["cmake", ".."], cwd=runner_build_dir, check=True)
+        subprocess.run(cmake_args, cwd=runner_build_dir, check=True)
 
     subprocess.run(["cmake", "--build", "."], cwd=runner_build_dir, check=True)
     return runner_exe
@@ -175,13 +185,15 @@ def main() -> int:
                         help="The directory to store intermediate files in, "
                              "created & deleted automatically. Defaults to "
                              "'bin' in the same directory")
+    parser.add_argument("--bitness", default=64, choices=[32, 64], type=int,
+                        help="uACPI build bitness")
     args = parser.parse_args()
 
     test_compiler = args.asl_compiler
     test_dir = args.test_dir
     test_runner = args.test_runner
     if test_runner is None:
-        test_runner = build_test_runner()
+        test_runner = build_test_runner(args.bitness)
 
     ret = run_resource_tests(test_runner)
     if ret != 0:
