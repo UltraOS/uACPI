@@ -257,7 +257,7 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
         std::abort();
     }
 
-    return (ts.tv_nsec + ts.tv_sec * 1000000000) / 100;
+    return (ts.tv_nsec + ts.tv_sec * 1000000000ull) / 100;
 #endif
 }
 
