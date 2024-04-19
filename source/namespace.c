@@ -443,6 +443,11 @@ uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
     return uacpi_unwrap_internal_reference(node->object);
 }
 
+uacpi_object_name uacpi_namespace_node_name(uacpi_namespace_node *node)
+{
+    return node->name;
+}
+
 void uacpi_namespace_for_each_node_depth_first(
     uacpi_namespace_node *node,
     uacpi_iteration_callback callback,
