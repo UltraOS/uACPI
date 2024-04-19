@@ -74,7 +74,7 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
         uacpi_trace_region_error(
             node, "unable to find device responsible for", ret
         );
-        uacpi_kernel_free(ctx);
+        uacpi_free(ctx, sizeof(*ctx));
         return ret;
     }
 
@@ -120,7 +120,7 @@ static uacpi_status pci_region_detach(uacpi_region_detach_data *data)
 {
     struct pci_region_ctx *ctx = data->region_context;
 
-    uacpi_kernel_free(ctx);
+    uacpi_free(ctx, sizeof(*ctx));
     return UACPI_STATUS_OK;
 }
 
@@ -181,7 +181,7 @@ static uacpi_status memory_region_attach(uacpi_region_attach_data *data)
     if (uacpi_unlikely(ctx->virt == UACPI_NULL)) {
         ret = UACPI_STATUS_MAPPING_FAILED;
         uacpi_trace_region_error(data->region_node, "unable to map", ret);
-        uacpi_kernel_free(ctx);
+        uacpi_free(ctx, sizeof(*ctx));
         return ret;
     }
 
@@ -194,7 +194,7 @@ static uacpi_status memory_region_detach(uacpi_region_detach_data *data)
     struct memory_region_ctx *ctx = data->region_context;
 
     uacpi_kernel_unmap(ctx->virt, ctx->size);
-    uacpi_kernel_free(ctx);
+    uacpi_free(ctx, sizeof(*ctx));
     return UACPI_STATUS_OK;
 }
 
@@ -221,7 +221,7 @@ static uacpi_status io_region_attach(uacpi_region_attach_data *data)
         uacpi_trace_region_error(
             data->region_node, "unable to map an IO", ret
         );
-        uacpi_kernel_free(ctx);
+        uacpi_free(ctx, sizeof(*ctx));
         return ret;
     }
 
@@ -234,7 +234,7 @@ static uacpi_status io_region_detach(uacpi_region_detach_data *data)
     struct io_region_ctx *ctx = data->region_context;
 
     uacpi_kernel_io_unmap(ctx->handle);
-    uacpi_kernel_free(ctx);
+    uacpi_free(ctx, sizeof(*ctx));
     return UACPI_STATUS_OK;
 }
 

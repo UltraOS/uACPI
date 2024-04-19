@@ -482,7 +482,10 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
 
 void uacpi_free_pnp_id(uacpi_pnp_id *id)
 {
-    uacpi_kernel_free(id);
+    if (id == UACPI_NULL)
+        return;
+
+    uacpi_free(id, sizeof(uacpi_pnp_id) + id->size);
 }
 
 uacpi_status uacpi_eval_cid(
@@ -604,7 +607,10 @@ uacpi_status uacpi_eval_cid(
 
 void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list)
 {
-    uacpi_kernel_free(list);
+    if (list == UACPI_NULL)
+        return;
+
+    uacpi_free(list, sizeof(uacpi_pnp_id_list) + list->size);
 }
 
 uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
@@ -892,5 +898,20 @@ out_bad_encoding:
 
 void uacpi_free_pci_routing_table(uacpi_pci_routing_table *table)
 {
-    uacpi_kernel_free(table);
+    if (table == UACPI_NULL)
+        return;
+
+    uacpi_free(
+        table,
+        sizeof(uacpi_pci_routing_table) +
+        table->num_entries * sizeof(uacpi_pci_routing_table_entry)
+    );
+}
+
+void uacpi_free_dynamic_string(const uacpi_char *str)
+{
+    if (str == UACPI_NULL)
+        return;
+
+    uacpi_free((void*)str, uacpi_strlen(str) + 1);
 }

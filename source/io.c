@@ -2,6 +2,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/opregion.h>
+#include <uacpi/internal/utilities.h>
 
 uacpi_size uacpi_round_up_bits_to_bytes(uacpi_size bit_length)
 {
@@ -211,7 +212,7 @@ static uacpi_status dispatch_field_io(
             "at 0x%"PRIX64" (idx=%u, width=%d)\n", path, region->offset,
             region->offset + region->length, data.offset, offset, byte_width
         );
-        uacpi_kernel_free((uacpi_char*)path);
+        uacpi_free_dynamic_string(path);
         return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
     }
 

@@ -100,7 +100,7 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
     if (initial_size) {
         buf->data = uacpi_kernel_alloc(initial_size);
         if (uacpi_unlikely(buf->data == UACPI_NULL)) {
-            uacpi_kernel_free(buf);
+            uacpi_free(buf, sizeof(*buf));
             return UACPI_FALSE;
         }
 
@@ -147,7 +147,7 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
 
     if (initial_size) {
         if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size))) {
-            uacpi_kernel_free(pkg);
+            uacpi_free(pkg, sizeof(*pkg));
             return UACPI_FALSE;
         }
     }
@@ -171,7 +171,7 @@ uacpi_mutex *uacpi_create_mutex(void)
 
     mutex->handle = uacpi_kernel_create_mutex();
     if (mutex->handle == UACPI_NULL) {
-        uacpi_kernel_free(mutex);
+        uacpi_free(mutex, sizeof(*mutex));
         return UACPI_NULL;
     }
 
@@ -195,7 +195,7 @@ static uacpi_bool event_alloc(uacpi_object *obj)
 
     event->handle = uacpi_kernel_create_event();
     if (event->handle == UACPI_NULL) {
-        uacpi_kernel_free(event);
+        uacpi_free(event, sizeof(*event));
         return UACPI_FALSE;
     }
 
@@ -322,7 +322,7 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
         return ret;
 
     if (uacpi_unlikely(!ctor(ret))) {
-        uacpi_kernel_free(ret);
+        uacpi_free(ret, sizeof(*ret));
         return UACPI_NULL;
     }
 
@@ -333,8 +333,15 @@ static void free_buffer(uacpi_handle handle)
 {
     uacpi_buffer *buf = handle;
 
-    uacpi_kernel_free(buf->data);
-    uacpi_kernel_free(buf);
+    if (buf->data != UACPI_NULL)
+        /*
+         * If buffer has a size of 0 but a valid data pointer it's probably an
+         * "empty" buffer allocated by the interpreter in make_null_buffer
+         * and its real size is actually 1.
+         */
+        uacpi_free(buf->data, UACPI_MAX(buf->size, 1));
+
+    uacpi_free(buf, sizeof(*buf));
 }
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(free_queue, uacpi_package*, 4)
@@ -371,7 +378,7 @@ static void free_plain_no_recurse(uacpi_object *obj, struct free_queue *queue)
         }
 
         // Don't call free_object here as that will recurse
-        uacpi_kernel_free(obj);
+        uacpi_free(obj, sizeof(*obj));
         break;
     default:
         /*
@@ -402,7 +409,7 @@ static void unref_chain_no_recurse(uacpi_object *obj, struct free_queue *queue)
             goto do_next;
 
         if (obj->type == UACPI_OBJECT_REFERENCE) {
-            uacpi_kernel_free(obj);
+            uacpi_free(obj, sizeof(*obj));
         } else {
             free_plain_no_recurse(obj, queue);
         }
@@ -446,10 +453,10 @@ static void free_package(uacpi_handle handle)
         }
 
         // 2. Release the object array
-        uacpi_kernel_free(pkg->objects);
+        uacpi_free(pkg->objects, sizeof(*pkg->objects) * pkg->count);
 
         // 3. Release the package itself
-        uacpi_kernel_free(pkg);
+        uacpi_free(pkg, sizeof(*pkg));
     }
 
     free_queue_clear(&queue);
@@ -460,7 +467,7 @@ static void free_mutex(uacpi_handle handle)
     uacpi_mutex *mutex = handle;
 
     uacpi_kernel_free_mutex(mutex->handle);
-    uacpi_kernel_free(mutex);
+    uacpi_free(mutex, sizeof(*mutex));
 }
 
 void uacpi_mutex_unref(uacpi_mutex *mutex)
@@ -476,13 +483,13 @@ static void free_event(uacpi_handle handle)
     uacpi_event *event = handle;
 
     uacpi_kernel_free_event(event->handle);
-    uacpi_kernel_free(event);
+    uacpi_free(event, sizeof(*event));
 }
 
 static void free_address_space_handler(uacpi_handle handle)
 {
     uacpi_address_space_handler *handler = handle;
-    uacpi_kernel_free(handler);
+    uacpi_free(handler, sizeof(*handler));
 }
 
 static void free_address_space_handlers(
@@ -506,7 +513,7 @@ static void free_device_notify_handlers(uacpi_device_notify_handler *handler)
 
     while (handler) {
         next_handler = handler->next;
-        uacpi_kernel_free(handler);
+        uacpi_free(handler, sizeof(*handler));
         handler = next_handler;
     }
 }
@@ -537,28 +544,28 @@ static void free_op_region(uacpi_handle handle)
         );
     }
 
-    uacpi_kernel_free(op_region);
+    uacpi_free(op_region, sizeof(*op_region));
 }
 
 static void free_device(uacpi_handle handle)
 {
     uacpi_device *device = handle;
     free_handlers(device);
-    uacpi_kernel_free(device);
+    uacpi_free(device, sizeof(*device));
 }
 
 static void free_processor(uacpi_handle handle)
 {
     uacpi_processor *processor = handle;
     free_handlers(processor);
-    uacpi_kernel_free(processor);
+    uacpi_free(processor, sizeof(*processor));
 }
 
 static void free_thermal_zone(uacpi_handle handle)
 {
     uacpi_thermal_zone *thermal_zone = handle;
     free_handlers(thermal_zone);
-    uacpi_kernel_free(thermal_zone);
+    uacpi_free(thermal_zone, sizeof(*thermal_zone));
 }
 
 static void free_field_unit(uacpi_handle handle)
@@ -584,7 +591,7 @@ static void free_field_unit(uacpi_handle handle)
         break;
     }
 
-    uacpi_kernel_free(field_unit);
+    uacpi_free(field_unit, sizeof(*field_unit));
 }
 
 static void free_method(uacpi_handle handle)
@@ -595,7 +602,7 @@ static void free_method(uacpi_handle handle)
         method->mutex, free_mutex
     );
 
-    uacpi_kernel_free(method);
+    uacpi_free(method, sizeof(*method));
 }
 
 static void free_object_storage(uacpi_object *obj)
@@ -656,7 +663,7 @@ static void free_object_storage(uacpi_object *obj)
 static void free_object(uacpi_object *obj)
 {
     free_object_storage(obj);
-    uacpi_kernel_free(obj);
+    uacpi_free(obj, sizeof(*obj));
 }
 
 static void make_chain_bugged(uacpi_object *obj)

@@ -439,7 +439,7 @@ static void do_account_sta_ini(
     );
 
     if (uacpi_likely(absolute_path != oom_absolute_path))
-        uacpi_kernel_free((void*)absolute_path);
+        uacpi_free_dynamic_string(absolute_path);
 }
 
 static void ini_eval(struct ns_init_context *ctx, uacpi_namespace_node *node)

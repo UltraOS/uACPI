@@ -1486,7 +1486,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
     ret = uacpi_table_append_mapped(UACPI_PTR_TO_VIRT_ADDR(table_buffer),
                                     &table);
     if (uacpi_unlikely_error(ret)) {
-        uacpi_kernel_free(table_buffer);
+        uacpi_free(table_buffer, src_table->length);
         goto error_out;
     }
 
@@ -2615,7 +2615,7 @@ static uacpi_status buffer_to_string(
             ((uacpi_u8*)buf->data)[i]
         );
         if (uacpi_unlikely(repr_len < 0)) {
-            uacpi_kernel_free(str->data);
+            uacpi_free(str->data, final_size);
             str->data = UACPI_NULL;
             return UACPI_STATUS_INVALID_ARGUMENT;
         }
@@ -2896,7 +2896,7 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
 
     cleanup:
         if (arg1->type == UACPI_OBJECT_BUFFER)
-            uacpi_kernel_free(arg1_ptr);
+            uacpi_free(arg1_ptr, arg1_size);
         break;
     }
     default:
@@ -3583,7 +3583,7 @@ static uacpi_status handle_notify(struct execution_context *ctx)
             "ignoring firmware Notify(%s, 0x%"UACPI_PRIX64") request, "
             "no listeners\n", path, value
         );
-        uacpi_kernel_free((void*)path);
+        uacpi_free_dynamic_string(path);
 
         return UACPI_STATUS_OK;
     }
@@ -4590,9 +4590,9 @@ static void trace_named_object_lookup_or_creation_failure(
         );
     }
 
-    uacpi_kernel_free(requested_path);
+    uacpi_free(requested_path, length);
     if (prefix_path != oom_prefix && prefix_path != empty_string)
-        uacpi_kernel_free((void*)prefix_path);
+        uacpi_free_dynamic_string(prefix_path);
 }
 
 static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
@@ -5504,7 +5504,7 @@ static void trace_method_abort(struct code_block *block, uacpi_size depth)
     uacpi_error("    #%zu in %s()\n", depth, absolute_path);
 
     if (absolute_path != oom_absolute_path && absolute_path != unknown_path)
-        uacpi_kernel_free((void*)absolute_path);
+        uacpi_free_dynamic_string(absolute_path);
 }
 
 enum unwind_type {
@@ -5583,7 +5583,7 @@ static void execution_context_release(struct execution_context *ctx)
 
     call_frame_array_clear(&ctx->call_stack);
     held_mutexes_array_clear(&ctx->held_mutexes);
-    uacpi_kernel_free(ctx);
+    uacpi_free(ctx, sizeof(*ctx));
 }
 
 uacpi_status uacpi_execute_control_method(

@@ -156,7 +156,7 @@ static void free_namespace_node(uacpi_handle handle)
     if (node->object)
         uacpi_object_unref(node->object);
 
-    uacpi_kernel_free(node);
+    uacpi_free(node, sizeof(*node));
 }
 
 void uacpi_namespace_node_unref(uacpi_namespace_node *node)
