@@ -62,10 +62,10 @@
                 bytes = arr->dynamic_capacity * type_size;                   \
                 bytes += type_size;                                          \
                                                                              \
-                arr->dynamic_capacity = bytes / type_size;                   \
                 new_buf = uacpi_kernel_alloc(bytes);                         \
                 if (!new_buf)                                                \
                     return NULL;                                             \
+                arr->dynamic_capacity = bytes / type_size;                   \
                                                                              \
                 if (arr->dynamic_storage) {                                  \
                     uacpi_memcpy(new_buf, arr->dynamic_storage,              \
