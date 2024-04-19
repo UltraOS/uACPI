@@ -4577,14 +4577,14 @@ static void trace_named_object_lookup_or_creation_failure(
     if (length == 5 && !is_create) {
         uacpi_log_lvl(
             level,
-            "Unable to %s named object '%s' within (or above) "
+            "unable to %s named object '%s' within (or above) "
             "scope '%s': %s\n", action, requested_path_to_print,
             prefix_path, uacpi_status_to_string(ret)
         );
     } else {
         uacpi_log_lvl(
             level,
-            "Unable to %s named object '%s%s%s': %s\n",
+            "unable to %s named object '%s%s%s': %s\n",
             action, prefix_path, middle_part,
             requested_path_to_print, uacpi_status_to_string(ret)
         );
