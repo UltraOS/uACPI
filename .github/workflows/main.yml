@@ -37,7 +37,7 @@ jobs:
         name: Install tools & libraries (Ubuntu)
         run: |
           sudo apt update
-          sudo apt install python3 python3-pytest acpica-tools cmake
+          sudo apt install python3 python3-pytest acpica-tools cmake gcc-multilib g++-multilib
           # https://github.com/actions/runner-images/issues/9491#issuecomment-1989718917
           sudo sysctl vm.mmap_rnd_bits=28
       - if: ${{ matrix.os == 'macos-latest' }}
@@ -58,5 +58,13 @@ jobs:
           cmake .. -DREDUCED_HARDWARE_BUILD=1 -DSIZED_FREES_BUILD=0
           cmake --build .
 
-      - name: Run tests
-        run: python3 ${{ github.workspace }}/tests/run_tests.py
+      - name: Run tests (64-bit)
+        run: python3 ${{ github.workspace }}/tests/run_tests.py --bitness=64
+
+      # MacOS doesn't want to compile i386 (at least easily) so just ignore it:
+      #     ld: warning: The i386 architecture is deprecated for macOS
+      #     ld: dynamic executables or dylibs must link with libSystem.dylib for architecture i386
+      #     clang: error: linker command failed with exit code 1 (use -v to see invocation)
+      - if: ${{ matrix.os != 'macos-latest' }}
+        name: Run tests (32-bit)
+        run: python3 ${{ github.workspace }}/tests/run_tests.py --bitness=32
