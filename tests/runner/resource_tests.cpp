@@ -2142,6 +2142,16 @@ std::array test_cases = {
 
 void run_resource_tests()
 {
+    if constexpr (sizeof(void*) == 4) {
+        /*
+         * Since resource tests do byte-by-byte memcmps it's too much work to
+         * make them support multiple bit widths. The current implementation
+         * is targeting 64-bit platforms.
+         */;
+        std::cout << "Resource tests only support 64-bit platforms\n";
+        return;
+    }
+
     size_t fail_count = 0;
 
     for (auto& test: test_cases) {
