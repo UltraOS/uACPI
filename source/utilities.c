@@ -777,13 +777,14 @@ uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
 }
 
 uacpi_status uacpi_get_pci_routing_table(
-    uacpi_namespace_node *parent, uacpi_pci_routing_table *out_table
+    uacpi_namespace_node *parent, uacpi_pci_routing_table **out_table
 )
 {
     uacpi_status ret;
     uacpi_object *obj, *entry_obj, *elem_obj;
     uacpi_package *table_pkg, *entry_pkg;
     uacpi_pci_routing_table_entry *entry;
+    uacpi_pci_routing_table *table;
     uacpi_size size, i;
 
     if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
@@ -808,11 +809,12 @@ uacpi_status uacpi_get_pci_routing_table(
     }
 
     size = table_pkg->count * sizeof(uacpi_pci_routing_table_entry);
-    out_table->entries = uacpi_kernel_alloc(size);
-    if (uacpi_unlikely(out_table->entries == UACPI_NULL)) {
+    table = uacpi_kernel_alloc(sizeof(uacpi_pci_routing_table) + size);
+    if (uacpi_unlikely(table == UACPI_NULL)) {
         uacpi_object_unref(obj);
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
+    table->num_entries = table_pkg->count;
 
     for (i = 0; i < table_pkg->count; ++i) {
         entry_obj = table_pkg->objects[i];
@@ -830,7 +832,7 @@ uacpi_status uacpi_get_pci_routing_table(
             goto out_bad_encoding;
         }
 
-        entry = &out_table->entries[i];
+        entry = &table->entries[i];
 
         elem_obj = entry_pkg->objects[0];
         if (uacpi_unlikely(elem_obj->type != UACPI_OBJECT_INTEGER)) {
@@ -878,13 +880,17 @@ uacpi_status uacpi_get_pci_routing_table(
         entry->index = elem_obj->integer;
     }
 
-    out_table->num_entries = table_pkg->count;
     uacpi_object_unref(obj);
+    *out_table = table;
     return UACPI_STATUS_OK;
 
 out_bad_encoding:
     uacpi_object_unref(obj);
-    uacpi_kernel_free(out_table->entries);
-    out_table->entries = UACPI_NULL;
+    uacpi_free_pci_routing_table(table);
     return UACPI_STATUS_AML_BAD_ENCODING;
+}
+
+void uacpi_free_pci_routing_table(uacpi_pci_routing_table *table)
+{
+    uacpi_kernel_free(table);
 }

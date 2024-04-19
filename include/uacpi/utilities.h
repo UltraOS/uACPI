@@ -60,11 +60,12 @@ typedef struct uacpi_pci_routing_table_entry {
 
 typedef struct uacpi_pci_routing_table {
     uacpi_size num_entries;
-    uacpi_pci_routing_table_entry *entries;
+    uacpi_pci_routing_table_entry entries[];
 } uacpi_pci_routing_table;
+void uacpi_free_pci_routing_table(uacpi_pci_routing_table*);
 
 uacpi_status uacpi_get_pci_routing_table(
-    uacpi_namespace_node *parent, uacpi_pci_routing_table *out_table
+    uacpi_namespace_node *parent, uacpi_pci_routing_table **out_table
 );
 
 #ifdef __cplusplus
