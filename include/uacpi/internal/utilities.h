@@ -65,3 +65,5 @@ void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list);
 uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list **out_list);
 
 uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
+
+void uacpi_free_dynamic_string(const uacpi_char *str);

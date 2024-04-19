@@ -7,6 +7,7 @@
 #include <thread>
 #include <condition_variable>
 #include <unordered_map>
+#include <cstring>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -170,13 +171,68 @@ void uacpi_kernel_unmap(void* addr, uacpi_size)
     virt_to_phys_and_refcount.erase(it);
 }
 
-void* uacpi_kernel_alloc(uacpi_size size) { return malloc(size); }
-void uacpi_kernel_free(void* mem) { free(mem); }
+#ifdef UACPI_SIZED_FREES
+static std::unordered_map<void*, uacpi_size> allocations;
+
+void* uacpi_kernel_alloc(uacpi_size size)
+{
+    auto *ret = malloc(size);
+    if (ret == nullptr)
+        return ret;
+
+    allocations[ret] = size;
+    return ret;
+}
+
+void uacpi_kernel_free(void* mem, uacpi_size size)
+{
+    if (mem == nullptr)
+        return;
+
+    auto it = allocations.find(mem);
+    if (it == allocations.end()) {
+        std::fprintf(stderr, "unable to find heap allocation %p\n", mem);
+        std::abort();
+    }
+
+    if (it->second != size) {
+        std::fprintf(
+            stderr,
+            "invalid free size: originally allocated %zu bytes, "
+            "freeing as %zu\n", it->second, size
+        );
+        std::abort();
+    }
+
+    allocations.erase(it);
+    free(mem);
+}
+
+void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
+{
+    auto *ret = uacpi_kernel_alloc(count * size);
+    if (ret == nullptr)
+        return ret;
+
+    memset(ret, 0, count * size);
+    return ret;
+}
+#else
+void* uacpi_kernel_alloc(uacpi_size size)
+{
+    return malloc(size);
+}
+
+void uacpi_kernel_free(void* mem)
+{
+    return free(mem);
+}
 
 void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
 {
     return calloc(count, size);
 }
+#endif
 
 void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list vlist)
 {

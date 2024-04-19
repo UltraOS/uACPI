@@ -612,7 +612,7 @@ static uacpi_status find_or_create_gpe_interrupt_ctx(
             irq, handle_gpes, entry, &entry->irq_handle
         );
         if (uacpi_unlikely_error(ret)) {
-            uacpi_kernel_free(entry);
+            uacpi_free(entry, sizeof(*entry));
             return ret;
         }
     }
@@ -632,7 +632,7 @@ static void gpe_release_implicit_notify_handlers(struct gp_event *event)
     handler = event->implicit_handler;
     while (handler) {
         next_handler = handler->next;
-        uacpi_kernel_free(handler);
+        uacpi_free(handler, sizeof(*handler));
         handler = next_handler;
     }
 
@@ -675,7 +675,7 @@ static void uninstall_gpe_block(struct gpe_block *block)
                 );
             }
 
-            uacpi_kernel_free(block->irq_ctx);
+            uacpi_free(block->irq_ctx, sizeof(*block->irq_ctx));
         }
     }
 
@@ -705,7 +705,8 @@ static void uninstall_gpe_block(struct gpe_block *block)
 
             case GPE_HANDLER_TYPE_NATIVE_HANDLER:
             case GPE_HANDLER_TYPE_NATIVE_HANDLER_RAW:
-                uacpi_kernel_free(event->native_handler);
+                uacpi_free(event->native_handler,
+                           sizeof(*event->native_handler));
                 break;
 
             case GPE_HANDLER_TYPE_IMPLICIT_NOTIFY: {
@@ -720,9 +721,11 @@ static void uninstall_gpe_block(struct gpe_block *block)
 
     }
 
-    uacpi_kernel_free(block->registers);
-    uacpi_kernel_free(block->events);
-    uacpi_kernel_free(block);
+    uacpi_free(block->registers,
+               sizeof(*block->registers) * block->num_registers);
+    uacpi_free(block->events,
+               sizeof(*block->events) * block->num_events);
+    uacpi_free(block, sizeof(*block));
 }
 
 static struct gp_event *gpe_from_block(struct gpe_block *block, uacpi_u16 idx)
@@ -1274,7 +1277,7 @@ uacpi_status uacpi_uninstall_gpe_handler(
     }
 
     uacpi_kernel_wait_for_work_completion();
-    uacpi_kernel_free(native_handler);
+    uacpi_free(native_handler, sizeof(*native_handler));
     return UACPI_STATUS_OK;
 }
 

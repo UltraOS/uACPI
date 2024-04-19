@@ -2,6 +2,13 @@
 
 #include <uacpi/internal/types.h>
 #include <uacpi/platform/stdlib.h>
+#include <uacpi/kernel_api.h>
+
+#ifdef UACPI_SIZED_FREES
+#define uacpi_free(mem, size) uacpi_kernel_free(mem, size)
+#else
+#define uacpi_free(mem, _) uacpi_kernel_free(mem)
+#endif
 
 #define uacpi_memzero(ptr, size) uacpi_memset(ptr, 0, size)
 

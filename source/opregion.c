@@ -4,6 +4,7 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/utilities.h>
 
 void uacpi_trace_region_error(
     uacpi_namespace_node *node, uacpi_char *message, uacpi_status ret
@@ -19,7 +20,7 @@ void uacpi_trace_region_error(
         "%s operation region %s@%p: %s\n",
         message, path, op_region, uacpi_status_to_string(ret)
     );
-    uacpi_kernel_free((void*)path);
+    uacpi_free_dynamic_string(path);
 }
 
 #define UACPI_TRACE_REGION_IO
@@ -58,7 +59,7 @@ void uacpi_trace_region_io(
         offset, ret
     );
 
-    uacpi_kernel_free((void*)path);
+    uacpi_free_dynamic_string(path);
 #else
     UACPI_UNUSED(op);
     UACPI_UNUSED(node);

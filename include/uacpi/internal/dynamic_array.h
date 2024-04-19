@@ -71,7 +71,7 @@
                     uacpi_memcpy(new_buf, arr->dynamic_storage,              \
                                  dynamic_size * type_size);                  \
                 }                                                            \
-                uacpi_kernel_free(arr->dynamic_storage);                     \
+                uacpi_free(arr->dynamic_storage, dynamic_size * type_size);  \
                 arr->dynamic_storage = new_buf;                              \
             }                                                                \
                                                                              \
@@ -122,7 +122,10 @@
                                                                              \
     prefix void name##_clear(struct name *arr)                               \
     {                                                                        \
-        uacpi_kernel_free(arr->dynamic_storage);                             \
+        uacpi_free(                                                          \
+            arr->dynamic_storage,                                            \
+            arr->dynamic_capacity * sizeof(*arr->dynamic_storage)            \
+        );                                                                   \
         arr->size_including_inline = 0;                                      \
         arr->dynamic_capacity = 0;                                           \
     }

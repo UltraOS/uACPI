@@ -1999,7 +1999,7 @@ uacpi_status uacpi_native_resources_from_aml(
 
     ret = aml_resources_to_native(aml_buffer, buffer);
     if (uacpi_unlikely_error(ret)) {
-        uacpi_kernel_free(buffer);
+        uacpi_free(buffer, ctx.size);
         return ret;
     }
 
@@ -2093,7 +2093,7 @@ uacpi_status uacpi_for_each_device_resource(
         return ret;
 
     ret = uacpi_for_each_resource(&resources, cb, user);
-    uacpi_kernel_free(resources.head);
+    uacpi_free(resources.head, resources.length);
 
     return ret;
 }
@@ -2451,7 +2451,7 @@ uacpi_status uacpi_native_resources_to_aml(
 
     obj = uacpi_create_object(UACPI_OBJECT_BUFFER);
     if (uacpi_unlikely(obj == UACPI_NULL)) {
-        uacpi_kernel_free(buffer);
+        uacpi_free(buffer, ctx.size);
         return UACPI_STATUS_OUT_OF_MEMORY;
     }
 

@@ -50,7 +50,7 @@ static void do_notify(uacpi_handle opaque)
         if (handler == UACPI_NULL) {
             if (did_notify_root) {
                 uacpi_namespace_node_unref(ctx->node);
-                uacpi_kernel_free(ctx);
+                uacpi_free(ctx, sizeof(*ctx));
                 return;
             }
 
@@ -97,7 +97,7 @@ uacpi_status uacpi_notify_all(uacpi_namespace_node *node, uacpi_u64 value)
         uacpi_warn("unable to schedule notification work: %s\n",
                    uacpi_status_to_string(ret));
         uacpi_namespace_node_unref(node);
-        uacpi_kernel_free(ctx);
+        uacpi_free(ctx, sizeof(*ctx));
         return ret;
     }
 
@@ -180,6 +180,6 @@ uacpi_status uacpi_uninstall_notify_handler(
     }
 
 out:
-    uacpi_kernel_free(containing);
+    uacpi_free(containing, sizeof(*containing));
     return UACPI_STATUS_OK;
 }

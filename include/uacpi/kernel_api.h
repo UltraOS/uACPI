@@ -85,9 +85,33 @@ uacpi_status uacpi_kernel_io_write(
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len);
 void uacpi_kernel_unmap(void *addr, uacpi_size len);
 
+/*
+ * Allocate a block of memory of 'size' bytes.
+ * The contents of the allocated memory are unspecified.
+ */
 void *uacpi_kernel_alloc(uacpi_size size);
+
+/*
+ * Allocate a block of memory of 'count' * 'size' bytes.
+ * The returned memory block is expected to be zero-filled.
+ */
 void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size);
+
+/*
+ * Free a previously allocated memory block.
+ *
+ * 'mem' might be a NULL pointer. In this case, the call is assumed to be a
+ * no-op.
+ *
+ * An optionally enabled 'size_hint' parameter contains the size of the original
+ * allocation. Note that in some scenarios this incurs additional cost to
+ * calculate the object size.
+ */
+#ifndef UACPI_SIZED_FREES
 void uacpi_kernel_free(void *mem);
+#else
+void uacpi_kernel_free(void *mem, uacpi_size size_hint);
+#endif
 
 enum uacpi_log_level {
     UACPI_LOG_TRACE = 3,
