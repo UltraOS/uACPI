@@ -413,32 +413,14 @@ out:
     return ret;
 }
 
-static uacpi_char *steal_or_copy_string(uacpi_object *obj)
-{
-    uacpi_char *ret;
+#define PNP_ID_LENGTH 8
 
-    if (uacpi_shareable_refcount(obj) == 1 &&
-        uacpi_shareable_refcount(obj->buffer) == 1) {
-        // No need to allocate anything, we can just steal the returned buffer
-        ret = obj->buffer->text;
-        obj->buffer->text = UACPI_NULL;
-        obj->buffer->size = 0;
-    } else {
-        ret = uacpi_kernel_alloc(obj->buffer->size);
-        if (uacpi_unlikely(ret == UACPI_NULL))
-            return UACPI_NULL;
-
-        uacpi_memcpy(ret, obj->buffer->text, obj->buffer->size);
-    }
-
-    return ret;
-}
-
-uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_char **out_hid)
+uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
 {
     uacpi_status ret;
     uacpi_object *hid_ret;
-    uacpi_char *out_id = UACPI_NULL;
+    uacpi_pnp_id *id;
+    uacpi_u32 size;
 
     ret = uacpi_eval_typed(
         node, "_HID", UACPI_NULL,
@@ -448,36 +430,73 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_char **out_hid)
     if (ret != UACPI_STATUS_OK)
         return ret;
 
+    size = sizeof(uacpi_pnp_id);
+
     switch (hid_ret->type) {
-    case UACPI_OBJECT_STRING:
-        out_id = steal_or_copy_string(hid_ret);
-        if (uacpi_unlikely(out_id == UACPI_NULL))
-            ret = UACPI_STATUS_OUT_OF_MEMORY;
-        break;
-    case UACPI_OBJECT_INTEGER:
-        out_id = uacpi_kernel_alloc(8);
-        if (uacpi_unlikely(out_id == UACPI_NULL)) {
-            ret = UACPI_STATUS_OUT_OF_MEMORY;
+    case UACPI_OBJECT_STRING: {
+        uacpi_buffer *buf = hid_ret->buffer;
+
+        size += buf->size;
+        if (uacpi_unlikely(buf->size == 0 || size < buf->size)) {
+            uacpi_error(
+                "%.4s._HID: empty/invalid EISA ID string (%zu bytes)\n",
+                uacpi_namespace_node_name(node).text, buf->size
+            );
+            ret = UACPI_STATUS_AML_BAD_ENCODING;
             break;
         }
 
-        uacpi_eisa_id_to_string(hid_ret->integer, out_id);
+        id = uacpi_kernel_alloc(size);
+        if (uacpi_unlikely(id == UACPI_NULL)) {
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+            break;
+        }
+        id->size = buf->size;
+        id->value = (uacpi_char*)id + sizeof(uacpi_pnp_id);
+
+        uacpi_memcpy(id->value, buf->text, buf->size);
+        id->value[buf->size - 1] = '\0';
         break;
     }
 
-    *out_hid = out_id;
+    case UACPI_OBJECT_INTEGER:
+        size += PNP_ID_LENGTH;
+
+        id = uacpi_kernel_alloc(size);
+        if (uacpi_unlikely(id == UACPI_NULL)) {
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+            break;
+        }
+        id->size = PNP_ID_LENGTH;
+        id->value = (uacpi_char*)id + sizeof(uacpi_pnp_id);
+
+        uacpi_eisa_id_to_string(hid_ret->integer, id->value);
+        break;
+    }
+
     uacpi_object_unref(hid_ret);
+    if (uacpi_likely_success(ret))
+        *out_id = id;
     return ret;
 }
 
+void uacpi_free_pnp_id(uacpi_pnp_id *id)
+{
+    uacpi_kernel_free(id);
+}
+
 uacpi_status uacpi_eval_cid(
-    uacpi_namespace_node *node, uacpi_pnp_id_list *out_list
+    uacpi_namespace_node *node, uacpi_pnp_id_list **out_list
 )
 {
     uacpi_status ret;
-    uacpi_object *cid_ret;
+    uacpi_object *object, *cid_ret;
     uacpi_object **objects;
-    uacpi_size i;
+    uacpi_size num_ids, i;
+    uacpi_u32 size;
+    uacpi_pnp_id *id;
+    uacpi_char *id_buffer;
+    uacpi_pnp_id_list *list;
 
     ret = uacpi_eval_typed(
         node, "_CID", UACPI_NULL,
@@ -491,49 +510,101 @@ uacpi_status uacpi_eval_cid(
     switch (cid_ret->type) {
     case UACPI_OBJECT_PACKAGE:
         objects = cid_ret->package->objects;
-        i = cid_ret->package->count;
+        num_ids = cid_ret->package->count;
         break;
     default:
         objects = &cid_ret;
-        i = 1;
+        num_ids = 1;
         break;
     }
 
-    out_list->ids = uacpi_kernel_calloc(i, sizeof(out_list->ids[0]));
-    if (uacpi_unlikely(out_list->ids == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
-    out_list->num_entries = i;
+    size = sizeof(uacpi_pnp_id_list);
+    size += num_ids * sizeof(uacpi_pnp_id);
 
-    for (i = 0; i < out_list->num_entries; ++i) {
-        uacpi_object *object = objects[i];
+    for (i = 0; i < num_ids; ++i) {
+        object = objects[i];
 
         switch (object->type) {
-        case UACPI_OBJECT_STRING:
-            out_list->ids[i] = steal_or_copy_string(object);
-            if (uacpi_unlikely(out_list->ids[i] == UACPI_NULL))
-                ret = UACPI_STATUS_OUT_OF_MEMORY;
-            break;
-        case UACPI_OBJECT_INTEGER:
-            out_list->ids[i] = uacpi_kernel_alloc(8);
-            if (uacpi_unlikely(out_list->ids[i] == UACPI_NULL)) {
-                ret = UACPI_STATUS_OUT_OF_MEMORY;
-                goto out_late_error;
+        case UACPI_OBJECT_STRING: {
+            uacpi_size buf_size = object->buffer->size;
+
+            if (uacpi_unlikely(buf_size == 0)) {
+                uacpi_error(
+                    "%.4s._CID: empty EISA ID string (sub-object %zu)\n",
+                    uacpi_namespace_node_name(node).text, i
+                );
+                return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
             }
 
-            uacpi_eisa_id_to_string(object->integer, out_list->ids[i]);
+            size += buf_size;
+            if (uacpi_unlikely(size < buf_size)) {
+                uacpi_error(
+                    "%.4s._CID: buffer size overflow (+ %zu)\n",
+                    uacpi_namespace_node_name(node).text, buf_size
+                );
+                return UACPI_STATUS_AML_BAD_ENCODING;
+            }
+
+            break;
+        }
+
+        case UACPI_OBJECT_INTEGER:
+            size += PNP_ID_LENGTH;
             break;
         default:
-            ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
-            goto out_late_error;
+            uacpi_error(
+                "%.4s._CID: invalid package sub-object %zu type: %s\n",
+                uacpi_namespace_node_name(node).text, i,
+                uacpi_object_type_to_string(object->type)
+            );
+            return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
         }
     }
 
-out_late_error:
-    if (ret != UACPI_STATUS_OK)
-        uacpi_release_pnp_id_list(out_list);
+    list = uacpi_kernel_alloc(size);
+    if (uacpi_unlikely(list == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    list->num_ids = num_ids;
+    list->size = size - sizeof(uacpi_pnp_id_list);
+
+    id_buffer = (uacpi_char*)list;
+    id_buffer += sizeof(uacpi_pnp_id_list);
+    id_buffer += num_ids * sizeof(uacpi_pnp_id);
+
+    for (i = 0; i < num_ids; ++i) {
+        object = objects[i];
+        id = &list->ids[i];
+
+        switch (object->type) {
+        case UACPI_OBJECT_STRING: {
+            uacpi_buffer *buf = object->buffer;
+
+            id->size = buf->size;
+            id->value = id_buffer;
+
+            uacpi_memcpy(id->value, buf->text, id->size);
+            id->value[id->size - 1] = '\0';
+            break;
+        }
+
+        case UACPI_OBJECT_INTEGER:
+            id->size = PNP_ID_LENGTH;
+            id->value = id_buffer;
+            uacpi_eisa_id_to_string(object->integer, id_buffer);
+            break;
+        }
+
+        id_buffer += id->size;
+    }
 
     uacpi_object_unref(cid_ret);
+    *out_list = list;
     return ret;
+}
+
+void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list)
+{
+    uacpi_kernel_free(list);
 }
 
 uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
@@ -566,13 +637,13 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
 }
 
 static uacpi_bool matches_any(
-    const uacpi_char *hid, const uacpi_char **ids
+    uacpi_pnp_id *id, const uacpi_char **ids
 )
 {
     uacpi_size i;
 
     for (i = 0; ids[i]; ++i) {
-        if (uacpi_strcmp(hid, ids[i]) == 0)
+        if (uacpi_strcmp(id->value, ids[i]) == 0)
             return UACPI_TRUE;
     }
 
@@ -585,8 +656,8 @@ uacpi_bool uacpi_device_matches_pnp_id(
 {
     uacpi_status st;
     uacpi_bool ret = UACPI_FALSE;
-    uacpi_char *id = UACPI_NULL;
-    uacpi_pnp_id_list id_list = { 0 };
+    uacpi_pnp_id *id = UACPI_NULL;
+    uacpi_pnp_id_list *id_list = UACPI_NULL;
 
     st = uacpi_eval_hid(node, &id);
     if (st == UACPI_STATUS_OK && matches_any(id, ids)) {
@@ -598,8 +669,8 @@ uacpi_bool uacpi_device_matches_pnp_id(
     if (st == UACPI_STATUS_OK) {
         uacpi_size i;
 
-        for (i = 0; i < id_list.num_entries; ++i) {
-            if (matches_any(id_list.ids[i], ids)) {
+        for (i = 0; i < id_list->num_ids; ++i) {
+            if (matches_any(&id_list->ids[i], ids)) {
                 ret = UACPI_TRUE;
                 goto out;
             }
@@ -607,8 +678,8 @@ uacpi_bool uacpi_device_matches_pnp_id(
     }
 
 out:
-    uacpi_kernel_free(id);
-    uacpi_release_pnp_id_list(&id_list);
+    uacpi_free_pnp_id(id);
+    uacpi_free_pnp_id_list(id_list);
     return ret;
 }
 
