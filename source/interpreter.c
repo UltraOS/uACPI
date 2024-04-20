@@ -4985,7 +4985,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 if (uacpi_unlikely(item->obj == UACPI_NULL))
                     return UACPI_STATUS_OUT_OF_MEMORY;
             } else {
-                item->handle = UACPI_NULL;
+                uacpi_memzero(&item->immediate, sizeof(item->immediate));
             }
         } else if (item == UACPI_NULL) {
             item = item_array_last(&op_ctx->items);
