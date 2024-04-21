@@ -3975,6 +3975,11 @@ static inline void trace_op(
     );
 }
 
+static inline void trace_pop(uacpi_u8 pop)
+{
+    uacpi_debug("    pOP: %s (0x%02X)\n", uacpi_parse_op_to_string(pop), pop);
+}
+
 static uacpi_status frame_push_args(struct call_frame *frame,
                                     struct op_context *op_ctx)
 {
@@ -4981,6 +4986,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         op = op_decode_byte(op_ctx);
+        trace_pop(op);
 
         if (parse_op_generates_item[op] != ITEM_NONE) {
             item = item_array_alloc(&op_ctx->items);
