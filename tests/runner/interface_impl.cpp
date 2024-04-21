@@ -239,6 +239,9 @@ void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list
     const char *lvl_str;
 
     switch (lvl) {
+    case UACPI_LOG_DEBUG:
+        lvl_str = "DEBUG";
+        break;
     case UACPI_LOG_TRACE:
         lvl_str = "TRACE";
         break;
