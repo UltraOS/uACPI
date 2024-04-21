@@ -233,7 +233,9 @@ enum uacpi_parse_op {
      * pc = decode_ops[pc + 1]
      */
     UACPI_PARSE_OP_JMP,
+    UACPI_PARSE_OP_MAX = UACPI_PARSE_OP_JMP,
 };
+const uacpi_char *uacpi_parse_op_to_string(enum uacpi_parse_op op);
 
 /*
  * A few notes about op properties:
