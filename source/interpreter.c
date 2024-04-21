@@ -3953,15 +3953,9 @@ static bool ctx_has_non_preempted_op(struct execution_context *ctx)
     return ctx->cur_op_ctx && !ctx->cur_op_ctx->preempted;
 }
 
-//#define UACPI_OP_TRACING
-
 static void trace_op(const struct uacpi_op_spec *op)
 {
-#ifdef UACPI_OP_TRACING
-    uacpi_trace("Processing Op '%s' (0x%04X)\n", op->name, op->code);
-#else
-    UACPI_UNUSED(op);
-#endif
+    uacpi_debug("Running OP '%s' (0x%04X)\n", op->name, op->code);
 }
 
 static uacpi_status frame_push_args(struct call_frame *frame,
