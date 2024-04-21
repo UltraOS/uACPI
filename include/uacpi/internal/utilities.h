@@ -23,6 +23,8 @@ uacpi_status uacpi_check_tbl_signature_with_warn(void*, const char *expect);
 #define UACPI_PTR_TO_VIRT_ADDR(ptr)   ((uacpi_virt_addr)(ptr))
 #define UACPI_VIRT_ADDR_TO_PTR(vaddr) ((void*)(vaddr))
 
+#define UACPI_PTR_ADD(ptr, value) ((void*)(((uacpi_u8*)(ptr)) + value))
+
 /*
  * Target buffer must have a length of at least 8 bytes.
  */

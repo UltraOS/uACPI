@@ -2,6 +2,7 @@
 #include <uacpi/acpi.h>
 #include <uacpi/internal/resources.h>
 #include <uacpi/internal/stdlib.h>
+#include <uacpi/internal/utilities.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/uacpi.h>
 
@@ -1997,7 +1998,7 @@ uacpi_status uacpi_native_resources_from_aml(
     if (uacpi_unlikely(resources == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
     resources->length = ctx.size;
-    resources->entries = (uacpi_resource*)((uacpi_u8*)resources + sizeof(uacpi_resources));
+    resources->entries = UACPI_PTR_ADD(resources, sizeof(uacpi_resources));
 
     ret = aml_resources_to_native(aml_buffer, resources->entries);
     if (uacpi_unlikely_error(ret)) {
