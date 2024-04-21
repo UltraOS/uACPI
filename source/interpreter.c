@@ -3953,9 +3953,26 @@ static bool ctx_has_non_preempted_op(struct execution_context *ctx)
     return ctx->cur_op_ctx && !ctx->cur_op_ctx->preempted;
 }
 
-static void trace_op(const struct uacpi_op_spec *op)
+enum op_trace_action_type {
+    OP_TRACE_ACTION_BEGIN,
+    OP_TRACE_ACTION_RESUME,
+    OP_TRACE_ACTION_END,
+};
+
+static const uacpi_char *const op_trace_action_types[3] = {
+    [OP_TRACE_ACTION_BEGIN] = "BEGIN",
+    [OP_TRACE_ACTION_RESUME] = "RESUME",
+    [OP_TRACE_ACTION_END] = "END",
+};
+
+static inline void trace_op(
+    const struct uacpi_op_spec *op, enum op_trace_action_type action
+)
 {
-    uacpi_debug("Running OP '%s' (0x%04X)\n", op->name, op->code);
+    uacpi_debug(
+        "%s OP '%s' (0x%04X)\n",
+        op_trace_action_types[action], op->name, op->code
+    );
 }
 
 static uacpi_status frame_push_args(struct call_frame *frame,
@@ -4937,6 +4954,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
         ret = push_op(ctx);
         if (uacpi_unlikely_error(ret))
             return ret;
+    } else {
+        trace_op(ctx->cur_op_ctx->op, OP_TRACE_ACTION_RESUME);
     }
 
     if (ctx->prev_op_ctx)
@@ -4988,6 +5007,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
         switch (op) {
         case UACPI_PARSE_OP_END:
         case UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL: {
+            trace_op(ctx->cur_op_ctx->op, OP_TRACE_ACTION_END);
+
             if (op == UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL) {
                 uacpi_u8 idx;
 
@@ -5621,7 +5642,7 @@ uacpi_status uacpi_execute_control_method(
             if (uacpi_unlikely_error(ret))
                 goto handle_method_abort;
 
-            trace_op(ctx->cur_op);
+            trace_op(ctx->cur_op, OP_TRACE_ACTION_BEGIN);
         }
 
         ret = exec_op(ctx);
