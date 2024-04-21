@@ -607,8 +607,11 @@ uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
 
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_METHOD) {
-        *ret = obj;
-        uacpi_object_ref(obj);
+        if (uacpi_likely(ret != UACPI_NULL)) {
+            *ret = obj;
+            uacpi_object_ref(obj);
+        }
+
         return UACPI_STATUS_OK;
     }
 
