@@ -2772,7 +2772,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     is_string = src->type == UACPI_OBJECT_STRING;
     get_object_storage(src, &src_buf, UACPI_FALSE);
 
-    if (uacpi_unlikely(src_buf.len == 0 || idx >= src_buf.len)) {
+    if (uacpi_unlikely(src_buf.len == 0 || idx >= src_buf.len || len == 0)) {
         if (src->type == UACPI_OBJECT_STRING) {
             dst->type = UACPI_OBJECT_STRING;
             return make_null_string(dst_buf);
