@@ -452,7 +452,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
             break;
         }
         id->size = buf->size;
-        id->value = (uacpi_char*)id + sizeof(uacpi_pnp_id);
+        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_pnp_id));
 
         uacpi_memcpy(id->value, buf->text, buf->size);
         id->value[buf->size - 1] = '\0';
@@ -468,7 +468,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
             break;
         }
         id->size = PNP_ID_LENGTH;
-        id->value = (uacpi_char*)id + sizeof(uacpi_pnp_id);
+        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_pnp_id));
 
         uacpi_eisa_id_to_string(hid_ret->integer, id->value);
         break;
@@ -570,8 +570,7 @@ uacpi_status uacpi_eval_cid(
     list->num_ids = num_ids;
     list->size = size - sizeof(uacpi_pnp_id_list);
 
-    id_buffer = (uacpi_char*)list;
-    id_buffer += sizeof(uacpi_pnp_id_list);
+    id_buffer = UACPI_PTR_ADD(list, sizeof(uacpi_pnp_id_list));
     id_buffer += num_ids * sizeof(uacpi_pnp_id);
 
     for (i = 0; i < num_ids; ++i) {
