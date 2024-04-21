@@ -1971,12 +1971,12 @@ static uacpi_status eval_resource_helper(
 }
 
 uacpi_status uacpi_native_resources_from_aml(
-    uacpi_buffer *aml_buffer, uacpi_resources *out_resources
+    uacpi_buffer *aml_buffer, uacpi_resources **out_resources
 )
 {
     uacpi_status ret;
-    void *buffer;
     struct resource_conversion_ctx ctx = { 0 };
+    uacpi_resources *resources;
 
     ret = uacpi_for_each_aml_resource(
         aml_buffer, accumulate_native_buffer_size, &ctx
@@ -1993,24 +1993,33 @@ uacpi_status uacpi_native_resources_from_aml(
         return UACPI_STATUS_INTERNAL_ERROR;
     }
 
-    buffer = uacpi_kernel_calloc(ctx.size, 1);
-    if (uacpi_unlikely(buffer == UACPI_NULL))
+    resources = uacpi_kernel_calloc(ctx.size + sizeof(uacpi_resources), 1);
+    if (uacpi_unlikely(resources == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
+    resources->length = ctx.size;
+    resources->entries = (uacpi_resource*)((uacpi_u8*)resources + sizeof(uacpi_resources));
 
-    ret = aml_resources_to_native(aml_buffer, buffer);
+    ret = aml_resources_to_native(aml_buffer, resources->entries);
     if (uacpi_unlikely_error(ret)) {
-        uacpi_free(buffer, ctx.size);
+        uacpi_free_resources(resources);
         return ret;
     }
 
-    out_resources->length = ctx.size;
-    out_resources->head = buffer;
+    *out_resources = resources;
     return ret;
+}
+
+void uacpi_free_resources(uacpi_resources *resources)
+{
+    if (resources == UACPI_NULL)
+        return;
+
+    uacpi_free(resources, sizeof(uacpi_resources) + resources->length);
 }
 
 static uacpi_status extract_native_resources_from_method(
     uacpi_namespace_node *device, const uacpi_char *method,
-    uacpi_resources *out_resources
+    uacpi_resources **out_resources
 )
 {
     uacpi_status ret;
@@ -2027,14 +2036,14 @@ static uacpi_status extract_native_resources_from_method(
 }
 
 uacpi_status uacpi_get_current_resources(
-    uacpi_namespace_node *device, uacpi_resources *out_resources
+    uacpi_namespace_node *device, uacpi_resources **out_resources
 )
 {
     return extract_native_resources_from_method(device, "_CRS", out_resources);
 }
 
 uacpi_status uacpi_get_possible_resources(
-    uacpi_namespace_node *device, uacpi_resources *out_resources
+    uacpi_namespace_node *device, uacpi_resources **out_resources
 )
 {
     return extract_native_resources_from_method(device, "_PRS", out_resources);
@@ -2045,7 +2054,7 @@ uacpi_status uacpi_for_each_resource(
 )
 {
     uacpi_size bytes_left = resources->length;
-    uacpi_resource *current = resources->head;
+    uacpi_resource *current = resources->entries;
     uacpi_resource_iteration_decision decision;
 
     while (bytes_left) {
@@ -2086,14 +2095,14 @@ uacpi_status uacpi_for_each_device_resource(
 )
 {
     uacpi_status ret;
-    uacpi_resources resources;
+    uacpi_resources *resources;
 
     ret = extract_native_resources_from_method(device, method, &resources);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    ret = uacpi_for_each_resource(&resources, cb, user);
-    uacpi_free(resources.head, resources.length);
+    ret = uacpi_for_each_resource(resources, cb, user);
+    uacpi_free_resources(resources);
 
     return ret;
 }

@@ -316,7 +316,7 @@ uacpi_status uacpi_find_aml_resource_end_tag(
 );
 
 uacpi_status uacpi_native_resources_from_aml(
-    uacpi_buffer *aml_buffer, uacpi_resources *out_resources
+    uacpi_buffer *aml_buffer, uacpi_resources **out_resources
 );
 
 uacpi_status uacpi_native_resources_to_aml(

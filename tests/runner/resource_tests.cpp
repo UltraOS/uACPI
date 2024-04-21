@@ -2157,7 +2157,7 @@ void run_resource_tests()
     for (auto& test: test_cases) {
         std::cout << "Running resource test '" << test.name << "'...";
 
-        uacpi_resources resources = {};
+        uacpi_resources *resources;
         uacpi_buffer aml_buffer;
         uint8_t *bytes;
         uacpi_status ret;
@@ -2173,15 +2173,15 @@ void run_resource_tests()
             goto next_test;
         }
 
-        if (resources.length != test.native_bytes.size()) {
+        if (resources->length != test.native_bytes.size()) {
             std::printf("unexpected native length %zu (expected %zu)\n",
-                        resources.length, test.native_bytes.size());
+                        resources->length, test.native_bytes.size());
             fail_count++;
             goto next_test;
         }
 
-        bytes = reinterpret_cast<uint8_t*>(resources.head);
-        for (size_t i = 0; i < resources.length; ++i) {
+        bytes = reinterpret_cast<uint8_t*>(resources->entries);
+        for (size_t i = 0; i < resources->length; ++i) {
             if ((i & (sizeof(void*) - 1)) == 0 &&
                 test.pointer_offsets.count(i)) {
                 i += sizeof(void*) - 1;
@@ -2196,7 +2196,7 @@ void run_resource_tests()
             }
         }
 
-        ret = uacpi_native_resources_to_aml(&resources, &resource_template);
+        ret = uacpi_native_resources_to_aml(resources, &resource_template);
         if (uacpi_unlikely_error(ret)) {
             std::printf("to_aml error: %s\n", uacpi_status_to_string(ret));
             fail_count++;
@@ -2223,7 +2223,7 @@ void run_resource_tests()
         std::puts("OK");
 
     next_test:
-        std::free(resources.head);
+        uacpi_free_resources(resources);
         uacpi_object_unref(resource_template);
     }
 
