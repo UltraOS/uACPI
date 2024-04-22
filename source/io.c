@@ -208,9 +208,10 @@ static uacpi_status dispatch_field_io(
 
         path = uacpi_namespace_node_generate_absolute_path(region_node);
         uacpi_error(
-            "out-of-bounds access to opregion %s[0x%"PRIX64"->0x%"PRIX64"] "
-            "at 0x%"PRIX64" (idx=%u, width=%d)\n", path, region->offset,
-            region->offset + region->length, data.offset, offset, byte_width
+            "out-of-bounds access to opregion %s[0x%"UACPI_PRIX64"->"
+            "0x%"UACPI_PRIX64"] at 0x%"UACPI_PRIX64" (idx=%u, width=%d)\n",
+            path, region->offset, region->offset + region->length, data.offset,
+            offset, byte_width
         );
         uacpi_free_dynamic_string(path);
         return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
