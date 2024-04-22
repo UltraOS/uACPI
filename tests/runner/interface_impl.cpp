@@ -7,7 +7,9 @@
 #include <thread>
 #include <condition_variable>
 #include <unordered_map>
+#include <unordered_set>
 #include <cstring>
+#include <cinttypes>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -118,31 +120,60 @@ uacpi_status uacpi_kernel_pci_write(
 
 bool g_expect_virtual_addresses = true;
 
+struct mapping {
+    void *virt;
+    uacpi_size size;
+
+    bool operator==(const mapping& m) const
+    {
+        return size == m.size;
+    }
+};
+
+template <>
+struct std::hash<mapping>
+{
+    size_t operator()(const mapping& m) const
+    {
+        return m.size;
+    }
+};
+
 static
 std::unordered_map<void*, std::pair<uacpi_phys_addr, size_t>>
 virt_to_phys_and_refcount;
 
-static std::unordered_map<uacpi_phys_addr, void*> phys_to_virt;
+static std::unordered_map<uacpi_phys_addr, std::unordered_set<mapping>>
+phys_to_virt;
 
 void* uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size size)
 {
     if (!g_expect_virtual_addresses) {
         auto it = phys_to_virt.find(addr);
         if (it != phys_to_virt.end()) {
-            virt_to_phys_and_refcount[it->second].second++;
-            return it->second;
+            auto mapping_it = it->second.find({ nullptr, size });
+
+            if (mapping_it != it->second.end()) {
+                virt_to_phys_and_refcount[mapping_it->virt].second++;
+                return mapping_it->virt;
+            }
+
+            std::printf("WARN: remapping physical 0x%016" PRIX64
+                        " with size %zu\n", addr, size);
         }
 
         void *virt = std::calloc(size, 1);
+        mapping m = { virt, size };
+
         virt_to_phys_and_refcount[virt] = { addr, 1 };
-        phys_to_virt[addr] = virt;
+        phys_to_virt[addr].insert(m);
         return virt;
     }
 
     return reinterpret_cast<void*>(addr);
 }
 
-void uacpi_kernel_unmap(void* addr, uacpi_size)
+void uacpi_kernel_unmap(void* addr, uacpi_size size)
 {
     auto it = virt_to_phys_and_refcount.find(addr);
     if (it == virt_to_phys_and_refcount.end())
@@ -151,7 +182,18 @@ void uacpi_kernel_unmap(void* addr, uacpi_size)
     if (--it->second.second > 0)
         return;
 
-    phys_to_virt.erase(it->second.first);
+    auto phys_it = phys_to_virt.find(it->second.first);
+    auto mapping_it = phys_it->second.find({ nullptr, size });
+    if (mapping_it == phys_it->second.end()) {
+        std::printf("WARN: cannot identify mapping virt=%p phys=0x%016" PRIX64
+                    " with size %zu\n", addr, phys_it->first, size);
+        return;
+    }
+
+    phys_it->second.erase(mapping_it);
+    if (phys_it->second.empty())
+        phys_to_virt.erase(it->second.first);
+
     std::free(it->first);
     virt_to_phys_and_refcount.erase(it);
 }
