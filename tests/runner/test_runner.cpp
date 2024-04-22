@@ -131,6 +131,8 @@ static void run_test(
     uacpi_status st = uacpi_initialize(&params);
     ensure_ok_status(st);
 
+    g_expect_virtual_addresses = false;
+
     st = uacpi_install_notify_handler(
         uacpi_namespace_root(), handle_notify, nullptr
     );

@@ -3,6 +3,8 @@
 #include <uacpi/acpi.h>
 #include <uacpi/uacpi.h>
 
+extern bool g_expect_virtual_addresses;
+
 UACPI_PACKED(struct full_xsdt {
     struct acpi_sdt_hdr hdr;
     acpi_fadt* fadt;
