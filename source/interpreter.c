@@ -680,8 +680,8 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
 
     if (uacpi_unlikely(declared_size->integer > 0xE0000000)) {
         uacpi_error(
-            "buffer is too large (%"PRIu64"), assuming corrupted bytestream\n",
-            declared_size->integer
+            "buffer is too large (%"UACPI_PRIu64"), assuming corrupted "
+            "bytestream\n", declared_size->integer
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
@@ -760,7 +760,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
         var_num_elements = item_array_at(&op_ctx->items, 1)->obj;
         if (uacpi_unlikely(var_num_elements->integer > 0xE0000000)) {
             uacpi_error(
-                "package is too large (%"PRIu64"), assuming "
+                "package is too large (%"UACPI_PRIu64"), assuming "
                 "corrupted bytestream\n", var_num_elements->integer
             );
             return UACPI_STATUS_AML_BAD_ENCODING;
@@ -1089,8 +1089,8 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
         uacpi_warn("unusable/empty operation region %.4s\n", node->name.text);
     } else if (uacpi_unlikely(op_region->offset > region_end)) {
         uacpi_error(
-            "invalid operation region %.4s bounds: offset=0x%"PRIX64
-            " length=0x%"PRIX64"\n", node->name.text, op_region->offset,
+            "invalid operation region %.4s bounds: offset=0x%"UACPI_PRIX64
+            " length=0x%"UACPI_PRIX64"\n", node->name.text, op_region->offset,
             op_region->length
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
@@ -1412,7 +1412,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
 
         if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
             uacpi_error(
-                "Load: operation region is too small: %"PRIu64"\n",
+                "Load: operation region is too small: %"UACPI_PRIu64"\n",
                 op_region->length
             );
             goto error_out;
@@ -1988,9 +1988,13 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         break;
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
-            uacpi_trace("%s Integer => 0x%08"PRIX64"\n", prefix, src->integer);
+            uacpi_trace(
+                "%s Integer => 0x%08"UACPI_PRIX64"\n", prefix, src->integer
+            );
         } else {
-            uacpi_trace("%s Integer => 0x%016"PRIX64"\n", prefix, src->integer);
+            uacpi_trace(
+                "%s Integer => 0x%016"UACPI_PRIX64"\n", prefix, src->integer
+            );
         }
         break;
     case UACPI_OBJECT_REFERENCE:
@@ -2010,8 +2014,9 @@ static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
         break;
     case UACPI_OBJECT_OPERATION_REGION:
         uacpi_trace(
-            "%s OperationRegion (ASID %d) 0x%016"PRIX64" -> 0x%016"PRIX64"\n",
-            prefix, src->op_region->space, src->op_region->offset,
+            "%s OperationRegion (ASID %d) 0x%016"UACPI_PRIX64
+            " -> 0x%016"UACPI_PRIX64"\n", prefix,
+            src->op_region->space, src->op_region->offset,
             src->op_region->offset + src->op_region->length
         );
         break;

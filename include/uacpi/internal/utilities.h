@@ -9,7 +9,7 @@ static inline uacpi_phys_addr uacpi_truncate_phys_addr_with_warn(uacpi_u64 large
 {
     if (sizeof(uacpi_phys_addr) < 8 && large_addr > 0xFFFFFFFF) {
         uacpi_warn(
-            "truncating a physical address 0x%"PRIX64
+            "truncating a physical address 0x%"UACPI_PRIX64
             " outside of address space\n", large_addr
         );
     }
