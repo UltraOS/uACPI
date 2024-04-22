@@ -5680,11 +5680,17 @@ uacpi_status uacpi_execute_control_method(
     }
 
 out:
-    if (ctx->ret != UACPI_NULL &&
-        ctx->ret->type != UACPI_OBJECT_UNINITIALIZED) {
-        uacpi_object_ref(ctx->ret);
-        *out_obj = ctx->ret;
+    if (ctx->ret != UACPI_NULL) {
+        uacpi_object *ret_obj = UACPI_NULL;
+
+        if (ctx->ret->type != UACPI_OBJECT_UNINITIALIZED) {
+            ret_obj = ctx->ret;
+            uacpi_object_ref(ret_obj);
+        }
+
+        *out_obj = ret_obj;
     }
+
     execution_context_release(ctx);
     return ret;
 }
