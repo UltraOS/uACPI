@@ -43,6 +43,7 @@ jobs:
       - if: ${{ matrix.os == 'macos-latest' }}
         name: Install tools & libraries (MacOS)
         run: |
+          export PIP_BREAK_SYSTEM_PACKAGES=1
           brew install python3 acpica cmake
           python3 -m pip install pytest
       - if: ${{ matrix.os == 'windows-latest' }}
