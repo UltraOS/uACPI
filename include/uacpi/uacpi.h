@@ -51,14 +51,14 @@ extern "C" {
  */
 #define UACPI_PARAM_BAD_XSDT (1 << 2)
 
-struct uacpi_params {
+typedef struct uacpi_params {
     enum uacpi_log_level log_level;
     uint64_t flags;
-};
+} uacpi_params;
 
-struct uacpi_init_params {
+typedef struct uacpi_init_params {
     uacpi_phys_addr rsdp;
-    struct uacpi_params rt_params;
+    uacpi_params rt_params;
 
     /*
      * If this is set, ACPI mode is not entered during the call to
@@ -66,7 +66,7 @@ struct uacpi_init_params {
      * discretion by using uacpi_enter_acpi_mode().
      */
     uacpi_bool no_acpi_mode;
-};
+} uacpi_init_params;
 
 /*
  * Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT
