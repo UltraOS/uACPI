@@ -30,13 +30,17 @@ uacpi_status uacpi_verify_table_checksum_with_warn(void *table, uacpi_size size)
             lvl = UACPI_LOG_ERROR;
         }
 
-        uacpi_log_lvl(lvl, "invalid table '%.4s' checksum!\n", (const char*)table);
+        uacpi_log_lvl(
+            lvl, "invalid table '%.4s' checksum!\n", (const uacpi_char*)table
+        );
     }
 
     return ret;
 }
 
-uacpi_status uacpi_check_tbl_signature_with_warn(void *table, const char *expect)
+uacpi_status uacpi_check_tbl_signature_with_warn(
+    void *table, const uacpi_char *expect
+)
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
@@ -50,7 +54,7 @@ uacpi_status uacpi_check_tbl_signature_with_warn(void *table, const char *expect
         }
 
         uacpi_log_lvl(lvl, "invalid table signature '%.4s' (expected '%.4s')\n",
-                      (const char*)table, expect);
+                      (const uacpi_char*)table, expect);
     }
 
     return ret;
