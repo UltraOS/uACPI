@@ -415,11 +415,11 @@ out:
 
 #define PNP_ID_LENGTH 8
 
-uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
+uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_id_string **out_id)
 {
     uacpi_status ret;
     uacpi_object *hid_ret;
-    uacpi_pnp_id *id;
+    uacpi_id_string *id;
     uacpi_u32 size;
 
     ret = uacpi_eval_typed(
@@ -430,7 +430,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
     if (ret != UACPI_STATUS_OK)
         return ret;
 
-    size = sizeof(uacpi_pnp_id);
+    size = sizeof(uacpi_id_string);
 
     switch (hid_ret->type) {
     case UACPI_OBJECT_STRING: {
@@ -452,7 +452,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
             break;
         }
         id->size = buf->size;
-        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_pnp_id));
+        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_id_string));
 
         uacpi_memcpy(id->value, buf->text, buf->size);
         id->value[buf->size - 1] = '\0';
@@ -468,7 +468,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
             break;
         }
         id->size = PNP_ID_LENGTH;
-        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_pnp_id));
+        id->value = UACPI_PTR_ADD(id, sizeof(uacpi_id_string));
 
         uacpi_eisa_id_to_string(hid_ret->integer, id->value);
         break;
@@ -480,12 +480,12 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_pnp_id **out_id)
     return ret;
 }
 
-void uacpi_free_pnp_id(uacpi_pnp_id *id)
+void uacpi_free_id_string(uacpi_id_string *id)
 {
     if (id == UACPI_NULL)
         return;
 
-    uacpi_free(id, sizeof(uacpi_pnp_id) + id->size);
+    uacpi_free(id, sizeof(uacpi_id_string) + id->size);
 }
 
 uacpi_status uacpi_eval_cid(
@@ -497,7 +497,7 @@ uacpi_status uacpi_eval_cid(
     uacpi_object **objects;
     uacpi_size num_ids, i;
     uacpi_u32 size;
-    uacpi_pnp_id *id;
+    uacpi_id_string *id;
     uacpi_char *id_buffer;
     uacpi_pnp_id_list *list;
 
@@ -522,7 +522,7 @@ uacpi_status uacpi_eval_cid(
     }
 
     size = sizeof(uacpi_pnp_id_list);
-    size += num_ids * sizeof(uacpi_pnp_id);
+    size += num_ids * sizeof(uacpi_id_string);
 
     for (i = 0; i < num_ids; ++i) {
         object = objects[i];
@@ -571,7 +571,7 @@ uacpi_status uacpi_eval_cid(
     list->size = size - sizeof(uacpi_pnp_id_list);
 
     id_buffer = UACPI_PTR_ADD(list, sizeof(uacpi_pnp_id_list));
-    id_buffer += num_ids * sizeof(uacpi_pnp_id);
+    id_buffer += num_ids * sizeof(uacpi_id_string);
 
     for (i = 0; i < num_ids; ++i) {
         object = objects[i];
@@ -642,7 +642,7 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
 }
 
 static uacpi_bool matches_any(
-    uacpi_pnp_id *id, const uacpi_char **ids
+    uacpi_id_string *id, const uacpi_char **ids
 )
 {
     uacpi_size i;
@@ -661,7 +661,7 @@ uacpi_bool uacpi_device_matches_pnp_id(
 {
     uacpi_status st;
     uacpi_bool ret = UACPI_FALSE;
-    uacpi_pnp_id *id = UACPI_NULL;
+    uacpi_id_string *id = UACPI_NULL;
     uacpi_pnp_id_list *id_list = UACPI_NULL;
 
     st = uacpi_eval_hid(node, &id);
@@ -683,7 +683,7 @@ uacpi_bool uacpi_device_matches_pnp_id(
     }
 
 out:
-    uacpi_free_pnp_id(id);
+    uacpi_free_id_string(id);
     uacpi_free_pnp_id_list(id_list);
     return ret;
 }
