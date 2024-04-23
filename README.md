@@ -194,9 +194,10 @@ This API is declared in [kernel_api.h](include/uacpi/kernel_api.h) and is implem
 
 That's it, uACPI is now integrated into your project.
 
-You should proceed to initialization.
-There is currently no in-depth tutorial on how to do it, but you can refer to [test_runner.cpp](https://github.com/UltraOS/uACPI/blob/master/tests/runner/test_runner.cpp#L108-L133)
-to see an example of how this can be done.
+You should proceed to initialization.  
+Refer to the [uACPI page](https://wiki.osdev.org/uACPI) on osdev wiki to see a
+snippet for basic initialization, as well as some code examples of how you may 
+want to use certain APIs.
 
 All of the headers and APIs defined in [uacpi](include/uacpi/) are public and may be utilized by your project.  
 Anything inside [uacpi/internal](include/uacpi/internal) is considered private/undocumented and unstable API.
