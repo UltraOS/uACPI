@@ -13,7 +13,7 @@
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
-const char *uacpi_status_to_string(uacpi_status st)
+const uacpi_char *uacpi_status_to_string(uacpi_status st)
 {
     switch (st) {
     case UACPI_STATUS_OK:

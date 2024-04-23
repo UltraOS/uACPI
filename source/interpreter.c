@@ -1977,7 +1977,7 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
     }
 }
 
-static void debug_store_no_recurse(const char *prefix, uacpi_object *src)
+static void debug_store_no_recurse(const uacpi_char *prefix, uacpi_object *src)
 {
     switch (src->type) {
     case UACPI_OBJECT_UNINITIALIZED:
@@ -2850,7 +2850,7 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
         break;
     }
     case UACPI_OBJECT_STRING: {
-        char int_buf[17];
+        uacpi_char int_buf[17];
         void *arg1_ptr;
         uacpi_size arg0_size, arg1_size;
         uacpi_buffer *arg0_buf = arg0->buffer;
@@ -4443,7 +4443,7 @@ static uacpi_bool op_allows_unresolved_if_load(enum uacpi_parse_op op)
 static uacpi_status op_typecheck(const struct op_context *op_ctx,
                                  const struct op_context *cur_op_ctx)
 {
-    const char *expected_type_str;
+    const uacpi_char *expected_type_str;
     uacpi_u8 ok_mask = 0;
     uacpi_u8 props = cur_op_ctx->op->properties;
 
