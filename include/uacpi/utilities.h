@@ -68,6 +68,43 @@ uacpi_status uacpi_get_pci_routing_table(
     uacpi_namespace_node *parent, uacpi_pci_routing_table **out_table
 );
 
+typedef struct uacpi_id_string {
+    // size of the string including the null byte
+    uacpi_u32 size;
+    uacpi_char *value;
+} uacpi_id_string;
+void uacpi_free_id_string(uacpi_id_string *id);
+
+/*
+ * Evaluate a device's _HID method and get its value.
+ * The returned struture must be freed using uacpi_free_id_string.
+ */
+uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_id_string **out_id);
+
+typedef struct uacpi_pnp_id_list {
+    // number of 'ids' in the list
+    uacpi_u32 num_ids;
+
+    // size of the 'ids' list including the string lengths
+    uacpi_u32 size;
+
+    // list of PNP ids
+    uacpi_id_string ids[];
+} uacpi_pnp_id_list;
+void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list);
+
+/*
+ * Evaluate a device's _CID method and get its value.
+ * The returned strucutre msut be freed using uacpi_free_pnp_id_list.
+ */
+uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list **out_list);
+
+/*
+ * Evaluate a device's _STA method and get its value.
+ * If this method is not found, the value of 'flags' is set to all ones.
+ */
+uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
+
 #ifdef __cplusplus
 }
 #endif

@@ -43,29 +43,4 @@ uacpi_status uacpi_string_to_integer(
 
 uacpi_bool uacpi_is_valid_nameseg(uacpi_u8 *nameseg);
 
-typedef struct uacpi_id_string {
-    // size of the string including the null byte
-    uacpi_u32 size;
-    uacpi_char *value;
-} uacpi_id_string;
-
-void uacpi_free_id_string(uacpi_id_string *id);
-uacpi_status uacpi_eval_hid(uacpi_namespace_node*, uacpi_id_string **out_id);
-
-typedef struct uacpi_pnp_id_list {
-    // number of 'ids' in the list
-    uacpi_u32 num_ids;
-
-    // size of the 'ids' list including the string lengths
-    uacpi_u32 size;
-
-    // list of PNP ids
-    uacpi_id_string ids[];
-} uacpi_pnp_id_list;
-
-void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list);
-uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list **out_list);
-
-uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
-
 void uacpi_free_dynamic_string(const uacpi_char *str);
