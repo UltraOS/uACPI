@@ -169,8 +169,6 @@ uacpi_status uacpi_node_install(
     uacpi_namespace_node *node
 )
 {
-    uacpi_namespace_node *prev;
-
     if (parent == UACPI_NULL)
         parent = uacpi_namespace_root();
 
@@ -180,22 +178,19 @@ uacpi_status uacpi_node_install(
         return UACPI_STATUS_NAMESPACE_NODE_DANGLING;
     }
 
-    prev = parent->child;
-    parent->child = node;
-    node->parent = parent;
-    node->next = prev;
+    if (parent->child == UACPI_NULL) {
+        parent->child = node;
+    } else {
+        uacpi_namespace_node *prev = parent->child;
 
-    if (prev) {
-        if (uacpi_unlikely(prev->prev != UACPI_NULL)) {
-            uacpi_warn(
-                "while installing node @%p: previous node @%p already has "
-                " a valid prev link @%p\n", node, prev, prev->prev
-            );
-        }
+        while (prev->next != UACPI_NULL)
+            prev = prev->next;
 
-        prev->prev = node;
+        prev->next = node;
+        node->prev = prev;
     }
 
+    node->parent = parent;
     return UACPI_STATUS_OK;
 }
 
