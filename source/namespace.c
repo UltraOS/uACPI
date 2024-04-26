@@ -187,7 +187,6 @@ uacpi_status uacpi_node_install(
             prev = prev->next;
 
         prev->next = node;
-        node->prev = prev;
     }
 
     node->parent = parent;
@@ -201,6 +200,7 @@ uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node)
 
 void uacpi_node_uninstall(uacpi_namespace_node *node)
 {
+    uacpi_namespace_node *prev;
     uacpi_object *object;
 
     if (uacpi_unlikely(uacpi_namespace_node_is_dangling(node))) {
@@ -248,19 +248,23 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
         node->object = UACPI_NULL;
     }
 
-    if (node->parent && node->parent->child == node)
+    prev = node->parent ? node->parent->child : UACPI_NULL;
+
+    if (prev == node) {
         node->parent->child = node->next;
+    } else {
+        while (uacpi_likely(prev != UACPI_NULL) && prev->next != node)
+            prev = prev->next;
 
-    if (node->prev)
-        node->prev->next = node->next;
-    if (node->next)
-        node->next->prev = node->prev;
+        if (uacpi_unlikely(prev == UACPI_NULL)) {
+            uacpi_warn(
+                "trying to uninstall a node %.4s (%p) not linked to any peer\n",
+                node->name.text, node
+            );
+            return;
+        }
 
-    if (uacpi_unlikely(node->child)) {
-        uacpi_warn(
-            "trying to uninstall a node @%p with a valid child link @%p\n",
-            node, node->child
-        );
+        prev->next = node->next;
     }
 
     node->flags |= UACPI_NAMESPACE_NODE_FLAG_DANGLING;
