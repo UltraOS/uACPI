@@ -72,7 +72,8 @@ void uacpi_trace_region_io(
 static uacpi_bool space_needs_reg(enum uacpi_address_space space)
 {
     if (space == UACPI_ADDRESS_SPACE_SYSTEM_MEMORY ||
-        space == UACPI_ADDRESS_SPACE_SYSTEM_IO)
+        space == UACPI_ADDRESS_SPACE_SYSTEM_IO ||
+        space == UACPI_ADDRESS_SPACE_TABLE_DATA)
         return UACPI_FALSE;
 
     return UACPI_TRUE;
