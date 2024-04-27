@@ -154,7 +154,7 @@ typedef struct uacpi_address_space_handler {
     uacpi_handle user_context;
     struct uacpi_address_space_handler *next;
     struct uacpi_operation_region *regions;
-    uacpi_u8 space;
+    uacpi_u16 space;
 } uacpi_address_space_handler;
 
 typedef uacpi_status (*uacpi_notify_handler)
@@ -209,7 +209,7 @@ typedef enum uacpi_address_space {
     UACPI_ADDRESS_SPACE_FFIXEDHW = 0x7F,
 
     // Internal type
-    UACPI_ADDRESS_SPACE_TABLE_DATA = 0xFE,
+    UACPI_ADDRESS_SPACE_TABLE_DATA = 0xDA1A,
 } uacpi_address_space;
 const uacpi_char *uacpi_address_space_to_string(uacpi_address_space space);
 
@@ -223,7 +223,7 @@ typedef struct uacpi_operation_region {
     struct uacpi_shareable shareable;
     uacpi_address_space_handler *handler;
     uacpi_handle user_context;
-    uacpi_u8 space;
+    uacpi_u16 space;
     uacpi_u8 state_flags;
     uacpi_u64 offset;
     uacpi_u64 length;
