@@ -5533,35 +5533,7 @@ static void trace_method_abort(struct code_block *block, uacpi_size depth)
         uacpi_free_dynamic_string(absolute_path);
 }
 
-enum unwind_type {
-    UNWIND_TYPE_THIS_TABLE,
-    UNWIND_TYPE_ALL,
-};
-
-enum trace_unwind {
-    TRACE_UNWIND_NO,
-    TRACE_UNWIND_YES,
-};
-
-static uacpi_bool ctx_has_dynamic_table_load(struct execution_context *ctx)
-{
-    uacpi_size depth;
-    struct call_frame *frame;
-
-    depth = call_frame_array_size(&ctx->call_stack);
-    while (depth-- > 1) {
-        frame = call_frame_array_at(&ctx->call_stack, depth);
-        if (frame->method->named_objects_persist)
-            return UACPI_TRUE;
-    }
-
-    return UACPI_FALSE;
-}
-
-static void stack_unwind(
-    struct execution_context *ctx, enum unwind_type type,
-    enum trace_unwind trace
-)
+static void stack_unwind(struct execution_context *ctx)
 {
     uacpi_size depth;
     uacpi_bool should_stop;
@@ -5574,20 +5546,28 @@ static void stack_unwind(
 
     if (depth != 0) {
         uacpi_size idx = 0;
+        uacpi_bool table_level_code;
 
         do {
+            table_level_code = ctx->cur_frame->method->named_objects_persist;
+
+            if (table_level_code && idx != 0)
+                /*
+                 * This isn't the first frame that we are aborting.
+                 * If this is table-level code, we have just unwound a call
+                 * chain that had triggered an abort. Stop here, no need to
+                 * abort table load because of it.
+                 */
+                break;
+
             while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
                 pop_op(ctx);
 
-            if (trace == TRACE_UNWIND_YES) {
-                trace_method_abort(
-                    code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx++
-                );
-            }
+            trace_method_abort(
+                code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx
+            );
 
-            should_stop = ctx->cur_frame->method->named_objects_persist;
-            should_stop &= type == UNWIND_TYPE_THIS_TABLE;
-
+            should_stop = idx++ == 0 && table_level_code;
             ctx_reload_post_ret(ctx);
         } while (--depth && !should_stop);
     }
@@ -5598,7 +5578,6 @@ static void execution_context_release(struct execution_context *ctx)
     if (ctx->ret)
         uacpi_object_unref(ctx->ret);
 
-    stack_unwind(ctx, UNWIND_TYPE_ALL, TRACE_UNWIND_NO);
     while (held_mutexes_array_size(&ctx->held_mutexes) != 0) {
         held_mutexes_array_remove_and_release(
             &ctx->held_mutexes,
@@ -5665,10 +5644,10 @@ uacpi_status uacpi_execute_control_method(
 
     handle_method_abort:
         uacpi_error("aborting %s due to previous error: %s\n",
-                    ctx_has_dynamic_table_load(ctx) ?
-                        "dynamic table load" : "method execution",
+                    ctx->cur_frame->method->named_objects_persist ?
+                        "table load" : "method invocation",
                     uacpi_status_to_string(ret));
-        stack_unwind(ctx, UNWIND_TYPE_THIS_TABLE, TRACE_UNWIND_YES);
+        stack_unwind(ctx);
 
         /*
          * Having a frame here implies that we just aborted a dynamic table
