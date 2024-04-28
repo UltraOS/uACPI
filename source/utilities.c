@@ -621,7 +621,9 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
     uacpi_status ret;
     uacpi_object *obj;
 
-    ret = uacpi_eval_typed(node, "_STA", NULL, UACPI_OBJECT_INTEGER_BIT, &obj);
+    ret = uacpi_eval_typed(
+        node, "_STA", UACPI_NULL, UACPI_OBJECT_INTEGER_BIT, &obj
+    );
 
     /*
      * ACPI 6.5 specification:
