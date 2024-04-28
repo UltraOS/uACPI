@@ -645,6 +645,11 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
     return ret;
 }
 
+uacpi_status uacpi_eval_adr(uacpi_namespace_node *node, uacpi_u64 *out)
+{
+    return uacpi_eval_integer(node, "_ADR", UACPI_NULL, out);
+}
+
 static uacpi_bool matches_any(
     uacpi_id_string *id, const uacpi_char **ids
 )

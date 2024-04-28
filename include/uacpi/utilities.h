@@ -105,6 +105,11 @@ uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list **out_list)
  */
 uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
 
+/*
+ * Evaluate a device's _ADR method and get its value.
+ */
+uacpi_status uacpi_eval_adr(uacpi_namespace_node*, uacpi_u64 *out);
+
 #ifdef __cplusplus
 }
 #endif
