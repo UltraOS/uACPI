@@ -618,6 +618,51 @@ uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
     return uacpi_execute_control_method(node, obj->method, args, ret);
 }
 
+#define TRACE_BAD_RET(path_fmt, type, ...)                                 \
+    uacpi_warn(                                                            \
+        "unexpected '%s' object returned by method "path_fmt               \
+        ", expected type mask: %08X\n", uacpi_object_type_to_string(type), \
+        __VA_ARGS__                                                        \
+    )
+
+#define TRACE_NO_RET(path_fmt, ...)                                        \
+    uacpi_warn(                                                            \
+        "no value returned from method "path_fmt", expected type mask: "   \
+        "%08X\n", __VA_ARGS__                                              \
+    )
+
+static void trace_invalid_return_type(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_u32 expected_mask, uacpi_object_type actual_type
+)
+{
+    const uacpi_char *abs_path;
+    uacpi_bool dynamic_abs_path = UACPI_FALSE;
+
+    if (parent == UACPI_NULL || (path != UACPI_NULL && path[0] == '\\')) {
+        abs_path = path;
+    } else {
+        abs_path = uacpi_namespace_node_generate_absolute_path(parent);
+        dynamic_abs_path = UACPI_TRUE;
+    }
+
+    if (dynamic_abs_path && path != UACPI_NULL) {
+        if (actual_type == UACPI_OBJECT_UNINITIALIZED)
+            TRACE_NO_RET("%s.%s", abs_path, path, expected_mask);
+        else
+            TRACE_BAD_RET("%s.%s", actual_type, abs_path, path, expected_mask);
+    } else {
+        if (actual_type == UACPI_OBJECT_UNINITIALIZED) {
+            TRACE_NO_RET("%s", abs_path, expected_mask);
+        } else {
+            TRACE_BAD_RET("%s", actual_type, abs_path, expected_mask);
+        }
+    }
+
+    if (dynamic_abs_path)
+        uacpi_free_dynamic_string(abs_path);
+}
+
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
     uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **out_obj
@@ -638,6 +683,7 @@ uacpi_status uacpi_eval_typed(
         returned_type = obj->type;
 
     if (ret_mask && (ret_mask & (1 << returned_type)) == 0) {
+        trace_invalid_return_type(parent, path, ret_mask, returned_type);
         uacpi_object_unref(obj);
         return UACPI_STATUS_TYPE_MISMATCH;
     }
