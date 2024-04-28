@@ -709,6 +709,63 @@ out:
     return ret;
 }
 
+uacpi_status uacpi_eval_uid(
+    uacpi_namespace_node *node, uacpi_id_string **out_uid
+)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+    uacpi_id_string *id_string;
+    uacpi_u32 size;
+
+    ret = uacpi_eval_typed(
+        node, "_UID", UACPI_NULL,
+        UACPI_OBJECT_INTEGER_BIT | UACPI_OBJECT_STRING_BIT,
+        &obj
+    );
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    if (obj->type == UACPI_OBJECT_STRING) {
+        size = obj->buffer->size;
+        if (uacpi_unlikely(size == 0 || size > 0xE0000000)) {
+            uacpi_error(
+                "invalid %.4s._UID string size: %u\n",
+                uacpi_namespace_node_name(node).text, size
+            );
+            ret = UACPI_STATUS_AML_BAD_ENCODING;
+            goto out;
+        }
+    } else {
+        size = uacpi_snprintf(UACPI_NULL, 0, "%"PRIu64, obj->integer) + 1;
+    }
+
+    id_string = uacpi_kernel_alloc(sizeof(uacpi_id_string) + size);
+    if (uacpi_unlikely(id_string == UACPI_NULL)) {
+        ret = UACPI_STATUS_OUT_OF_MEMORY;
+        goto out;
+    }
+
+    id_string->value = UACPI_PTR_ADD(id_string, sizeof(uacpi_id_string));
+    id_string->size = size;
+
+    if (obj->type == UACPI_OBJECT_STRING) {
+        uacpi_memcpy(id_string->value, obj->buffer->text, size);
+        id_string->value[size - 1] = '\0';
+    } else {
+        uacpi_snprintf(
+            id_string->value, id_string->size, "%"PRIu64, obj->integer
+        );
+    }
+
+out:
+    if (uacpi_likely_success(ret))
+        *out_uid = id_string;
+
+    uacpi_object_unref(obj);
+    return ret;
+}
+
 static uacpi_bool matches_any(
     uacpi_id_string *id, const uacpi_char **ids
 )

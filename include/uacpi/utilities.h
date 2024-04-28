@@ -120,6 +120,12 @@ uacpi_status uacpi_eval_adr(uacpi_namespace_node*, uacpi_u64 *out);
  */
 uacpi_status uacpi_eval_cls(uacpi_namespace_node*, uacpi_id_string **out_id);
 
+/*
+ * Evaluate a device's _UID method and get its value.
+ * The returned struture must be freed using uacpi_free_id_string.
+ */
+uacpi_status uacpi_eval_uid(uacpi_namespace_node*, uacpi_id_string **out_uid);
+
 #ifdef __cplusplus
 }
 #endif
