@@ -1267,7 +1267,7 @@ static uacpi_status do_load_table(
         return ret;
     }
 
-    ret = uacpi_execute_control_method(parent, &method, NULL, NULL);
+    ret = uacpi_execute_control_method(parent, &method, UACPI_NULL, UACPI_NULL);
     if (uacpi_unlikely_error(ret))
         return ret;
 

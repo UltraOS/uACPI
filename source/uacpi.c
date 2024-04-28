@@ -446,7 +446,7 @@ static void ini_eval(struct ns_init_context *ctx, uacpi_namespace_node *node)
 {
     uacpi_status ret;
 
-    ret = uacpi_eval(node, "_INI", NULL, NULL);
+    ret = uacpi_eval(node, "_INI", UACPI_NULL, UACPI_NULL);
     do_account_sta_ini("_INI", &ctx->ini_executed, &ctx->ini_errors, node, ret);
 }
 
