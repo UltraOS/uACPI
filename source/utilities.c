@@ -650,6 +650,65 @@ uacpi_status uacpi_eval_adr(uacpi_namespace_node *node, uacpi_u64 *out)
     return uacpi_eval_integer(node, "_ADR", UACPI_NULL, out);
 }
 
+#define CLS_REPR_SIZE 7
+
+static uacpi_u8 extract_package_byte_or_zero(uacpi_package *pkg, uacpi_size i)
+{
+    uacpi_object *obj;
+
+    if (uacpi_unlikely(pkg->count <= i))
+        return 0;
+
+    obj = pkg->objects[i];
+    if (uacpi_unlikely(obj->type != UACPI_OBJECT_INTEGER))
+        return 0;
+
+    return obj->integer;
+}
+
+uacpi_status uacpi_eval_cls(
+    uacpi_namespace_node *node, uacpi_id_string **out_id
+)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+    uacpi_package *pkg;
+    uacpi_u8 class_codes[3];
+    uacpi_id_string *id_string;
+
+    ret = uacpi_eval_typed(
+        node, "_CLS", UACPI_NULL, UACPI_OBJECT_PACKAGE_BIT, &obj
+    );
+    if (ret != UACPI_STATUS_OK)
+        return ret;
+
+    pkg = obj->package;
+    class_codes[0] = extract_package_byte_or_zero(pkg, 0);
+    class_codes[1] = extract_package_byte_or_zero(pkg, 1);
+    class_codes[2] = extract_package_byte_or_zero(pkg, 2);
+
+    id_string = uacpi_kernel_alloc(sizeof(uacpi_id_string) + CLS_REPR_SIZE);
+    if (uacpi_unlikely(id_string == UACPI_NULL)) {
+        ret = UACPI_STATUS_OUT_OF_MEMORY;
+        goto out;
+    }
+
+    id_string->size = CLS_REPR_SIZE;
+    id_string->value = UACPI_PTR_ADD(id_string, sizeof(uacpi_id_string));
+
+    uacpi_snprintf(
+        id_string->value, CLS_REPR_SIZE, "%02X%02X%02X",
+        class_codes[0], class_codes[1], class_codes[2]
+    );
+
+out:
+    if (uacpi_likely_success(ret))
+        *out_id = id_string;
+
+    uacpi_object_unref(obj);
+    return ret;
+}
+
 static uacpi_bool matches_any(
     uacpi_id_string *id, const uacpi_char **ids
 )

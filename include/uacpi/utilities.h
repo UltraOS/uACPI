@@ -110,6 +110,16 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node*, uacpi_u32 *flags);
  */
 uacpi_status uacpi_eval_adr(uacpi_namespace_node*, uacpi_u64 *out);
 
+/*
+ * Evaluate a device's _CLS method and get its value.
+ * The format of returned string is BBSSPP where:
+ *     BB => Base Class (e.g. 01 => Mass Storage)
+ *     SS => Sub-Class (e.g. 06 => SATA)
+ *     PP => Programming Interface (e.g. 01 => AHCI)
+ * The returned struture must be freed using uacpi_free_id_string.
+ */
+uacpi_status uacpi_eval_cls(uacpi_namespace_node*, uacpi_id_string **out_id);
+
 #ifdef __cplusplus
 }
 #endif
