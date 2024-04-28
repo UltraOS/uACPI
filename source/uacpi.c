@@ -620,23 +620,30 @@ uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
 
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
+    uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **out_obj
 )
 {
-    uacpi_status st;
-    uacpi_u32 type_mask = 0;
+    uacpi_status ret;
+    uacpi_object *obj;
+    uacpi_object_type returned_type = UACPI_OBJECT_UNINITIALIZED;
 
-    st = uacpi_eval(parent, path, args, ret);
-    if (uacpi_unlikely_error(st))
-        return st;
+    if (uacpi_unlikely(out_obj == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if ((*ret) != UACPI_NULL)
-        type_mask = 1 << (*ret)->type;
+    ret = uacpi_eval(parent, path, args, &obj);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-    if (ret_mask && (ret_mask & type_mask) == 0)
+    if (obj != UACPI_NULL)
+        returned_type = obj->type;
+
+    if (ret_mask && (ret_mask & (1 << returned_type)) == 0) {
+        uacpi_object_unref(obj);
         return UACPI_STATUS_TYPE_MISMATCH;
+    }
 
-    return st;
+    *out_obj = obj;
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_eval_integer(
