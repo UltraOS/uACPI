@@ -782,6 +782,176 @@ static uacpi_bool matches_any(
     return UACPI_FALSE;
 }
 
+static uacpi_status uacpi_eval_dstate_method_template(
+    uacpi_namespace_node *parent, uacpi_char *template, uacpi_u8 num_methods,
+    uacpi_u8 *out_values
+)
+{
+    uacpi_u8 i;
+    uacpi_status ret = UACPI_STATUS_NOT_FOUND, eval_ret;
+    uacpi_object *obj;
+
+    // We expect either _SxD or _SxW, so increment template[2]
+    for (i = 0; i < num_methods; ++i, template[2]++) {
+        eval_ret = uacpi_eval_typed(
+            parent, template, UACPI_NULL, UACPI_OBJECT_INTEGER_BIT, &obj
+        );
+        if (eval_ret == UACPI_STATUS_OK) {
+            ret = UACPI_STATUS_OK;
+            out_values[i] = obj->integer;
+            uacpi_object_unref(obj);
+            continue;
+        }
+
+        out_values[i] = 0xFF;
+        if (uacpi_unlikely(eval_ret != UACPI_STATUS_NOT_FOUND)) {
+            const char *path;
+
+            path = uacpi_namespace_node_generate_absolute_path(parent);
+            uacpi_warn(
+                "failed to evaluate %s.%s: %s\n",
+                path, template, uacpi_status_to_string(eval_ret)
+            );
+            uacpi_free_dynamic_string(path);
+        }
+    }
+
+    return ret;
+}
+
+#define NODE_INFO_EVAL_ADD_ID(name)                          \
+    if (uacpi_eval_##name(node, &name) == UACPI_STATUS_OK) { \
+        size += name->size;                                  \
+        if (uacpi_unlikely(size < name->size)) {             \
+            ret = UACPI_STATUS_AML_BAD_ENCODING;             \
+            goto out;                                        \
+        }                                                    \
+    }
+
+#define NODE_INFO_COPY_ID(name)                        \
+    if (name != UACPI_NULL) {                          \
+        info->has_##name = 1;                          \
+        info->name.value = cursor;                     \
+        info->name.size = name->size;                  \
+        uacpi_memcpy(cursor, name->value, name->size); \
+        cursor += name->size;                          \
+    } else {                                           \
+        info->has_##name = 0;                          \
+        uacpi_memzero(&info->name, sizeof(*name));     \
+    }                                                  \
+
+uacpi_status uacpi_get_namespace_node_info(
+    uacpi_namespace_node *node, uacpi_namespace_node_info **out_info
+)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_u32 size = sizeof(uacpi_namespace_node_info);
+    uacpi_object *obj;
+    uacpi_namespace_node_info *info;
+    uacpi_id_string *hid = UACPI_NULL, *uid = UACPI_NULL, *cls = UACPI_NULL;
+    uacpi_pnp_id_list *cid = UACPI_NULL;
+    uacpi_char *cursor;
+    uacpi_u64 adr = 0;
+    uacpi_bool has_adr = UACPI_FALSE;
+    uacpi_bool has_sxd = UACPI_FALSE, has_sxw = UACPI_FALSE;
+    uacpi_u8 sxd[4], sxw[5];
+
+    obj = uacpi_namespace_node_get_object(node);
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    if (obj->type == UACPI_OBJECT_DEVICE ||
+        obj->type == UACPI_OBJECT_PROCESSOR) {
+        char dstate_method_template[5] = { '_', 'S', '1', 'D', '\0' };
+
+        NODE_INFO_EVAL_ADD_ID(hid)
+        NODE_INFO_EVAL_ADD_ID(uid)
+        NODE_INFO_EVAL_ADD_ID(cls)
+        NODE_INFO_EVAL_ADD_ID(cid)
+
+        if (uacpi_eval_adr(node, &adr) == UACPI_STATUS_OK)
+            has_adr = UACPI_TRUE;
+
+        if (uacpi_eval_dstate_method_template(
+                node, dstate_method_template, sizeof(sxd), sxd
+            ) == UACPI_STATUS_OK)
+            has_sxd = UACPI_TRUE;
+
+        dstate_method_template[2] = '0';
+        dstate_method_template[3] = 'W';
+
+        if (uacpi_eval_dstate_method_template(
+                node, dstate_method_template, sizeof(sxw), sxw
+            ) == UACPI_STATUS_OK)
+            has_sxw = UACPI_TRUE;
+    }
+
+    info = uacpi_kernel_alloc(size);
+    if (uacpi_unlikely(info == UACPI_NULL)) {
+        ret = UACPI_STATUS_OUT_OF_MEMORY;
+        goto out;
+    }
+    info->size = size;
+    cursor = UACPI_PTR_ADD(info, sizeof(uacpi_namespace_node_info));
+    info->name = uacpi_namespace_node_name(node);
+    info->type = obj->type;
+    info->num_params = info->type == UACPI_OBJECT_METHOD ? obj->method->args : 0;
+
+    info->has_adr = has_adr;
+    info->adr = adr;
+
+    info->has_sxd = has_sxd;
+    if (info->has_sxd)
+        uacpi_memcpy(info->sxd, sxd, sizeof(sxd));
+    else
+        uacpi_memzero(info->sxd, sizeof(info->sxd));
+
+    info->has_sxw = has_sxw;
+    if (info->has_sxw)
+        uacpi_memcpy(info->sxw, sxw, sizeof(sxw));
+    else
+        uacpi_memzero(info->sxw, sizeof(info->sxw));
+
+    if (cid != UACPI_NULL) {
+        uacpi_u32 i;
+
+        uacpi_memcpy(&info->cid, cid, cid->size + sizeof(*cid));
+        cursor += cid->num_ids * sizeof(uacpi_id_string);
+
+        for (i = 0; i < cid->num_ids; ++i) {
+            info->cid.ids[i].value = cursor;
+            cursor += info->cid.ids[i].size;
+        }
+
+        info->has_cid = 1;
+    } else {
+        info->has_cid = 0;
+        uacpi_memzero(&info->cid, sizeof(*cid));
+    }
+
+    NODE_INFO_COPY_ID(hid)
+    NODE_INFO_COPY_ID(uid)
+    NODE_INFO_COPY_ID(cls)
+
+out:
+    if (uacpi_likely_success(ret))
+        *out_info = info;
+
+    uacpi_free_id_string(hid);
+    uacpi_free_id_string(uid);
+    uacpi_free_id_string(cls);
+    uacpi_free_pnp_id_list(cid);
+    return ret;
+}
+
+void uacpi_free_namespace_node_info(uacpi_namespace_node_info *info)
+{
+    if (info == UACPI_NULL)
+        return;
+
+    uacpi_free(info, info->size);
+}
+
 uacpi_bool uacpi_device_matches_pnp_id(
     uacpi_namespace_node *node, const uacpi_char **ids
 )
