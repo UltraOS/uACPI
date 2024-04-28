@@ -126,6 +126,54 @@ uacpi_status uacpi_eval_cls(uacpi_namespace_node*, uacpi_id_string **out_id);
  */
 uacpi_status uacpi_eval_uid(uacpi_namespace_node*, uacpi_id_string **out_uid);
 
+typedef struct uacpi_namespace_node_info {
+    // Size of the entire structure
+    uacpi_u32 size;
+
+    // Object information
+    uacpi_object_name name;
+    uacpi_object_type type;
+    uacpi_u8 num_params;
+
+    uacpi_u8 has_adr : 1;
+    uacpi_u8 has_hid : 1;
+    uacpi_u8 has_uid : 1;
+    uacpi_u8 has_cid : 1;
+    uacpi_u8 has_cls : 1;
+    uacpi_u8 has_sxd : 1;
+    uacpi_u8 has_sxw : 1;
+
+    /*
+     * A mapping of [S1..S4] to the shallowest D state supported by the device
+     * in that S state.
+     */
+    uacpi_u8 sxd[4];
+
+    /*
+     * A mapping of [S0..S4] to the deepest D state supported by the device
+     * in that S state to be able to wake itself.
+     */
+    uacpi_u8 sxw[5];
+
+    uacpi_u64 adr;
+    uacpi_id_string hid;
+    uacpi_id_string uid;
+    uacpi_id_string cls;
+    uacpi_pnp_id_list cid;
+} uacpi_namespace_node_info;
+void uacpi_free_namespace_node_info(uacpi_namespace_node_info*);
+
+/*
+ * Retrieve information about a namespace node. This includes the attached
+ * object's type, name, number of parameters (if it's a method), the result of
+ * evaluating _ADR, _UID, _CLS, _HID, _CID, as well as _SxD and _SxW.
+ *
+ * The returned structure must be freed with uacpi_free_namespace_node_info.
+ */
+uacpi_status uacpi_get_namespace_node_info(
+    uacpi_namespace_node *node, uacpi_namespace_node_info **out_info
+);
+
 #ifdef __cplusplus
 }
 #endif
