@@ -52,9 +52,9 @@ UACPI_PACKED(struct acpi_gas {
 UACPI_EXPECT_SIZEOF(struct acpi_gas, 12);
 
 UACPI_PACKED(struct acpi_rsdp {
-    char signature[8];
+    uacpi_char signature[8];
     uacpi_u8 checksum;
-    char oemid[6];
+    uacpi_char oemid[6];
     uacpi_u8 revision;
     uacpi_u32 rsdt_addr;
 
@@ -67,12 +67,12 @@ UACPI_PACKED(struct acpi_rsdp {
 UACPI_EXPECT_SIZEOF(struct acpi_rsdp, 36);
 
 UACPI_PACKED(struct acpi_sdt_hdr {
-    char signature[4];
+    uacpi_char signature[4];
     uacpi_u32 length;
     uacpi_u8 revision;
     uacpi_u8 checksum;
-    char oemid[6];
-    char oem_table_id[8];
+    uacpi_char oemid[6];
+    uacpi_char oem_table_id[8];
     uacpi_u32 oem_revision;
     uacpi_u32 creator_id;
     uacpi_u32 creator_revision;
@@ -515,7 +515,7 @@ UACPI_EXPECT_SIZEOF(struct acpi_fadt, 276);
 #define ACPI_64BIT_WAKE_F           (1 << 0)
 
 UACPI_PACKED(struct acpi_facs {
-    char signature[4];
+    uacpi_char signature[4];
     uacpi_u32 length;
     uacpi_u32 hardware_signature;
     uacpi_u32 firmware_waking_vector;
@@ -523,9 +523,9 @@ UACPI_PACKED(struct acpi_facs {
     uacpi_u32 flags;
     uacpi_u64 x_firmware_waking_vector;
     uacpi_u8 version;
-    char rsvd0[3];
+    uacpi_char rsvd0[3];
     uacpi_u32 ospm_flags;
-    char rsvd1[24];
+    uacpi_char rsvd1[24];
 })
 UACPI_EXPECT_SIZEOF(struct acpi_facs, 64);
 
