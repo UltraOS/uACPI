@@ -873,7 +873,7 @@ UACPI_EXPECT_SIZEOF(struct acpi_resource_address16, 16);
 UACPI_PACKED(struct acpi_resource_address64_extended {
     struct acpi_resource_address common;
     uacpi_u8 revision_id;
-    uacpi_u8 reserved;
+    uacpi_u8 rsvd;
     uacpi_u64 granularity;
     uacpi_u64 minimum;
     uacpi_u64 maximum;
