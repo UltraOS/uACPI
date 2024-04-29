@@ -13,6 +13,7 @@
 #define ACPI_RSDP_SIGNATURE "RSD PTR "
 #define ACPI_RSDT_SIGNATURE "RSDT"
 #define ACPI_XSDT_SIGNATURE "XSDT"
+#define ACPI_MADT_SIGNATURE "APIC"
 #define ACPI_FADT_SIGNATURE "FACP"
 #define ACPI_FACS_SIGNATURE "FACS"
 #define ACPI_DSDT_SIGNATURE "DSDT"
@@ -87,6 +88,328 @@ UACPI_PACKED(struct acpi_xsdt {
     struct acpi_sdt_hdr hdr;
     uacpi_u64 entries[];
 })
+
+UACPI_PACKED(struct acpi_entry_hdr {
+    // acpi_madt_entry_type for the APIC table
+    uacpi_u8 type;
+    uacpi_u8 length;
+})
+
+// acpi_madt->flags
+#define ACPI_PCAT_COMPAT (1 << 0)
+
+enum acpi_madt_entry_type {
+    ACPI_MADT_ENTRY_TYPE_LAPIC = 0,
+    ACPI_MADT_ENTRY_TYPE_IOAPIC = 1,
+    ACPI_MADT_ENTRY_TYPE_INTERRUPT_SOURCE_OVERRIDE = 2,
+    ACPI_MADT_ENTRY_TYPE_NMI_SOURCE = 3,
+    ACPI_MADT_ENTRY_TYPE_LAPIC_NMI = 4,
+    ACPI_MADT_ENTRY_TYPE_LAPIC_ADDRESS_OVERRIDE = 5,
+    ACPI_MADT_ENTRY_TYPE_IOSAPIC = 6,
+    ACPI_MADT_ENTRY_TYPE_LSAPIC = 7,
+    ACPI_MADT_ENTRY_TYPE_PLATFORM_INTERRUPT_SOURCES = 8,
+    ACPI_MADT_ENTRY_TYPE_LOCAL_X2APIC = 9,
+    ACPI_MADT_ENTRY_TYPE_LOCAL_X2APIC_NMI = 0xA,
+    ACPI_MADT_ENTRY_TYPE_GICC = 0xB,
+    ACPI_MADT_ENTRY_TYPE_GICD = 0xC,
+    ACPI_MADT_ENTRY_TYPE_GIC_MSI_FRAME = 0xD,
+    ACPI_MADT_ENTRY_TYPE_GICR = 0xE,
+    ACPI_MADT_ENTRY_TYPE_GIC_ITS = 0xF,
+    ACPI_MADT_ENTRY_TYPE_MULTIPROCESSOR_WAKEUP = 0x10,
+    ACPI_MADT_ENTRY_TYPE_CORE_PIC = 0x11,
+    ACPI_MADT_ENTRY_TYPE_LIO_PIC = 0x12,
+    ACPI_MADT_ENTRY_TYPE_HT_PIC = 0x13,
+    ACPI_MADT_ENTRY_TYPE_EIO_PIC = 0x14,
+    ACPI_MADT_ENTRY_TYPE_MSI_PIC = 0x15,
+    ACPI_MADT_ENTRY_TYPE_BIO_PIC = 0x16,
+    ACPI_MADT_ENTRY_TYPE_LPC_PIC = 0x17,
+    ACPI_MADT_ENTRY_TYPE_RESERVED = 0x18, // 0x18..0x7F
+    ACPI_MADT_ENTRY_TYPE_OEM = 0x80, // 0x80..0xFF
+};
+
+UACPI_PACKED(struct acpi_madt {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u32 local_interrupt_controller_address;
+    uacpi_u32 flags;
+    struct acpi_entry_hdr entries[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt, 44);
+
+/*
+ * - acpi_madt_lapic->flags
+ * - acpi_madt_lsapic->flags
+ * - acpi_madt_x2apic->flags
+ */
+#define ACPI_PIC_ENABLED (1 << 0)
+#define ACPI_PIC_ONLINE_CAPABLE (1 << 1)
+
+UACPI_PACKED(struct acpi_madt_lapic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 uid;
+    uacpi_u8 id;
+    uacpi_u32 flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lapic, 8);
+
+UACPI_PACKED(struct acpi_madt_ioapic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 id;
+    uacpi_u8 rsvd;
+    uacpi_u32 address;
+    uacpi_u32 gsi_base;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_ioapic, 12);
+
+/*
+ * - acpi_madt_interrupt_source_override->flags
+ * - acpi_madt_nmi_source->flags
+ * - acpi_madt_lapic_nmi->flags
+ * - acpi_madt_platform_interrupt_source->flags
+ * - acpi_madt_x2apic_nmi->flags
+ */
+#define ACPI_MADT_POLARITY_MASK 0b11
+#define ACPI_MADT_POLARITY_CONFORMING 0b00
+#define ACPI_MADT_POLARITY_ACTIVE_HIGH 0b01
+#define ACPI_MADT_POLARITY_ACTIVE_LOW 0b11
+
+#define ACPI_MADT_TRIGGERING_MASK 0b1100
+#define ACPI_MADT_TRIGGERING_CONFORMING 0b0000
+#define ACPI_MADT_TRIGGERING_EDGE 0b0100
+#define ACPI_MADT_TRIGGERING_LEVEL 0b1100
+
+UACPI_PACKED(struct acpi_madt_interrupt_source_override {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 bus;
+    uacpi_u8 source;
+    uacpi_u32 gsi;
+    uacpi_u16 flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_interrupt_source_override, 10);
+
+UACPI_PACKED(struct acpi_madt_nmi_source {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 flags;
+    uacpi_u32 gsi;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_nmi_source, 8);
+
+UACPI_PACKED(struct acpi_madt_lapic_nmi {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 uid;
+    uacpi_u16 flags;
+    uacpi_u8 lint;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lapic_nmi, 6);
+
+UACPI_PACKED(struct acpi_madt_lapic_address_override {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd;
+    uacpi_u64 address;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lapic_address_override, 12);
+
+UACPI_PACKED(struct acpi_madt_iosapic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 id;
+    uacpi_u8 rsvd;
+    uacpi_u32 gsi_base;
+    uacpi_u64 address;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_iosapic, 16);
+
+UACPI_PACKED(struct acpi_madt_lsapic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 acpi_id;
+    uacpi_u8 id;
+    uacpi_u8 eid;
+    uacpi_u8 reserved[3];
+    uacpi_u32 flags;
+    uacpi_u32 uid;
+    uacpi_char uid_string[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lsapic, 16);
+
+// acpi_madt_platform_interrupt_source->platform_flags
+#define ACPI_CPEI_PROCESSOR_OVERRIDE (1 << 0)
+
+UACPI_PACKED(struct acpi_madt_platform_interrupt_source {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 flags;
+    uacpi_u8 type;
+    uacpi_u8 processor_id;
+    uacpi_u8 processor_eid;
+    uacpi_u8 iosapic_vector;
+    uacpi_u32 gsi;
+    uacpi_u32 platform_flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_platform_interrupt_source, 16);
+
+UACPI_PACKED(struct acpi_madt_x2apic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd;
+    uacpi_u32 id;
+    uacpi_u32 flags;
+    uacpi_u32 uid;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_x2apic, 16);
+
+UACPI_PACKED(struct acpi_madt_x2apic_nmi {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 flags;
+    uacpi_u32 uid;
+    uacpi_u8 lint;
+    uacpi_u8 reserved[3];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_x2apic_nmi, 12);
+
+// acpi_madt_gicc->flags
+#define ACPI_GICC_ENABLED (1 << 0)
+#define ACPI_GICC_PERF_INTERRUPT_MODE (1 << 1)
+#define ACPI_GICC_VGIC_MAINTENANCE_INTERRUPT_MODE (1 << 2)
+#define ACPI_GICC_ONLINE_CAPABLE (1 << 3)
+
+// ACPI_GICC_*_INTERRUPT_MODE
+#define ACPI_GICC_TRIGGERING_EDGE 1
+#define ACPI_GICC_TRIGGERING_LEVEL 0
+
+UACPI_PACKED(struct acpi_madt_gicc {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd0;
+    uacpi_u32 interface_number;
+    uacpi_u32 acpi_id;
+    uacpi_u32 flags;
+    uacpi_u32 parking_protocol_version;
+    uacpi_u32 perf_interrupt_gsiv;
+    uacpi_u64 parked_address;
+    uacpi_u64 address;
+    uacpi_u64 gicv;
+    uacpi_u64 gich;
+    uacpi_u32 vgic_maitenante_interrupt;
+    uacpi_u64 gicr_base_address;
+    uacpi_u64 mpidr;
+    uacpi_u8 power_efficiency_class;
+    uacpi_u8 rsvd1;
+    uacpi_u16 spe_overflow_interrupt;
+    uacpi_u16 trbe_interrupt;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_gicc, 82);
+
+UACPI_PACKED(struct acpi_madt_gicd {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd0;
+    uacpi_u32 id;
+    uacpi_u64 address;
+    uacpi_u32 system_vector_base;
+    uacpi_u8 gic_version;
+    uacpi_u8 reserved1[3];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_gicd, 24);
+
+// acpi_madt_gic_msi_frame->flags
+#define ACPI_SPI_SELECT (1 << 0)
+
+UACPI_PACKED(struct acpi_madt_gic_msi_frame {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd;
+    uacpi_u32 id;
+    uacpi_u64 address;
+    uacpi_u32 flags;
+    uacpi_u16 spi_count;
+    uacpi_u16 spi_base;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_gic_msi_frame, 24);
+
+UACPI_PACKED(struct acpi_madt_gicr {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd;
+    uacpi_u64 address;
+    uacpi_u32 length;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_gicr, 16);
+
+UACPI_PACKED(struct acpi_madt_gic_its {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd0;
+    uacpi_u32 id;
+    uacpi_u64 address;
+    uacpi_u32 rsvd1;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_gic_its, 20);
+
+UACPI_PACKED(struct acpi_madt_multiprocessor_wakeup {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 mailbox_version;
+    uacpi_u32 rsvd;
+    uacpi_u64 mailbox_address;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_multiprocessor_wakeup, 16);
+
+#define ACPI_CORE_PIC_ENABLED (1 << 0)
+
+UACPI_PACKED(struct acpi_madt_core_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u32 acpi_id;
+    uacpi_u32 id;
+    uacpi_u32 flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_core_pic, 15);
+
+UACPI_PACKED(struct acpi_madt_lio_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u64 address;
+    uacpi_u16 size;
+    uacpi_u16 cascade_vector;
+    uacpi_u64 cascade_vector_mapping;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lio_pic, 23);
+
+UACPI_PACKED(struct acpi_madt_ht_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u64 address;
+    uacpi_u16 size;
+    uacpi_u64 cascade_vector;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_ht_pic, 21);
+
+UACPI_PACKED(struct acpi_madt_eio_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u8 cascade_vector;
+    uacpi_u8 node;
+    uacpi_u64 node_map;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_eio_pic, 13);
+
+UACPI_PACKED(struct acpi_madt_msi_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u64 address;
+    uacpi_u32 start;
+    uacpi_u32 count;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_msi_pic, 19);
+
+UACPI_PACKED(struct acpi_madt_bio_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u64 address;
+    uacpi_u16 size;
+    uacpi_u16 hardware_id;
+    uacpi_u16 gsi_base;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_bio_pic, 17);
+
+UACPI_PACKED(struct acpi_madt_lpc_pic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u64 address;
+    uacpi_u16 size;
+    uacpi_u16 cascade_vector;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_lpc_pic, 15);
 
 // acpi_fdt->iapc_flags
 #define ACPI_IA_PC_LEGACY_DEVS  (1 << 0)
