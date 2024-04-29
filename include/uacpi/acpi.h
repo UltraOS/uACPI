@@ -18,6 +18,7 @@
 #define ACPI_FACS_SIGNATURE "FACS"
 #define ACPI_MCFG_SIGNATURE "MCFG"
 #define ACPI_HPET_SIGNATURE "HPET"
+#define ACPI_SRAT_SIGNATURE "SRAT"
 #define ACPI_DSDT_SIGNATURE "DSDT"
 #define ACPI_SSDT_SIGNATURE "SSDT"
 #define ACPI_PSDT_SIGNATURE "PSDT"
@@ -92,7 +93,10 @@ UACPI_PACKED(struct acpi_xsdt {
 })
 
 UACPI_PACKED(struct acpi_entry_hdr {
-    // acpi_madt_entry_type for the APIC table
+    /*
+     * - acpi_madt_entry_type for the APIC table
+     * - acpi_srat_entry_type for the SRAT table
+     */
     uacpi_u8 type;
     uacpi_u8 length;
 })
@@ -412,6 +416,118 @@ UACPI_PACKED(struct acpi_madt_lpc_pic {
     uacpi_u16 cascade_vector;
 })
 UACPI_EXPECT_SIZEOF(struct acpi_madt_lpc_pic, 15);
+
+enum acpi_srat_entry_type {
+    ACPI_SRAT_ENTRY_TYPE_PROCESSOR_AFFINITY = 0,
+    ACPI_SRAT_ENTRY_TYPE_MEMORY_AFFINITY = 1,
+    ACPI_SRAT_ENTRY_TYPE_X2APIC_AFFINITY = 2,
+    ACPI_SRAT_ENTRY_TYPE_GICC_AFFINITY = 3,
+    ACPI_SRAT_ENTRY_TYPE_GIC_ITS_AFFINITY = 4,
+    ACPI_SRAT_ENTRY_TYPE_GENERIC_INITIATOR_AFFINITY = 5,
+    ACPI_SRAT_ENTRY_TYPE_GENERIC_PORT_AFFINITY = 6,
+    ACPI_SRAT_ENTRY_TYPE_RINTC_AFFINITY = 7,
+};
+
+UACPI_PACKED(struct acpi_srat {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u32 rsvd0;
+    uacpi_u64 rsvd1;
+    struct acpi_entry_hdr entries[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat, 48);
+
+/*
+ * acpi_srat_processor_affinity->flags
+ * acpi_srat_x2apic_affinity->flags
+ */
+#define ACPI_SRAT_PROCESSOR_ENABLED (1 << 0)
+
+UACPI_PACKED(struct acpi_srat_processor_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 proximity_domain_low;
+    uacpi_u8 id;
+    uacpi_u32 flags;
+    uacpi_u8 eid;
+    uacpi_u8 proximity_domain_high[3];
+    uacpi_u32 clock_domain;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_processor_affinity, 16);
+
+// acpi_srat_memory_affinity->flags
+#define ACPI_SRAT_MEMORY_ENABLED (1 << 0)
+#define ACPI_SRAT_MEMORY_HOTPLUGGABLE (1 << 1)
+#define ACPI_SRAT_MEMORY_NON_VOLATILE (1 << 2)
+
+UACPI_PACKED(struct acpi_srat_memory_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u32 proximity_domain;
+    uacpi_u16 rsvd0;
+    uacpi_u64 address;
+    uacpi_u64 length;
+    uacpi_u32 rsvd1;
+    uacpi_u32 flags;
+    uacpi_u64 rsdv2;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_memory_affinity, 40);
+
+UACPI_PACKED(struct acpi_srat_x2apic_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd0;
+    uacpi_u32 proximity_domain;
+    uacpi_u32 id;
+    uacpi_u32 flags;
+    uacpi_u32 clock_domain;
+    uacpi_u32 rsvd1;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_x2apic_affinity, 24);
+
+// acpi_srat_gicc_affinity->flags
+#define ACPI_SRAT_GICC_ENABLED (1 << 0)
+
+UACPI_PACKED(struct acpi_srat_gicc_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u32 proximity_domain;
+    uacpi_u32 uid;
+    uacpi_u32 flags;
+    uacpi_u32 clock_domain;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_gicc_affinity, 18);
+
+UACPI_PACKED(struct acpi_srat_gic_its_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u32 proximity_domain;
+    uacpi_u16 rsvd;
+    uacpi_u32 id;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_gic_its_affinity, 12);
+
+// acpi_srat_generic_affinity->flags
+#define ACPI_GENERIC_AFFINITY_ENABLED (1 << 0)
+#define ACPI_GENERIC_AFFINITY_ARCH_TRANSACTIONS (1 << 1)
+
+UACPI_PACKED(struct acpi_srat_generic_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 rsvd0;
+    uacpi_u8 handle_type;
+    uacpi_u32 proximity_domain;
+    uacpi_u8 handle[16];
+    uacpi_u32 flags;
+    uacpi_u32 rsvd1;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_generic_affinity, 32);
+
+// acpi_srat_rintc_affinity->flags
+#define ACPI_SRAT_RINTC_AFFINITY_ENABLED (1 << 0)
+
+UACPI_PACKED(struct acpi_srat_rintc_affinity {
+    struct acpi_entry_hdr hdr;
+    uacpi_u16 rsvd;
+    uacpi_u32 proximity_domain;
+    uacpi_u32 uid;
+    uacpi_u32 flags;
+    uacpi_u32 clock_domain;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_srat_rintc_affinity, 20);
 
 // acpi_fdt->iapc_flags
 #define ACPI_IA_PC_LEGACY_DEVS  (1 << 0)
