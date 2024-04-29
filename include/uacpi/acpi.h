@@ -17,6 +17,7 @@
 #define ACPI_FADT_SIGNATURE "FACP"
 #define ACPI_FACS_SIGNATURE "FACS"
 #define ACPI_MCFG_SIGNATURE "MCFG"
+#define ACPI_HPET_SIGNATURE "HPET"
 #define ACPI_DSDT_SIGNATURE "DSDT"
 #define ACPI_SSDT_SIGNATURE "SSDT"
 #define ACPI_PSDT_SIGNATURE "PSDT"
@@ -545,6 +546,30 @@ UACPI_PACKED(struct acpi_mcfg {
     struct acpi_mcfg_allocation entries[];
 })
 UACPI_EXPECT_SIZEOF(struct acpi_mcfg, 44);
+
+// acpi_hpet->block_id
+#define ACPI_HPET_PCI_VENDOR_ID_SHIFT 16
+#define ACPI_HPET_LEGACY_REPLACEMENT_IRQ_ROUTING_CAPABLE (1 << 15)
+#define ACPI_HPET_COUNT_SIZE_CAP_COUNTER_SIZE (1 << 13)
+#define ACPI_HPET_NUMBER_OF_COMPARATORS_SHIFT 8
+#define ACPI_HPET_NUMBER_OF_COMPARATORS_MASK 0b11111
+#define ACPI_HPET_HARDWARE_REV_ID_MASK 0b11111111
+
+// acpi_hpet->flags
+#define ACPI_HPET_PAGE_PROTECTION_MASK 0b11
+#define ACPI_HPET_PAGE_NO_PROTECTION 0
+#define ACPI_HPET_PAGE_4K_PROTECTED 1
+#define ACPI_HPET_PAGE_64K_PROTECTED 2
+
+UACPI_PACKED(struct acpi_hpet {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u32 block_id;
+    struct acpi_gas address;
+    uacpi_u8 number;
+    uacpi_u16 min_clock_tick;
+    uacpi_u8 flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_hpet, 56);
 
 // PM1{a,b}_STS
 #define ACPI_PM1_STS_TMR_STS_IDX 0
