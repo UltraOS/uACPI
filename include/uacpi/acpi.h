@@ -16,6 +16,7 @@
 #define ACPI_MADT_SIGNATURE "APIC"
 #define ACPI_FADT_SIGNATURE "FACP"
 #define ACPI_FACS_SIGNATURE "FACS"
+#define ACPI_MCFG_SIGNATURE "MCFG"
 #define ACPI_DSDT_SIGNATURE "DSDT"
 #define ACPI_SSDT_SIGNATURE "SSDT"
 #define ACPI_PSDT_SIGNATURE "PSDT"
@@ -528,6 +529,22 @@ UACPI_PACKED(struct acpi_facs {
     uacpi_char rsvd1[24];
 })
 UACPI_EXPECT_SIZEOF(struct acpi_facs, 64);
+
+UACPI_PACKED(struct acpi_mcfg_allocation {
+    uacpi_u64 address;
+    uacpi_u16 segment;
+    uacpi_u8 start_bus;
+    uacpi_u8 end_bus;
+    uacpi_u32 rsvd;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_mcfg_allocation, 16);
+
+UACPI_PACKED(struct acpi_mcfg {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u64 rsvd;
+    struct acpi_mcfg_allocation entries[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_mcfg, 44);
 
 // PM1{a,b}_STS
 #define ACPI_PM1_STS_TMR_STS_IDX 0
