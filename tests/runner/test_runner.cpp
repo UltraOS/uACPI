@@ -2,9 +2,11 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <cinttypes>
 
 #include "helpers.h"
 #include <uacpi/notify.h>
+#include <uacpi/utilities.h>
 
 void run_resource_tests();
 
@@ -82,6 +84,95 @@ private:
     ExprT callback;
 };
 
+static void enumerate_namespace()
+{
+    uacpi_namespace_for_each_node_depth_first(
+        uacpi_namespace_root(), [] (void*, uacpi_namespace_node *node) {
+            uacpi_namespace_node_info *info;
+
+            auto depth = uacpi_namespace_node_depth(node);
+
+            auto nested_printf = [depth](const char *fmt, ...) {
+                va_list va;
+                size_t padding = depth * 4;
+
+                while (padding-- > 0)
+                    std::printf(" ");
+
+                va_start(va, fmt);
+                std::vprintf(fmt, va);
+                va_end(va);
+            };
+
+            auto ret = uacpi_get_namespace_node_info(node, &info);
+            if (uacpi_unlikely_error(ret)) {
+                fprintf(
+                    stderr, "unable to get node %.4s info: %s\n",
+                    uacpi_namespace_node_name(node).text,
+                    uacpi_status_to_string(ret)
+                );
+                std::exit(1);
+            }
+
+            auto *path = uacpi_namespace_node_generate_absolute_path(node);
+            nested_printf(
+                "%s [%s]", path, uacpi_object_type_to_string(info->type)
+            );
+            uacpi_free_absolute_path(path);
+
+            if (info->type == UACPI_OBJECT_METHOD)
+                std::printf(" (%d args)", info->num_params);
+
+            auto has_info = info->has_adr || info->has_hid ||
+                            info->has_cid || info->has_uid ||
+                            info->has_cls || info->has_sxd ||
+                            info->has_sxw;
+
+            if (has_info)
+                std::printf(" {\n");
+
+            if (info->has_adr)
+                nested_printf("  _ADR: %016" PRIX64 "\n", info->adr);
+
+            if (info->has_hid)
+                nested_printf("  _HID: %s\n", info->hid.value);
+            if (info->has_cid) {
+                nested_printf("  _CID: ");
+                for (size_t i = 0; i < info->cid.num_ids; ++i)
+                    std::printf("%s ", info->cid.ids[i].value);
+
+                std::printf("\n");
+            }
+            if (info->has_uid)
+                nested_printf("  _UID: %s\n", info->uid.value);
+            if (info->has_cls)
+                nested_printf("  _CLS: %s\n", info->cls.value);
+
+            if (info->has_sxd) {
+                nested_printf(
+                    "  _SxD: S1->D%d S2->D%d S3->D%d S4->D%d\n",
+                    info->sxd[0], info->sxd[1], info->sxd[2], info->sxd[3]
+                );
+            }
+            if (info->has_sxw) {
+                nested_printf(
+                    "  _SxW: S0->D%d S1->D%d S2->D%d S3->D%d S4->D%d\n",
+                    info->sxw[0], info->sxw[1], info->sxw[2], info->sxw[3],
+                    info->sxw[4]
+                );
+            }
+
+            if (has_info)
+                nested_printf("}\n");
+            else
+                std::printf("\n");
+
+            uacpi_free_namespace_node_info(info);
+            return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        }, nullptr
+    );
+}
+
 static uacpi_status handle_notify(
     uacpi_handle, uacpi_namespace_node *node, uacpi_u64 value
 )
@@ -97,6 +188,7 @@ static uacpi_status handle_notify(
 
 enum class run_mode {
     EMULATION,
+    EMULATION_WITH_NAMESPACE_DUMP,
     TEST,
     RESOURCE_TESTS,
 };
@@ -120,9 +212,15 @@ static void run_test(
         }
     );
 
+    uacpi_log_level level = UACPI_LOG_TRACE;
+
+    // Don't spam the log with traces if enumeration is enabled
+    if (mode == run_mode::EMULATION_WITH_NAMESPACE_DUMP)
+        level = UACPI_LOG_INFO;
+
     uacpi_init_params params = {
         reinterpret_cast<uacpi_phys_addr>(&rsdp),
-        { UACPI_LOG_TRACE, 0 },
+        { level, 0 },
         UACPI_TRUE, // don't attempt to enter ACPI mode in userspace
     };
 
@@ -150,9 +248,16 @@ static void run_test(
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
-    if (mode == run_mode::EMULATION)
+    switch (mode) {
+    case run_mode::EMULATION_WITH_NAMESPACE_DUMP:
+        enumerate_namespace();
+        [[fallthrough]];
+    case run_mode::EMULATION:
         // We're done with emulation mode
         return;
+    default:
+        break;
+    }
 
     uacpi_object* ret = UACPI_NULL;
     auto guard = ScopeGuard(
@@ -172,6 +277,11 @@ run_mode get_run_mode(int argc, char **argv)
         if (std::string_view(argv[1]) == "--test-resources")
             return run_mode::RESOURCE_TESTS;
         return run_mode::EMULATION;
+    case 3:
+        if (std::string_view(argv[2]) != "--enumerate-namespace")
+            break;
+
+        return run_mode::EMULATION_WITH_NAMESPACE_DUMP;
     case 4:
         return run_mode::TEST;
     default:
@@ -179,7 +289,7 @@ run_mode get_run_mode(int argc, char **argv)
     }
 
     std::cout << "Usage:"
-        << "\n[EMULATION] " << argv[0] << " <dsdt_path>"
+        << "\n[EMULATION] " << argv[0] << " <dsdt_path> {--enumerate-namespace}"
         << "\n[TEST MODE] " << argv[0]
         << " <dsdt_path> <expected_type> <expected_value>"
         << "\n[RESOURCE TESTS] " << argv[0] << " --test-resources\n";
