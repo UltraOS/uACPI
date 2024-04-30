@@ -31,6 +31,8 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
 uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node);
 uacpi_object_name uacpi_namespace_node_name(uacpi_namespace_node *node);
 
+uacpi_size uacpi_namespace_node_depth(uacpi_namespace_node *node);
+
 uacpi_namespace_node *uacpi_namespace_node_find(
     uacpi_namespace_node *parent,
     const uacpi_char *path
