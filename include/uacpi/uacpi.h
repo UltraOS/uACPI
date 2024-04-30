@@ -53,7 +53,7 @@ extern "C" {
 
 typedef struct uacpi_params {
     enum uacpi_log_level log_level;
-    uint64_t flags;
+    uacpi_u64 flags;
 } uacpi_params;
 
 typedef struct uacpi_init_params {
