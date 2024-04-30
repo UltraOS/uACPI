@@ -294,10 +294,18 @@ uacpi_table_find_by_type(enum uacpi_table_type type,
 }
 
 uacpi_status uacpi_table_find_by_signature(
-    uacpi_object_name signature, struct uacpi_table **out_table
+    const uacpi_char *signature_string, struct uacpi_table **out_table
 )
 {
     struct table_search_ctx ctx = { 0 };
+    uacpi_object_name signature = {
+        .text = {
+            signature_string[0],
+            signature_string[1],
+            signature_string[2],
+            signature_string[3]
+        },
+    };
 
     ctx.out_table = get_table_for_signature(signature);
     if (ctx.out_table == UACPI_NULL) {

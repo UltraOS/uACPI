@@ -57,7 +57,7 @@ uacpi_table_find_by_type(uacpi_table_type type,
 
 
 uacpi_status
-uacpi_table_find_by_signature(uacpi_object_name signature,
+uacpi_table_find_by_signature(const uacpi_char *signature,
                               uacpi_table **out_table);
 
 uacpi_status
