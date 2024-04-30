@@ -273,10 +273,17 @@ static void run_test(
 run_mode get_run_mode(int argc, char **argv)
 {
     switch (argc) {
-    case 2:
-        if (std::string_view(argv[1]) == "--test-resources")
+    case 2: {
+        auto arg_view = std::string_view(argv[1]);
+
+        if (arg_view == "--test-resources")
             return run_mode::RESOURCE_TESTS;
+
+        if (arg_view == "--help" || arg_view == "?" || arg_view == "-h")
+            break;
+
         return run_mode::EMULATION;
+    }
     case 3:
         if (std::string_view(argv[2]) != "--enumerate-namespace")
             break;
