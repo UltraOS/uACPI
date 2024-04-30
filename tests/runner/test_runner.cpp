@@ -95,8 +95,14 @@ static uacpi_status handle_notify(
     return UACPI_STATUS_OK;
 }
 
+enum class run_mode {
+    EMULATION,
+    TEST,
+    RESOURCE_TESTS,
+};
+
 static void run_test(
-    std::string_view dsdt_path, uacpi_object_type expected_type,
+    run_mode mode, std::string_view dsdt_path, uacpi_object_type expected_type,
     std::string_view expected_value
 )
 {
@@ -144,7 +150,7 @@ static void run_test(
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
-    if (expected_type == UACPI_OBJECT_UNINITIALIZED)
+    if (mode == run_mode::EMULATION)
         // We're done with emulation mode
         return;
 
@@ -159,20 +165,33 @@ static void run_test(
     validate_ret_against_expected(*ret, expected_type, expected_value);
 }
 
-int main(int argc, char** argv)
+run_mode get_run_mode(int argc, char **argv)
 {
-    if (argc != 2 && argc != 4) {
-        std::cout << "Usage:"
-            << "\n[EMULATION] " << argv[0] << " <dsdt_path>"
-            << "\n[TEST MODE] " << argv[0]
-            << " <dsdt_path> <expected_type> <expected_value>"
-            << "\n[RESOURCE TESTS] " << argv[0] << " --test-resources"
-            << std::endl;
-        return 1;
+    switch (argc) {
+    case 2:
+        if (std::string_view(argv[1]) == "--test-resources")
+            return run_mode::RESOURCE_TESTS;
+        return run_mode::EMULATION;
+    case 4:
+        return run_mode::TEST;
+    default:
+        break;
     }
 
+    std::cout << "Usage:"
+        << "\n[EMULATION] " << argv[0] << " <dsdt_path>"
+        << "\n[TEST MODE] " << argv[0]
+        << " <dsdt_path> <expected_type> <expected_value>"
+        << "\n[RESOURCE TESTS] " << argv[0] << " --test-resources\n";
+    std::exit(1);
+}
+
+int main(int argc, char** argv)
+{
+    auto mode = get_run_mode(argc, argv);
+
     try {
-        if (argc == 2 && std::string_view(argv[1]) == "--test-resources") {
+        if (mode == run_mode::RESOURCE_TESTS) {
             run_resource_tests();
             return 0;
         }
@@ -180,12 +199,12 @@ int main(int argc, char** argv)
         std::string_view expected_value;
         uacpi_object_type expected_type = UACPI_OBJECT_UNINITIALIZED;
 
-        if (argc == 4) {
+        if (mode == run_mode::TEST) {
             expected_type = string_to_object_type(argv[2]);
             expected_value = argv[3];
         }
 
-        run_test(argv[1], expected_type, expected_value);
+        run_test(mode, argv[1], expected_type, expected_value);
     } catch (const std::exception& ex) {
         std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;
