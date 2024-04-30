@@ -19,6 +19,7 @@
 #define ACPI_MCFG_SIGNATURE "MCFG"
 #define ACPI_HPET_SIGNATURE "HPET"
 #define ACPI_SRAT_SIGNATURE "SRAT"
+#define ACPI_SLIT_SIGNATURE "SLIT"
 #define ACPI_DSDT_SIGNATURE "DSDT"
 #define ACPI_SSDT_SIGNATURE "SSDT"
 #define ACPI_PSDT_SIGNATURE "PSDT"
@@ -528,6 +529,13 @@ UACPI_PACKED(struct acpi_srat_rintc_affinity {
     uacpi_u32 clock_domain;
 })
 UACPI_EXPECT_SIZEOF(struct acpi_srat_rintc_affinity, 20);
+
+UACPI_PACKED(struct acpi_slit {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u64 num_localities;
+    uacpi_u8 matrix[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_slit, 44);
 
 // acpi_fdt->iapc_flags
 #define ACPI_IA_PC_LEGACY_DEVS  (1 << 0)
