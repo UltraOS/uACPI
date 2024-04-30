@@ -5,6 +5,7 @@
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/utilities.h>
 #include <uacpi/kernel_api.h>
 
 #define UACPI_REV_VALUE 2
@@ -541,4 +542,9 @@ const uacpi_char *uacpi_namespace_node_generate_absolute_path(
     }
 
     return path;
+}
+
+void uacpi_free_absolute_path(const uacpi_char *path)
+{
+    uacpi_free_dynamic_string(path);
 }
