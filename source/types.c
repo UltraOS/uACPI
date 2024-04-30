@@ -42,6 +42,8 @@ const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
         return "Processor";
     case UACPI_OBJECT_THERMAL_ZONE:
         return "Thermal Zone";
+    case UACPI_OBJECT_BUFFER_FIELD:
+        return "Buffer Field";
     case UACPI_OBJECT_DEBUG:
         return "Debug";
     default:
