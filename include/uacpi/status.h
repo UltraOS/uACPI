@@ -37,6 +37,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX = 0x0EFF0006,
     UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH = 0x0EFF0007,
     UACPI_STATUS_AML_INVALID_RESOURCE = 0x0EFF0008,
+    UACPI_STATUS_AML_LOOP_TIMEOUT = 0x0EFF0009,
 } uacpi_status;
 
 const uacpi_char *uacpi_status_to_string(uacpi_status);

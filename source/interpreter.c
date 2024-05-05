@@ -89,7 +89,10 @@ enum code_block_type {
 struct code_block {
     enum code_block_type type;
     uacpi_u32 begin, end;
-    struct uacpi_namespace_node *node;
+    union {
+        struct uacpi_namespace_node *node;
+        uacpi_u64 expiration_point;
+    };
 };
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(code_block_array, struct code_block, 8)
@@ -259,9 +262,12 @@ struct call_frame {
     struct code_block_array code_blocks;
     struct temp_namespace_node_array temp_nodes;
     struct code_block *last_while;
-    struct uacpi_namespace_node *cur_scope;
+    uacpi_u64 prev_while_expiration;
+    uacpi_u32 prev_while_code_offset;
 
     uacpi_u32 code_offset;
+
+    struct uacpi_namespace_node *cur_scope;
 
     // Only used if the method is serialized
     uacpi_u8 prev_sync_level;
@@ -1913,6 +1919,8 @@ static void update_scope(struct call_frame *frame)
     frame->cur_scope = block->node;
 }
 
+#define TICKS_PER_SECOND (1000ull * 1000ull * 10ull)
+
 static uacpi_status begin_block_execution(struct execution_context *ctx)
 {
     struct call_frame *cur_frame = ctx->cur_frame;
@@ -1924,6 +1932,8 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
     if (uacpi_unlikely(block == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
+    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
+
     switch (op_ctx->op->code) {
     case UACPI_AML_OP_IfOp:
         block->type = CODE_BLOCK_IF;
@@ -1933,6 +1943,28 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         break;
     case UACPI_AML_OP_WhileOp:
         block->type = CODE_BLOCK_WHILE;
+
+        if (pkg->begin == cur_frame->prev_while_code_offset) {
+            uacpi_u64 cur_ticks;
+
+            cur_ticks = uacpi_kernel_get_ticks();
+
+            if (uacpi_unlikely(cur_ticks > block->expiration_point)) {
+                uacpi_error("loop time out after running for %u seconds\n",
+                            g_uacpi_rt_ctx.loop_timeout_seconds);
+                return UACPI_STATUS_AML_LOOP_TIMEOUT;
+            }
+
+            block->expiration_point = cur_frame->prev_while_expiration;
+        } else {
+            /*
+             * Calculate the expiration point for this loop.
+             * If a loop is executed past this point, it will get aborted.
+             */
+            block->expiration_point = uacpi_kernel_get_ticks();
+            block->expiration_point +=
+                g_uacpi_rt_ctx.loop_timeout_seconds * TICKS_PER_SECOND;
+        }
         break;
     case UACPI_AML_OP_ScopeOp:
     case UACPI_AML_OP_DeviceOp:
@@ -1950,8 +1982,6 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    pkg = &item_array_at(&op_ctx->items, 0)->pkg;
-
     // -1 because we want to re-evaluate at the start of the op next time
     block->begin = pkg->begin - 1;
     block->end = pkg->end;
@@ -1967,6 +1997,15 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
                                        enum code_block_type type)
 {
     struct call_frame *frame = ctx->cur_frame;
+
+    if (type == CODE_BLOCK_WHILE) {
+        struct code_block *block = ctx->cur_block;
+
+        // + 1 here to skip the WhileOp and get to the PkgLength
+        frame->prev_while_code_offset = block->begin + 1;
+        frame->prev_while_expiration = block->expiration_point;
+    }
+
     code_block_array_pop(&frame->code_blocks);
     ctx->cur_block = code_block_array_last(&frame->code_blocks);
 
