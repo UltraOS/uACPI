@@ -6,6 +6,7 @@ import sys
 import platform
 from typing import List, Tuple, Optional
 from types import TracebackType
+from abc import ABC, abstractmethod
 
 from utilities.asl import ASLSource
 import generated_test_cases.buffer_field as bf
@@ -20,6 +21,89 @@ def generate_test_cases(compiler: str, bin_dir: str) -> List[str]:
         bf.generate_buffer_reads_test(compiler, bin_dir),
         bf.generate_buffer_writes_test(compiler, bin_dir),
     ]
+
+
+ACPI_DUMPS_URL = "https://github.com/UltraOS/ACPIDumps.git"
+
+
+class TestCase(ABC):
+    def __init__(self, path: str, name: str):
+        self.path = path
+        self.name = name
+
+    @abstractmethod
+    def extra_runner_args(self) -> List[str]:
+        pass
+
+
+class TestCaseWithMain(TestCase):
+    def __init__(
+        self, path: str, name: str, rtype: str, value: str
+    ) -> None:
+        super().__init__(path, name)
+        self.rtype = rtype
+        self.value = value
+
+    def extra_runner_args(self) -> List[str]:
+        return [self.rtype, self.value]
+
+
+class TestCaseHardwareBlob(TestCase):
+    def __init__(self, path: str) -> None:
+        super().__init__(path, "hw-blob")
+
+    def extra_runner_args(self) -> List[str]:
+        return ["--enumerate-namespace"]
+
+
+def generate_large_test_cases(extractor: str, bin_dir: str) -> List[TestCase]:
+    acpi_dumps_dir = os.path.join(abs_path_to_current_dir(), "acpi-dumps")
+    large_tests_dir = os.path.join(bin_dir, "large-tests")
+
+    if not os.path.exists(acpi_dumps_dir):
+        subprocess.check_call(["git", "clone", ACPI_DUMPS_URL, acpi_dumps_dir])
+
+    os.makedirs(large_tests_dir, exist_ok=True)
+    test_cases = []
+
+    def recurse_one(path, depth=1):
+        for obj in os.listdir(path):
+            if obj.startswith("."):
+                continue
+
+            obj_path = os.path.join(path, obj)
+
+            if os.path.isdir(obj_path):
+                recurse_one(obj_path, depth + 1)
+                continue
+
+            if depth == 1 or not obj.endswith(".bin"):
+                continue
+
+            print(f"Preparing HW blob {obj_path}...")
+
+            split_path = obj_path.split(os.path.sep)[-depth:]
+            fixed_up_path = [
+                seg.replace(" ", "_").lower() for seg in split_path
+            ]
+
+            test_case_name = "_".join(fixed_up_path).replace(".bin", "")
+            test_case_name += ".aml"
+            output_test_name = os.path.join(large_tests_dir, test_case_name)
+
+            if not os.path.exists(output_test_name):
+                xtractor_output = os.path.join(large_tests_dir, "dsdt.dat")
+
+                subprocess.check_call(
+                    [extractor, "-sDSDT", obj_path], cwd=large_tests_dir,
+                    stdout=subprocess.DEVNULL
+                )
+                os.rename(xtractor_output, output_test_name)
+
+            test_cases.append(TestCaseHardwareBlob(output_test_name))
+
+    recurse_one(acpi_dumps_dir)
+    return test_cases
 
 
 def get_case_name_and_expected_result(case: str) -> Tuple[str, str, str]:
@@ -54,18 +138,13 @@ def run_resource_tests(runner: str) -> int:
         return subprocess.run([runner, "--test-resources"]).returncode
 
 
-def run_tests(
-    cases: List[str], runner: str, compiler: str,
-    bin_dir: str
-) -> int:
-    fail_count = 0
-    skipped_count = 0
+def compile_test_cases(
+    test_cases: List[str], compiler: str, bin_dir: str
+) -> List[TestCase]:
+    compiled_cases: List[TestCase] = []
 
-    for case in cases:
-        name, rtype, value = get_case_name_and_expected_result(case)
-        case_name = os.path.basename(case)
-
-        print(f"{case_name}:{name}...", end=" ", flush=True)
+    for case in test_cases:
+        print(f"Compiling {case}...", end="")
 
         # Skip the table loading test for old iASL, it prints bogus error
         # messages and refuses to compile the test case no matter what I try:
@@ -73,23 +152,41 @@ def run_tests(
         #                             If (!Load(TABL)) {
         # Error    6126 -       syntax error ^
         #
-        if case_name == "table-loading-0.asl":
+        if os.path.basename(case) == "table-loading-0.asl":
             out = subprocess.check_output([compiler, "-v"],
                                           universal_newlines=True)
             # I don't know which versions it's broken for specifically, this
             # one comes with Ubuntu 22.04, so hardcode it.
             if "20200925" in out:
-                skipped_count += 1
                 print("SKIPPED (bugged iASL)", flush=True)
                 continue
 
-        compiled_case = ASLSource.compile(case, compiler, bin_dir)
-        proc = subprocess.Popen([runner, compiled_case, rtype, value],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                universal_newlines=True)
+        compiled_cases.append(
+            TestCaseWithMain(
+                ASLSource.compile(case, compiler, bin_dir),
+                *get_case_name_and_expected_result(case)
+            )
+        )
+        print("")
+
+    return compiled_cases
+
+
+def run_tests(cases: List[TestCase], runner: str) -> bool:
+    fail_count = 0
+
+    for case in cases:
+        case_name = os.path.basename(os.path.basename(case.path))
+
+        print(f"{case_name}:{case.name}...", end=" ", flush=True)
+
+        proc = subprocess.Popen(
+            [runner, case.path, *case.extra_runner_args()],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
         try:
-            stdout, stderr = proc.communicate(timeout=10)
+            stdout, stderr = proc.communicate(timeout=30)
             if proc.returncode == 0:
                 print("OK", flush=True)
                 continue
@@ -123,14 +220,15 @@ def run_tests(
         else:
             print("NO OUTPUT FROM TEST", flush=True)
 
-    skipped_str = f", {skipped_count} SKIPPED" if skipped_count else ""
-    pass_count = len(cases) - fail_count - skipped_count
-    print(
-        f"SUMMARY: {pass_count}/{len(cases)} "
-        f"({fail_count} FAILED{skipped_str})",
-        flush=True
-    )
-    return fail_count
+    pass_count = len(cases) - fail_count
+    print(f"SUMMARY: {pass_count}/{len(cases)}", end="")
+
+    if fail_count:
+        print(f" ({fail_count} FAILED)")
+    else:
+        print(" (ALL PASS!)")
+
+    return not fail_count
 
 
 def test_relpath(*args: str) -> str:
@@ -174,6 +272,9 @@ def main() -> int:
     parser.add_argument("--asl-compiler",
                         help="Compiler to use to build test cases",
                         default="iasl")
+    parser.add_argument("--acpi-extractor",
+                        help="ACPI extractor utility to use for ACPI dumps",
+                        default="acpixtract")
     parser.add_argument("--test-dir",
                         default=test_relpath("test-cases"),
                         help="The directory to run tests from, defaults to "
@@ -187,6 +288,8 @@ def main() -> int:
                              "'bin' in the same directory")
     parser.add_argument("--bitness", default=64, choices=[32, 64], type=int,
                         help="uACPI build bitness")
+    parser.add_argument("--large", action="store_true",
+                        help="Run the large test suite as well")
     args = parser.parse_args()
 
     test_compiler = args.asl_compiler
@@ -209,9 +312,21 @@ def main() -> int:
     ]
     test_cases.extend(generate_test_cases(test_compiler, bin_dir))
 
+    base_test_cases = compile_test_cases(
+        test_cases, test_compiler, bin_dir
+    )
     with TestHeaderFooter("AML Tests"):
-        ret = run_tests(test_cases, test_runner, test_compiler, bin_dir)
-    sys.exit(ret)
+        ret = run_tests(base_test_cases, test_runner)
+
+    if ret and args.large:
+        large_test_cases = generate_large_test_cases(
+            args.acpi_extractor, bin_dir
+        )
+
+        with TestHeaderFooter("Large AML Tests"):
+            ret = run_tests(large_test_cases, test_runner)
+
+    sys.exit(not ret)
 
 
 if __name__ == "__main__":
