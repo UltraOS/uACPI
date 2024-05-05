@@ -13,6 +13,19 @@
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
+void uacpi_context_set_loop_timeout(uacpi_u32 seconds)
+{
+    if (seconds == 0)
+        seconds = UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS;
+
+    g_uacpi_rt_ctx.loop_timeout_seconds = seconds;
+}
+
+uacpi_u32 uacpi_context_get_loop_timeout(void)
+{
+    return g_uacpi_rt_ctx.loop_timeout_seconds;
+}
+
 const uacpi_char *uacpi_status_to_string(uacpi_status st)
 {
     switch (st) {
@@ -69,6 +82,8 @@ const uacpi_char *uacpi_status_to_string(uacpi_status st)
         return "AML attempted to acquire a mutex with a lower sync level";
     case UACPI_STATUS_AML_INVALID_RESOURCE:
         return "invalid resource template encoding or type";
+    case UACPI_STATUS_AML_LOOP_TIMEOUT:
+        return "hanging AML while loop";
     default:
         return "<invalid status>";
     }
@@ -260,6 +275,9 @@ uacpi_status uacpi_initialize(struct uacpi_init_params *params)
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.s0_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.s0_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+
+    if (g_uacpi_rt_ctx.loop_timeout_seconds == 0)
+        uacpi_context_set_loop_timeout(UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS);
 
     uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
                  sizeof(params->rt_params));

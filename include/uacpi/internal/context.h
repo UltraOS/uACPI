@@ -5,6 +5,7 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/shareable.h>
+#include <uacpi/context.h>
 
 struct uacpi_runtime_context {
     /*
@@ -46,6 +47,7 @@ struct uacpi_runtime_context {
     uacpi_bool has_global_lock;
     uacpi_handle sci_handle;
 #endif
+    uacpi_u32 loop_timeout_seconds;
 
 #define UACPI_INIT_LEVEL_EARLY 0
 #define UACPI_INIT_LEVEL_TABLES_LOADED 1

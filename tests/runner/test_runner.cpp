@@ -5,6 +5,7 @@
 #include <cinttypes>
 
 #include "helpers.h"
+#include <uacpi/context.h>
 #include <uacpi/notify.h>
 #include <uacpi/utilities.h>
 
@@ -234,6 +235,9 @@ static void run_test(
 
     uacpi_status st = uacpi_initialize(&params);
     ensure_ok_status(st);
+
+    // We really don't need more than this
+    uacpi_context_set_loop_timeout(3);
 
     g_expect_virtual_addresses = false;
 
