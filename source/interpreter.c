@@ -1952,6 +1952,7 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
             if (uacpi_unlikely(cur_ticks > block->expiration_point)) {
                 uacpi_error("loop time out after running for %u seconds\n",
                             g_uacpi_rt_ctx.loop_timeout_seconds);
+                code_block_array_pop(&cur_frame->code_blocks);
                 return UACPI_STATUS_AML_LOOP_TIMEOUT;
             }
 
