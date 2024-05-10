@@ -4253,7 +4253,7 @@ static uacpi_status enter_method(
 
     if (uacpi_unlikely(ctx->sync_level > method->sync_level)) {
         uacpi_error(
-            "Cannot invoke method @%p, sync level %d is too low "
+            "cannot invoke method @%p, sync level %d is too low "
             "(current is %d)\n",
             method, method->sync_level, ctx->sync_level
         );
