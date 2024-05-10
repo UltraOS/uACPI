@@ -171,6 +171,8 @@ uacpi_mutex *uacpi_create_mutex(void)
     if (uacpi_unlikely(mutex == UACPI_NULL))
         return UACPI_NULL;
 
+    mutex->owner = UACPI_THREAD_ID_NONE;
+
     mutex->handle = uacpi_kernel_create_mutex();
     if (mutex->handle == UACPI_NULL) {
         uacpi_free(mutex, sizeof(*mutex));

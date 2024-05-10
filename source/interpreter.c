@@ -15,6 +15,7 @@
 #include <uacpi/internal/notify.h>
 #include <uacpi/internal/resources.h>
 #include <uacpi/internal/event.h>
+#include <uacpi/internal/mutex.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -201,6 +202,11 @@ static uacpi_status held_mutexes_array_remove_and_release(
         return UACPI_STATUS_OK;
     }
 
+    if (mutex->depth > 1 && force == FORCE_RELEASE_NO) {
+        uacpi_release_aml_mutex(mutex);
+        return UACPI_STATUS_OK;
+    }
+
     // Fast path for well-behaved AML that releases mutexes in descending order
     if (uacpi_likely(item == mutex)) {
         held_mutexes_array_pop(arr);
@@ -226,8 +232,10 @@ static uacpi_status held_mutexes_array_remove_and_release(
     held_mutexes_array_remove_idx(arr, i);
 
 do_release:
-    mutex->owner = UACPI_NULL;
-    uacpi_kernel_release_mutex(mutex->handle);
+    // This is either a force release, or depth was already 1 to begin with
+    mutex->depth = 1;
+    uacpi_release_aml_mutex(mutex);
+
     uacpi_mutex_unref(mutex);
     return UACPI_STATUS_OK;
 }
@@ -2085,9 +2093,9 @@ static void debug_store_no_recurse(const uacpi_char *prefix, uacpi_object *src)
         break;
     case UACPI_OBJECT_MUTEX:
         uacpi_trace(
-            "%s Mutex @%p (%p => %p) sync level %d (owned by %p)\n",
+            "%s Mutex @%p (%p => %p) sync level %d\n",
             prefix, src, src->mutex, src->mutex->handle,
-            src->mutex->sync_level, src->mutex->owner
+            src->mutex->sync_level
         );
         break;
     case UACPI_OBJECT_METHOD:
@@ -3506,7 +3514,6 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *obj;
-    uacpi_bool owned_by_us;
 
     obj = uacpi_unwrap_internal_reference(
         item_array_at(&op_ctx->items, 0)->obj
@@ -3519,15 +3526,12 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
-    // TODO: This should probably be a relaxed atomic load?
-    owned_by_us = obj->mutex->owner == ctx;
-
     switch (op_ctx->op->code)
     {
     case UACPI_AML_OP_AcquireOp: {
         uacpi_u64 timeout;
         uacpi_u64 *return_value;
-        uacpi_bool success;
+        uacpi_status ret;
 
         return_value = &item_array_at(&op_ctx->items, 2)->obj->integer;
 
@@ -3540,48 +3544,40 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
             break;
         }
 
-        if (owned_by_us) {
-            obj->mutex->depth++;
-            *return_value = 0;
-            break;
-        }
-
         timeout = item_array_at(&op_ctx->items, 1)->immediate;
         if (timeout > 0xFFFF)
             timeout = 0xFFFF;
 
-        success = uacpi_kernel_acquire_mutex(obj->mutex->handle, timeout);
-        if (success) {
-            uacpi_status ret;
-
-            ret = held_mutexes_array_push(&ctx->held_mutexes, obj->mutex);
-            if (uacpi_unlikely_error(ret)) {
-                uacpi_kernel_release_mutex(obj->mutex->handle);
-                return ret;
-            }
-
-            // TODO: this should be a relaxed atomic store
-            obj->mutex->owner = ctx;
-            obj->mutex->depth = 1;
-            ctx->sync_level = obj->mutex->sync_level;
-            *return_value = 0;
+        if (uacpi_this_thread_owns_aml_mutex(obj->mutex)) {
+            if (uacpi_likely(uacpi_acquire_aml_mutex(obj->mutex, timeout)))
+                *return_value = 0;
+            break;
         }
+
+        if (!uacpi_acquire_aml_mutex(obj->mutex, timeout))
+            break;
+
+        ret = held_mutexes_array_push(&ctx->held_mutexes, obj->mutex);
+        if (uacpi_unlikely_error(ret)) {
+            uacpi_release_aml_mutex(obj->mutex);
+            return ret;
+        }
+
+        ctx->sync_level = obj->mutex->sync_level;
+        *return_value = 0;
         break;
     }
 
     case UACPI_AML_OP_ReleaseOp: {
         uacpi_status ret;
 
-        if (!owned_by_us) {
+        if (!uacpi_this_thread_owns_aml_mutex(obj->mutex)) {
             uacpi_warn(
                 "attempted to release not-previously-acquired mutex object "
                 "@%p (%p)\n", obj->mutex, obj->mutex->handle
             );
             break;
         }
-
-        if (obj->mutex->depth-- > 1)
-            break;
 
         ret = held_mutexes_array_remove_and_release(
             &ctx->held_mutexes, obj->mutex,
@@ -4246,7 +4242,6 @@ static uacpi_status enter_method(
 )
 {
     uacpi_status ret = UACPI_STATUS_OK;
-    uacpi_bool owned_by_us = UACPI_FALSE;
 
     if (!method->is_serialized)
         return ret;
@@ -4265,25 +4260,17 @@ static uacpi_status enter_method(
         if (uacpi_unlikely(method->mutex == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
         method->mutex->sync_level = method->sync_level;
-    } else {
-        // TODO: relaxed atomic load
-        owned_by_us = method->mutex->owner == ctx;
     }
 
-    if (!owned_by_us) {
-        if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(
-            method->mutex->handle, 0xFFFF))) {
+    if (!uacpi_this_thread_owns_aml_mutex(method->mutex)) {
+        if (uacpi_unlikely(!uacpi_acquire_aml_mutex(method->mutex, 0xFFFF)))
             return UACPI_STATUS_INTERNAL_ERROR;
-        }
 
         ret = held_mutexes_array_push(&ctx->held_mutexes, method->mutex);
         if (uacpi_unlikely_error(ret)) {
-            uacpi_kernel_release_mutex(method->mutex->handle);
+            uacpi_release_aml_mutex(method->mutex);
             return ret;
         }
-
-        method->mutex->owner = ctx;
-        method->mutex->depth = 1;
     }
 
     new_frame->prev_sync_level = ctx->sync_level;

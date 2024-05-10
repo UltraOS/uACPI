@@ -1,6 +1,7 @@
 #pragma once
 #include <uacpi/platform/types.h>
 #include <uacpi/platform/compiler.h>
+#include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 
 #ifdef __cplusplus
@@ -105,7 +106,7 @@ typedef struct uacpi_buffer_index {
 typedef struct uacpi_mutex {
     struct uacpi_shareable shareable;
     uacpi_handle handle;
-    uacpi_handle owner;
+    uacpi_thread_id owner;
     uacpi_u16 depth;
     uacpi_u8 sync_level;
 } uacpi_mutex;
