@@ -8,6 +8,7 @@
 #include <uacpi/context.h>
 #include <uacpi/notify.h>
 #include <uacpi/utilities.h>
+#include <uacpi/resources.h>
 
 void run_resource_tests();
 
@@ -163,10 +164,32 @@ static void enumerate_namespace()
                 );
             }
 
-            if (has_info)
+            if (has_info) {
+                auto dump_resources = [=](auto cb, const char *name) {
+                    uacpi_resources *res;
+
+                    auto ret = cb(node, &res);
+                    if (ret == UACPI_STATUS_OK) {
+                        // TODO: dump resources here
+                        nested_printf("  %s: <%u bytes>\n", name, res->length);
+                        uacpi_free_resources(res);
+                    } else if (ret != UACPI_STATUS_NOT_FOUND) {
+                        nested_printf(
+                            "  %s: unable to evaluate (%s)\n",
+                            name, uacpi_status_to_string(ret)
+                        );
+                    }
+                };
+
+                if (info->type == UACPI_OBJECT_DEVICE) {
+                    dump_resources(uacpi_get_current_resources, "_CRS");
+                    dump_resources(uacpi_get_possible_resources, "_PRS");
+                }
+
                 nested_printf("}\n");
-            else
+            } else {
                 std::printf("\n");
+            }
 
             uacpi_free_namespace_node_info(info);
             return UACPI_NS_ITERATION_DECISION_CONTINUE;
