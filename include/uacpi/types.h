@@ -106,7 +106,7 @@ typedef struct uacpi_mutex {
     struct uacpi_shareable shareable;
     uacpi_handle handle;
     uacpi_handle owner;
-    uacpi_u64 depth;
+    uacpi_u16 depth;
     uacpi_u8 sync_level;
 } uacpi_mutex;
 
