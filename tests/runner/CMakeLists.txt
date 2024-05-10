@@ -86,3 +86,6 @@ else ()
         -fsanitize=address,undefined -g3
     )
 endif ()
+
+find_package(Threads REQUIRED)
+target_link_libraries(test-runner PRIVATE Threads::Threads)

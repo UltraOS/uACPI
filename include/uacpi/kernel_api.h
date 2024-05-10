@@ -181,6 +181,13 @@ uacpi_handle uacpi_kernel_create_event(void);
 void uacpi_kernel_free_event(uacpi_handle);
 
 /*
+ * Returns a unique identifier of the currently executing thread.
+ *
+ * The returned thread id cannot be UACPI_THREAD_ID_NONE.
+ */
+uacpi_thread_id uacpi_kernel_get_thread_id(void);
+
+/*
  * Try to acquire the mutex with a millisecond timeout.
  * A timeout value of 0xFFFF implies infinite wait.
  */

@@ -176,7 +176,7 @@ All of the headers can be "implemented" by your project in a few ways:
 In this case, the header becomes a proxy that includes a corresponding `uacpi_x.h` header exported by your project.
 
 Currently used platform-specific headers are:
-- [arch_helpers.h](include/uacpi/platform/arch_helpers.h) - defines architecture/cpu-specific helpers
+- [arch_helpers.h](include/uacpi/platform/arch_helpers.h) - defines architecture/cpu-specific helpers & thread-id-related interfaces
 - [compiler.h](include/uacpi/platform/compiler.h) - defines compiler-specific helpers like attributes and intrinsics.
 This already works for MSVC, clang & GCC so you most likely won't have to override it.
 - [atomic.h](include/uacpi/platform/atomic.h) - defines compiler-specific helpers for dealing with atomic operations.

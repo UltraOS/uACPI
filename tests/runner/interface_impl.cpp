@@ -18,10 +18,12 @@
 #include <mach/mach_time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pthread.h>
 #else
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #endif
 
 #include <uacpi/kernel_api.h>
@@ -370,6 +372,24 @@ void uacpi_kernel_free_mutex(uacpi_handle handle)
 {
     auto* mutex = (std::timed_mutex*)handle;
     delete mutex;
+}
+
+uacpi_thread_id uacpi_kernel_get_thread_id(void)
+{
+#ifdef _WIN32
+    return (uacpi_thread_id)((uintptr_t)GetCurrentThreadId());
+#elif defined(__APPLE__)
+    uint64_t id;
+
+    if (pthread_threadid_np(NULL, &id) < 0) {
+        std::cout << "pthread_threadid_np failed" << std::endl;
+        std::exit(1);
+    }
+
+    return (uacpi_thread_id)id;
+#else
+    return (uacpi_thread_id)((unsigned long)gettid());
+#endif
 }
 
 uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
