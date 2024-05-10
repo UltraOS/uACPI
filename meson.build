@@ -18,6 +18,7 @@ sources = files(
     'source/registers.c',
     'source/resources.c',
     'source/event.c',
+    'source/mutex.c',
 )
 
 includes = include_directories('include')
