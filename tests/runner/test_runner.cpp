@@ -226,7 +226,9 @@ static void run_test(
             delete[] reinterpret_cast<uint8_t*>(
                 static_cast<uintptr_t>(xsdt.fadt->x_dsdt)
             );
-
+            delete reinterpret_cast<acpi_facs*>(
+                static_cast<uintptr_t>(xsdt.fadt->x_firmware_ctrl)
+            );
             delete xsdt.fadt;
         }
     );

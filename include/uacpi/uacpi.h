@@ -117,6 +117,16 @@ UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
     uacpi_status uacpi_leave_acpi_mode(void)
 )
 
+/*
+ * Attempt to acquire the global lock for 'timeout' milliseconds.
+ * 0xFFFF implies infinite wait.
+ *
+ * On success, 'out_seq' is set to a unique sequence number for the current
+ * acquire transaction. This number is used for validation during release.
+ */
+uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq);
+uacpi_status uacpi_release_global_lock(uacpi_u32 seq);
+
 #ifdef __cplusplus
 }
 #endif

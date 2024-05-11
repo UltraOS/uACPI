@@ -70,6 +70,8 @@ static uacpi_object *make_object_for_predefined(
 
     case UACPI_PREDEFINED_NAMESPACE_GL:
         obj = uacpi_create_object(UACPI_OBJECT_MUTEX);
+        if (uacpi_likely(obj != UACPI_NULL))
+            g_uacpi_rt_ctx.global_lock_mutex = obj->mutex->handle;
         break;
 
     case UACPI_PREDEFINED_NAMESPACE_OSI:

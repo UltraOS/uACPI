@@ -58,6 +58,14 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(dsdt);
     memcpy(fadt.hdr.signature, ACPI_FADT_SIGNATURE,
            sizeof(ACPI_FADT_SIGNATURE) - 1);
+
+    auto *facs = new acpi_facs { };
+    facs->length = sizeof(*facs);
+    memcpy(facs->signature, ACPI_FACS_SIGNATURE,
+           sizeof(ACPI_FACS_SIGNATURE) - 1);
+
+    fadt.x_firmware_ctrl = reinterpret_cast<uintptr_t>(facs);
+
     fadt.hdr.checksum = gen_checksum(&fadt, sizeof(fadt));
 
     xsdt.fadt = &fadt;

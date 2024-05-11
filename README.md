@@ -13,6 +13,7 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 What works:
 - The interpreter itself, all of AML is supported and relatively well-tested
 - Namespace initialization, this includes properly running _STA and _INI, _REG for opregions
+- ACPI global firmware lock management via _GL, locked fields, as well as public API
 - The operation region subsystem. This includes public API for registering handlers, as well as builtin handlers for most common address space types
 - Notify handlers including public API
 - The resource subsystem. Every resource defined by ACPI 6.5 (last release) is supported
@@ -23,7 +24,6 @@ What works:
 - Device search API
 
 What's missing or doesn't work:
-- ACPI global lock is not implemented
 - No locking. This means all of the currently defined public API is not thread safe
 - A lot of general utility API is missing and/or is currently internal-only
 - Public API is not set in stone and may change, get added/removed without notice

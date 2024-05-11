@@ -41,6 +41,7 @@ struct uacpi_runtime_context {
      * as DSDT.
      */
     uacpi_bool is_rev1;
+    uacpi_bool global_lock_acquired;
 
 #ifndef UACPI_REDUCED_HARDWARE
     uacpi_bool is_hardware_reduced;
@@ -48,6 +49,15 @@ struct uacpi_runtime_context {
     uacpi_handle sci_handle;
 #endif
     uacpi_u32 loop_timeout_seconds;
+
+    uacpi_u32 global_lock_seq_num;
+    uacpi_handle *global_lock_mutex;
+
+#ifndef UACPI_REDUCED_HARDWARE
+    uacpi_handle *global_lock_event;
+    uacpi_handle *global_lock_spinlock;
+    uacpi_bool global_lock_pending;
+#endif
 
 #define UACPI_INIT_LEVEL_EARLY 0
 #define UACPI_INIT_LEVEL_TABLES_LOADED 1
