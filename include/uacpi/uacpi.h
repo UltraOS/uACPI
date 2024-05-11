@@ -12,9 +12,11 @@
 #if UACPI_REDUCED_HARDWARE == 1
 #define UACPI_MAKE_STUB_FOR_REDUCED_HARDWARE(fn, ret) \
     UACPI_NO_UNUSED_PARAMETER_WARNINGS_BEGIN          \
-    static inline fn { return (ret); }                \
+    static inline fn { return ret; }                \
     UACPI_NO_UNUSED_PARAMETER_WARNINGS_END
 
+#define UACPI_STUB_IF_REDUCED_HARDWARE(fn) \
+    UACPI_MAKE_STUB_FOR_REDUCED_HARDWARE(fn,)
 #define UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(fn) \
     UACPI_MAKE_STUB_FOR_REDUCED_HARDWARE(fn, UACPI_STATUS_COMPILED_OUT)
 #define UACPI_ALWAYS_OK_FOR_REDUCED_HARDWARE(fn) \
@@ -25,7 +27,7 @@
 #error UACPI_REDUCED_HARDWARE must be set to either 0 or 1
 #endif
 
-#define UACPI_STUB_IF_REDUCED_HARDWARE(fn, ret) fn;
+#define UACPI_STUB_IF_REDUCED_HARDWARE(fn) fn;
 #define UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(fn) fn;
 #define UACPI_ALWAYS_OK_FOR_REDUCED_HARDWARE(fn) fn;
 #endif
