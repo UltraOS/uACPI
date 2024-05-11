@@ -640,7 +640,7 @@ UACPI_EXPECT_SIZEOF(struct acpi_fadt, 276);
 // acpi_facs->ospm_flags
 #define ACPI_64BIT_WAKE_F           (1 << 0)
 
-UACPI_PACKED(struct acpi_facs {
+struct acpi_facs {
     uacpi_char signature[4];
     uacpi_u32 length;
     uacpi_u32 hardware_signature;
@@ -652,7 +652,7 @@ UACPI_PACKED(struct acpi_facs {
     uacpi_char rsvd0[3];
     uacpi_u32 ospm_flags;
     uacpi_char rsvd1[24];
-})
+};
 UACPI_EXPECT_SIZEOF(struct acpi_facs, 64);
 
 UACPI_PACKED(struct acpi_mcfg_allocation {
