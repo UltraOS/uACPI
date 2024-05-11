@@ -1736,7 +1736,28 @@ uacpi_status uacpi_gpe_uninstall_block(
 
 static uacpi_interrupt_ret handle_global_lock(uacpi_handle ctx)
 {
+    uacpi_cpu_flags flags;
     UACPI_UNUSED(ctx);
+
+    if (uacpi_unlikely(!g_uacpi_rt_ctx.has_global_lock)) {
+        uacpi_warn("platform has no global lock but a release event "
+                   "was fired anyway?\n");
+        return UACPI_INTERRUPT_HANDLED;
+    }
+
+    flags = uacpi_kernel_spinlock_lock(g_uacpi_rt_ctx.global_lock_spinlock);
+    if (!g_uacpi_rt_ctx.global_lock_pending) {
+        uacpi_trace("spurious firmware global lock release notification\n");
+        goto out;
+    }
+
+    uacpi_trace("received a firmware global lock release notification\n");
+
+    uacpi_kernel_signal_event(g_uacpi_rt_ctx.global_lock_event);
+    g_uacpi_rt_ctx.global_lock_pending = UACPI_FALSE;
+
+out:
+    uacpi_kernel_spinlock_unlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
     return UACPI_INTERRUPT_HANDLED;
 }
 
@@ -1772,10 +1793,23 @@ uacpi_status uacpi_initialize_events(void)
     if (uacpi_unlikely_error(ret))
         return ret;
 
+    g_uacpi_rt_ctx.global_lock_event = uacpi_kernel_create_event();
+    if (uacpi_unlikely(g_uacpi_rt_ctx.global_lock_event == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    g_uacpi_rt_ctx.global_lock_spinlock = uacpi_kernel_create_spinlock();
+    if (uacpi_unlikely(g_uacpi_rt_ctx.global_lock_spinlock == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
     ret = uacpi_install_fixed_event_handler(
         UACPI_FIXED_EVENT_GLOBAL_LOCK, handle_global_lock, UACPI_NULL
     );
     if (uacpi_likely_success(ret)) {
+        if (uacpi_unlikely(g_uacpi_rt_ctx.facs == UACPI_NULL)) {
+            uacpi_uninstall_fixed_event_handler(UACPI_FIXED_EVENT_GLOBAL_LOCK);
+            uacpi_warn("platform has global lock but no FACS was provided\n");
+            return ret;
+        }
         g_uacpi_rt_ctx.has_global_lock = UACPI_TRUE;
     } else if (ret == UACPI_STATUS_HARDWARE_TIMEOUT) {
         // has_global_lock remains set to false
