@@ -435,7 +435,7 @@ uacpi_namespace_node *uacpi_namespace_node_resolve_from_aml_namepath(
     );
 }
 
-uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
+uacpi_object *uacpi_namespace_node_get_object(const uacpi_namespace_node *node)
 {
     if (node == UACPI_NULL || node->object == UACPI_NULL)
         return UACPI_NULL;
@@ -443,7 +443,7 @@ uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node)
     return uacpi_unwrap_internal_reference(node->object);
 }
 
-uacpi_object_name uacpi_namespace_node_name(uacpi_namespace_node *node)
+uacpi_object_name uacpi_namespace_node_name(const uacpi_namespace_node *node)
 {
     return node->name;
 }
@@ -492,7 +492,7 @@ void uacpi_namespace_for_each_node_depth_first(
     }
 }
 
-uacpi_size uacpi_namespace_node_depth(uacpi_namespace_node *node)
+uacpi_size uacpi_namespace_node_depth(const uacpi_namespace_node *node)
 {
     uacpi_size depth = 0;
 
@@ -505,7 +505,7 @@ uacpi_size uacpi_namespace_node_depth(uacpi_namespace_node *node)
 }
 
 const uacpi_char *uacpi_namespace_node_generate_absolute_path(
-    uacpi_namespace_node *node
+    const uacpi_namespace_node *node
 )
 {
     uacpi_size depth, offset;
