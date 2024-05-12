@@ -4919,7 +4919,8 @@ enum method_call_type {
 
 static uacpi_status prepare_method_call(
     struct execution_context *ctx, uacpi_namespace_node *node,
-    uacpi_control_method *method, enum method_call_type type, uacpi_args *args
+    uacpi_control_method *method, enum method_call_type type,
+    const uacpi_args *args
 )
 {
     uacpi_status ret;
@@ -5633,7 +5634,7 @@ static void execution_context_release(struct execution_context *ctx)
 
 uacpi_status uacpi_execute_control_method(
     uacpi_namespace_node *scope, uacpi_control_method *method,
-    uacpi_args *args, uacpi_object **out_obj
+    const uacpi_args *args, uacpi_object **out_obj
 )
 {
     uacpi_status ret = UACPI_STATUS_OK;
