@@ -2399,7 +2399,7 @@ static uacpi_status do_binary_math(
         res = lhs % rhs;
         break;
     default:
-        break;
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     if (should_negate)
