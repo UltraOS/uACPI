@@ -828,15 +828,14 @@ static uacpi_status uacpi_eval_dstate_method_template(
         }                                                    \
     }
 
-#define NODE_INFO_COPY_ID(name)                        \
+#define NODE_INFO_COPY_ID(name, flag)                  \
     if (name != UACPI_NULL) {                          \
-        info->has_##name = 1;                          \
+        flags |= UACPI_NS_NODE_INFO_HAS_##flag;        \
         info->name.value = cursor;                     \
         info->name.size = name->size;                  \
         uacpi_memcpy(cursor, name->value, name->size); \
         cursor += name->size;                          \
     } else {                                           \
-        info->has_##name = 0;                          \
         uacpi_memzero(&info->name, sizeof(*name));     \
     }                                                  \
 
@@ -852,8 +851,7 @@ uacpi_status uacpi_get_namespace_node_info(
     uacpi_pnp_id_list *cid = UACPI_NULL;
     uacpi_char *cursor;
     uacpi_u64 adr = 0;
-    uacpi_bool has_adr = UACPI_FALSE;
-    uacpi_bool has_sxd = UACPI_FALSE, has_sxw = UACPI_FALSE;
+    uacpi_u8 flags = 0;
     uacpi_u8 sxd[4], sxw[5];
 
     obj = uacpi_namespace_node_get_object(node);
@@ -870,12 +868,12 @@ uacpi_status uacpi_get_namespace_node_info(
         NODE_INFO_EVAL_ADD_ID(cid)
 
         if (uacpi_eval_adr(node, &adr) == UACPI_STATUS_OK)
-            has_adr = UACPI_TRUE;
+            flags |= UACPI_NS_NODE_INFO_HAS_ADR;
 
         if (uacpi_eval_dstate_method_template(
                 node, dstate_method_template, sizeof(sxd), sxd
             ) == UACPI_STATUS_OK)
-            has_sxd = UACPI_TRUE;
+            flags |= UACPI_NS_NODE_INFO_HAS_SXD;
 
         dstate_method_template[2] = '0';
         dstate_method_template[3] = 'W';
@@ -883,7 +881,7 @@ uacpi_status uacpi_get_namespace_node_info(
         if (uacpi_eval_dstate_method_template(
                 node, dstate_method_template, sizeof(sxw), sxw
             ) == UACPI_STATUS_OK)
-            has_sxw = UACPI_TRUE;
+            flags |= UACPI_NS_NODE_INFO_HAS_SXW;
     }
 
     info = uacpi_kernel_alloc(size);
@@ -897,17 +895,13 @@ uacpi_status uacpi_get_namespace_node_info(
     info->type = obj->type;
     info->num_params = info->type == UACPI_OBJECT_METHOD ? obj->method->args : 0;
 
-    info->has_adr = has_adr;
     info->adr = adr;
-
-    info->has_sxd = has_sxd;
-    if (info->has_sxd)
+    if (flags & UACPI_NS_NODE_INFO_HAS_SXD)
         uacpi_memcpy(info->sxd, sxd, sizeof(sxd));
     else
         uacpi_memzero(info->sxd, sizeof(info->sxd));
 
-    info->has_sxw = has_sxw;
-    if (info->has_sxw)
+    if (flags & UACPI_NS_NODE_INFO_HAS_SXW)
         uacpi_memcpy(info->sxw, sxw, sizeof(sxw));
     else
         uacpi_memzero(info->sxw, sizeof(info->sxw));
@@ -923,19 +917,20 @@ uacpi_status uacpi_get_namespace_node_info(
             cursor += info->cid.ids[i].size;
         }
 
-        info->has_cid = 1;
+        flags |= UACPI_NS_NODE_INFO_HAS_CID;
     } else {
-        info->has_cid = 0;
         uacpi_memzero(&info->cid, sizeof(*cid));
     }
 
-    NODE_INFO_COPY_ID(hid)
-    NODE_INFO_COPY_ID(uid)
-    NODE_INFO_COPY_ID(cls)
+    NODE_INFO_COPY_ID(hid, HID)
+    NODE_INFO_COPY_ID(uid, UID)
+    NODE_INFO_COPY_ID(cls, CLS)
 
 out:
-    if (uacpi_likely_success(ret))
+    if (uacpi_likely_success(ret)) {
+        info->flags = flags;
         *out_info = info;
+    }
 
     uacpi_free_id_string(hid);
     uacpi_free_id_string(uid);

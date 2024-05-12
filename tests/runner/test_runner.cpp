@@ -125,38 +125,33 @@ static void enumerate_namespace()
             if (info->type == UACPI_OBJECT_METHOD)
                 std::printf(" (%d args)", info->num_params);
 
-            auto has_info = info->has_adr || info->has_hid ||
-                            info->has_cid || info->has_uid ||
-                            info->has_cls || info->has_sxd ||
-                            info->has_sxw;
-
-            if (has_info)
+            if (info->flags)
                 std::printf(" {\n");
 
-            if (info->has_adr)
+            if (info->flags)
                 nested_printf("  _ADR: %016" PRIX64 "\n", info->adr);
 
-            if (info->has_hid)
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_HID)
                 nested_printf("  _HID: %s\n", info->hid.value);
-            if (info->has_cid) {
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_CID) {
                 nested_printf("  _CID: ");
                 for (size_t i = 0; i < info->cid.num_ids; ++i)
                     std::printf("%s ", info->cid.ids[i].value);
 
                 std::printf("\n");
             }
-            if (info->has_uid)
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_UID)
                 nested_printf("  _UID: %s\n", info->uid.value);
-            if (info->has_cls)
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_CLS)
                 nested_printf("  _CLS: %s\n", info->cls.value);
 
-            if (info->has_sxd) {
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_SXD) {
                 nested_printf(
                     "  _SxD: S1->D%d S2->D%d S3->D%d S4->D%d\n",
                     info->sxd[0], info->sxd[1], info->sxd[2], info->sxd[3]
                 );
             }
-            if (info->has_sxw) {
+            if (info->flags & UACPI_NS_NODE_INFO_HAS_SXW) {
                 nested_printf(
                     "  _SxW: S0->D%d S1->D%d S2->D%d S3->D%d S4->D%d\n",
                     info->sxw[0], info->sxw[1], info->sxw[2], info->sxw[3],
@@ -164,7 +159,7 @@ static void enumerate_namespace()
                 );
             }
 
-            if (has_info) {
+            if (info->flags) {
                 auto dump_resources = [=](auto cb, const char *name) {
                     uacpi_resources *res;
 

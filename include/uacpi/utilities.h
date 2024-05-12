@@ -126,6 +126,16 @@ uacpi_status uacpi_eval_cls(uacpi_namespace_node*, uacpi_id_string **out_id);
  */
 uacpi_status uacpi_eval_uid(uacpi_namespace_node*, uacpi_id_string **out_uid);
 
+
+// uacpi_namespace_node_info->flags
+#define UACPI_NS_NODE_INFO_HAS_ADR (1 << 0)
+#define UACPI_NS_NODE_INFO_HAS_HID (1 << 1)
+#define UACPI_NS_NODE_INFO_HAS_UID (1 << 2)
+#define UACPI_NS_NODE_INFO_HAS_CID (1 << 3)
+#define UACPI_NS_NODE_INFO_HAS_CLS (1 << 4)
+#define UACPI_NS_NODE_INFO_HAS_SXD (1 << 5)
+#define UACPI_NS_NODE_INFO_HAS_SXW (1 << 6)
+
 typedef struct uacpi_namespace_node_info {
     // Size of the entire structure
     uacpi_u32 size;
@@ -135,13 +145,8 @@ typedef struct uacpi_namespace_node_info {
     uacpi_object_type type;
     uacpi_u8 num_params;
 
-    uacpi_u8 has_adr : 1;
-    uacpi_u8 has_hid : 1;
-    uacpi_u8 has_uid : 1;
-    uacpi_u8 has_cid : 1;
-    uacpi_u8 has_cls : 1;
-    uacpi_u8 has_sxd : 1;
-    uacpi_u8 has_sxw : 1;
+    // UACPI_NS_NODE_INFO_HAS_*
+    uacpi_u8 flags;
 
     /*
      * A mapping of [S1..S4] to the shallowest D state supported by the device
