@@ -74,7 +74,7 @@ typedef struct uacpi_init_params {
  * Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT
  * tables. Enters ACPI mode.
  */
-uacpi_status uacpi_initialize(struct uacpi_init_params*);
+uacpi_status uacpi_initialize(const struct uacpi_init_params*);
 
 /*
  * Parses & executes all of the DSDT/SSDT tables.
@@ -95,7 +95,7 @@ uacpi_status uacpi_namespace_initialize(void);
  * lookups, unless 'path' is already absolute.
  */
 uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
-                        uacpi_args *args, uacpi_object **ret);
+                        const uacpi_args *args, uacpi_object **ret);
 
 /*
  * Same as uacpi_eval, but the return value type is validated against
@@ -103,7 +103,7 @@ uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
  */
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
+    const uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
 );
 
 /*
@@ -111,7 +111,7 @@ uacpi_status uacpi_eval_typed(
  */
 uacpi_status uacpi_eval_integer(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    uacpi_args *args, uacpi_u64 *out_value
+    const uacpi_args *args, uacpi_u64 *out_value
 );
 
 /*
