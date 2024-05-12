@@ -303,7 +303,7 @@ static uacpi_char to_lower(uacpi_char c)
 }
 
 static uacpi_bool peek_one(
-    const uacpi_char **str, uacpi_size *size, uacpi_char *out_char
+    const uacpi_char **str, const uacpi_size *size, uacpi_char *out_char
 )
 {
     if (*size == 0)
@@ -769,7 +769,7 @@ out:
 }
 
 static uacpi_bool matches_any(
-    uacpi_id_string *id, const uacpi_char **ids
+    uacpi_id_string *id, const uacpi_char *const *ids
 )
 {
     uacpi_size i;
@@ -953,7 +953,7 @@ void uacpi_free_namespace_node_info(uacpi_namespace_node_info *info)
 }
 
 uacpi_bool uacpi_device_matches_pnp_id(
-    uacpi_namespace_node *node, const uacpi_char **ids
+    uacpi_namespace_node *node, const uacpi_char *const *ids
 )
 {
     uacpi_status st;
@@ -986,7 +986,7 @@ out:
 }
 
 struct device_find_ctx {
-    const uacpi_char **target_hids;
+    const uacpi_char *const *target_hids;
     void *user;
     uacpi_iteration_callback cb;
 };
@@ -1022,7 +1022,7 @@ enum uacpi_ns_iteration_decision find_one_device(
 
 
 uacpi_status uacpi_find_devices_at(
-    uacpi_namespace_node *parent, const uacpi_char **hids,
+    uacpi_namespace_node *parent, const uacpi_char *const *hids,
     uacpi_iteration_callback cb, void *user
 )
 {

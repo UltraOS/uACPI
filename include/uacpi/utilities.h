@@ -17,7 +17,7 @@ extern "C" {
  */
 uacpi_bool uacpi_device_matches_pnp_id(
     uacpi_namespace_node *node,
-    const uacpi_char **list
+    const uacpi_char *const *list
 );
 
 /*
@@ -28,7 +28,7 @@ uacpi_bool uacpi_device_matches_pnp_id(
  */
 uacpi_status uacpi_find_devices_at(
     uacpi_namespace_node *parent,
-    const uacpi_char **hids,
+    const uacpi_char *const *hids,
     uacpi_iteration_callback cb,
     void *user
 );
