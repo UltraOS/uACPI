@@ -240,7 +240,7 @@ void uacpi_for_each_table(
 }
 
 struct table_search_ctx {
-    struct uacpi_table_identifiers *id;
+    const uacpi_table_identifiers *id;
     uacpi_table *out_table;
 };
 
@@ -249,7 +249,7 @@ static enum uacpi_table_iteration_decision do_search_tables(
 )
 {
     struct table_search_ctx *ctx = user;
-    struct uacpi_table_identifiers *id = ctx->id;
+    const uacpi_table_identifiers *id = ctx->id;
 
     if (id->signature.id != table->signature.id)
         return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
@@ -268,7 +268,7 @@ static enum uacpi_table_iteration_decision do_search_tables(
 }
 
 static uacpi_status find_table(
-    uacpi_size base_idx, struct uacpi_table_identifiers *id,
+    uacpi_size base_idx, const uacpi_table_identifiers *id,
     uacpi_table **out_table
 )
 {
@@ -360,7 +360,7 @@ uacpi_table_find_next_with_same_signature(struct uacpi_table **in_out_table)
 }
 
 uacpi_status
-uacpi_table_find(struct uacpi_table_identifiers *id,
+uacpi_table_find(const uacpi_table_identifiers *id,
                  struct uacpi_table **out_table)
 {
     return find_table(0, id, out_table);
