@@ -28,10 +28,10 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
     uacpi_predefined_namespace
 );
 
-uacpi_object *uacpi_namespace_node_get_object(uacpi_namespace_node *node);
-uacpi_object_name uacpi_namespace_node_name(uacpi_namespace_node *node);
+uacpi_object *uacpi_namespace_node_get_object(const uacpi_namespace_node *node);
+uacpi_object_name uacpi_namespace_node_name(const uacpi_namespace_node *node);
 
-uacpi_size uacpi_namespace_node_depth(uacpi_namespace_node *node);
+uacpi_size uacpi_namespace_node_depth(const uacpi_namespace_node *node);
 
 uacpi_namespace_node *uacpi_namespace_node_find(
     uacpi_namespace_node *parent,
@@ -73,7 +73,7 @@ void uacpi_namespace_for_each_node_depth_first(
 );
 
 const uacpi_char *uacpi_namespace_node_generate_absolute_path(
-    uacpi_namespace_node *node
+    const uacpi_namespace_node *node
 );
 void uacpi_free_absolute_path(const uacpi_char *path);
 
