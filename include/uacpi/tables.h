@@ -64,7 +64,7 @@ uacpi_status
 uacpi_table_find_next_with_same_signature(uacpi_table **in_out_table);
 
 uacpi_status
-uacpi_table_find(uacpi_table_identifiers *id, uacpi_table **out_table);
+uacpi_table_find(const uacpi_table_identifiers *id, uacpi_table **out_table);
 
 /*
  * Returns the pointer to a sanitized internal version of FADT.
