@@ -72,19 +72,11 @@
         #else
             #define UACPI_POINTER_SIZE 4
         #endif
+    #elif defined(__GNUC__)
+        #define UACPI_POINTER_SIZE __SIZEOF_POINTER__
+    #else
+        #error Failed to detect pointer size
     #endif
-
-    #ifdef __GNUC__
-        #if __x86_64__ || defined(__aarch64__)
-            #define UACPI_POINTER_SIZE 8
-        #elif defined(__i386__) || defined(__arm__)
-            #define UACPI_POINTER_SIZE 4
-        #endif
-    #endif
-#endif
-
-#ifndef UACPI_POINTER_SIZE
-#error Failed to detect pointer size
 #endif
 
 #endif
