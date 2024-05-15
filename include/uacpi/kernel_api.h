@@ -113,7 +113,7 @@ void uacpi_kernel_free(void *mem);
 void uacpi_kernel_free(void *mem, uacpi_size size_hint);
 #endif
 
-enum uacpi_log_level {
+typedef enum uacpi_log_level {
     /*
      * Super verbose logging, every op & uop being processed is logged.
      * Mostly useful for tracking down hangs/lockups.
@@ -142,11 +142,11 @@ enum uacpi_log_level {
      * prevent stable runtime.
      */
     UACPI_LOG_ERROR = 0,
-};
+} uacpi_log_level;
 
 UACPI_PRINTF_DECL(2, 3)
-void uacpi_kernel_log(enum uacpi_log_level, const char*, ...);
-void uacpi_kernel_vlog(enum uacpi_log_level, const char*, uacpi_va_list);
+void uacpi_kernel_log(uacpi_log_level, const uacpi_char*, ...);
+void uacpi_kernel_vlog(uacpi_log_level, const uacpi_char*, uacpi_va_list);
 
 /*
  * Returns the number of 100 nanosecond ticks elapsed since boot,
