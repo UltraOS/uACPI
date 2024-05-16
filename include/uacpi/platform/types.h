@@ -37,8 +37,13 @@ typedef uacpi_uintptr uacpi_virt_addr;
 typedef size_t uacpi_size;
 
 typedef va_list uacpi_va_list;
+#define uacpi_va_start va_start
+#define uacpi_va_end va_end
+#define uacpi_va_arg va_arg
 
 typedef char uacpi_char;
+
+#define uacpi_offsetof offsetof
 
 /*
  * We use unsignd long long for 64-bit number formatting because 64-bit types
