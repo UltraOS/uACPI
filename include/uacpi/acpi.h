@@ -1,7 +1,7 @@
 #pragma once
 
-#include <uacpi/internal/compiler.h>
-#include <uacpi/internal/helpers.h>
+#include <uacpi/platform/compiler.h>
+#include <uacpi/helpers.h>
 #include <uacpi/types.h>
 
 /*
