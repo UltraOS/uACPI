@@ -32,7 +32,8 @@ typedef bool uacpi_bool;
 
 #define UACPI_NULL NULL
 
-typedef uintptr_t uacpi_virt_addr;
+typedef uintptr_t uacpi_uintptr;
+typedef uacpi_uintptr uacpi_virt_addr;
 typedef size_t uacpi_size;
 
 typedef va_list uacpi_va_list;
