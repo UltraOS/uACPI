@@ -13,11 +13,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
-#include <inttypes.h>
-
-#define UACPI_PRIx64 PRIx64
-#define UACPI_PRIX64 PRIX64
-#define UACPI_PRIu64 PRIu64
 
 #define uacpi_memcpy memcpy
 #define uacpi_memset memset

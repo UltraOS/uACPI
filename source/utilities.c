@@ -739,7 +739,9 @@ uacpi_status uacpi_eval_uid(
             goto out;
         }
     } else {
-        size = uacpi_snprintf(UACPI_NULL, 0, "%"UACPI_PRIu64, obj->integer) + 1;
+        size = uacpi_snprintf(
+            UACPI_NULL, 0, "%"UACPI_PRIu64, UACPI_FMT64(obj->integer)
+        ) + 1;
     }
 
     id_string = uacpi_kernel_alloc(sizeof(uacpi_id_string) + size);
@@ -756,7 +758,8 @@ uacpi_status uacpi_eval_uid(
         id_string->value[size - 1] = '\0';
     } else {
         uacpi_snprintf(
-            id_string->value, id_string->size, "%"UACPI_PRIu64, obj->integer
+            id_string->value, id_string->size, "%"UACPI_PRIu64,
+            UACPI_FMT64(obj->integer)
         );
     }
 
