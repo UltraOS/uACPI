@@ -56,7 +56,7 @@ void uacpi_trace_region_io(
         "%s [%s] (%d bytes) %s[0x%016"UACPI_PRIX64"] = 0x%"UACPI_PRIX64"\n",
         type_str, path, byte_size,
         uacpi_address_space_to_string(op_region->space),
-        offset, ret
+        UACPI_FMT64(offset), UACPI_FMT64(ret)
     );
 
     uacpi_free_dynamic_string(path);

@@ -687,7 +687,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
     if (uacpi_unlikely(declared_size->integer > 0xE0000000)) {
         uacpi_error(
             "buffer is too large (%"UACPI_PRIu64"), assuming corrupted "
-            "bytestream\n", declared_size->integer
+            "bytestream\n", UACPI_FMT64(declared_size->integer)
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
@@ -767,7 +767,7 @@ static uacpi_status handle_package(struct execution_context *ctx)
         if (uacpi_unlikely(var_num_elements->integer > 0xE0000000)) {
             uacpi_error(
                 "package is too large (%"UACPI_PRIu64"), assuming "
-                "corrupted bytestream\n", var_num_elements->integer
+                "corrupted bytestream\n", UACPI_FMT64(var_num_elements->integer)
             );
             return UACPI_STATUS_AML_BAD_ENCODING;
         }
@@ -1096,8 +1096,8 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
     } else if (uacpi_unlikely(op_region->offset > region_end)) {
         uacpi_error(
             "invalid operation region %.4s bounds: offset=0x%"UACPI_PRIX64
-            " length=0x%"UACPI_PRIX64"\n", node->name.text, op_region->offset,
-            op_region->length
+            " length=0x%"UACPI_PRIX64"\n", node->name.text,
+            UACPI_FMT64(op_region->offset), UACPI_FMT64(op_region->length)
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
@@ -1419,7 +1419,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
         if (uacpi_unlikely(op_region->length < sizeof(struct acpi_sdt_hdr))) {
             uacpi_error(
                 "Load: operation region is too small: %"UACPI_PRIu64"\n",
-                op_region->length
+                UACPI_FMT64(op_region->length)
             );
             goto error_out;
         }
@@ -1429,7 +1429,8 @@ static uacpi_status handle_load(struct execution_context *ctx)
             uacpi_error(
                 "Load: failed to map operation region "
                 "0x%016"UACPI_PRIX64" -> 0x%016"UACPI_PRIX64"\n",
-                op_region->offset, op_region->offset + op_region->length
+                UACPI_FMT64(op_region->offset),
+                UACPI_FMT64(op_region->offset + op_region->length)
             );
             goto error_out;
         }
@@ -2029,11 +2030,12 @@ static void debug_store_no_recurse(const uacpi_char *prefix, uacpi_object *src)
     case UACPI_OBJECT_INTEGER:
         if (g_uacpi_rt_ctx.is_rev1) {
             uacpi_trace(
-                "%s Integer => 0x%08"UACPI_PRIX64"\n", prefix, src->integer
+                "%s Integer => 0x%08X\n", prefix, (uacpi_u32)src->integer
             );
         } else {
             uacpi_trace(
-                "%s Integer => 0x%016"UACPI_PRIX64"\n", prefix, src->integer
+                "%s Integer => 0x%016"UACPI_PRIX64"\n", prefix,
+                UACPI_FMT64(src->integer)
             );
         }
         break;
@@ -2056,8 +2058,8 @@ static void debug_store_no_recurse(const uacpi_char *prefix, uacpi_object *src)
         uacpi_trace(
             "%s OperationRegion (ASID %d) 0x%016"UACPI_PRIX64
             " -> 0x%016"UACPI_PRIX64"\n", prefix,
-            src->op_region->space, src->op_region->offset,
-            src->op_region->offset + src->op_region->length
+            src->op_region->space, UACPI_FMT64(src->op_region->offset),
+            UACPI_FMT64(src->op_region->offset + src->op_region->length)
         );
         break;
     case UACPI_OBJECT_POWER_RESOURCE:
@@ -2593,7 +2595,7 @@ static uacpi_status integer_to_string(
     repr_len = uacpi_snprintf(
         int_buf, sizeof(int_buf),
         is_hex ? "%"UACPI_PRIX64 : "%"UACPI_PRIu64,
-        integer
+        UACPI_FMT64(integer)
     );
     if (uacpi_unlikely(repr_len < 0))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -2899,7 +2901,7 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
         case UACPI_OBJECT_INTEGER: {
             int size;
             size = uacpi_snprintf(int_buf, sizeof(int_buf), "%"UACPI_PRIx64,
-                                  arg1->integer);
+                                  UACPI_FMT64(arg1->integer));
             if (size < 0)
                 return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -3626,7 +3628,7 @@ static uacpi_status handle_notify(struct execution_context *ctx)
         path = uacpi_namespace_node_generate_absolute_path(node);
         uacpi_warn(
             "ignoring firmware Notify(%s, 0x%"UACPI_PRIX64") request, "
-            "no listeners\n", path, value
+            "no listeners\n", path, UACPI_FMT64(value)
         );
         uacpi_free_dynamic_string(path);
 

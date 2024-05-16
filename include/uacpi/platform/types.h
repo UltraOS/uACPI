@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include <uacpi/helpers.h>
+
 typedef uint8_t uacpi_u8;
 typedef uint16_t uacpi_u16;
 typedef uint32_t uacpi_u32;
@@ -36,5 +38,21 @@ typedef size_t uacpi_size;
 typedef va_list uacpi_va_list;
 
 typedef char uacpi_char;
+
+/*
+ * We use unsignd long long for 64-bit number formatting because 64-bit types
+ * don't have a standard way to format them. The inttypes.h header is not
+ * freestanding therefore it's not practical to force the user to define the
+ * corresponding PRI macros. Moreover, unsignd long long  is required to be
+ * at least 64-bits as per C99.
+ */
+UACPI_BUILD_BUG_ON_WITH_MSG(
+    sizeof(unsigned long long) < 8,
+    "unsigned long long must be at least 64 bits large as per C99"
+);
+#define UACPI_PRIu64 "llu"
+#define UACPI_PRIx64 "llx"
+#define UACPI_PRIX64 "llX"
+#define UACPI_FMT64(val) ((unsigned long long)(val))
 
 #endif
