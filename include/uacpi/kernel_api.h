@@ -144,9 +144,13 @@ typedef enum uacpi_log_level {
     UACPI_LOG_ERROR = 0,
 } uacpi_log_level;
 
+#ifndef UACPI_FORMATTED_LOGGING
+void uacpi_kernel_log(uacpi_log_level, const uacpi_char*);
+#else
 UACPI_PRINTF_DECL(2, 3)
 void uacpi_kernel_log(uacpi_log_level, const uacpi_char*, ...);
 void uacpi_kernel_vlog(uacpi_log_level, const uacpi_char*, uacpi_va_list);
+#endif
 
 /*
  * Returns the number of 100 nanosecond ticks elapsed since boot,

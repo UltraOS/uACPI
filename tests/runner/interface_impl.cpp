@@ -261,31 +261,28 @@ void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
 }
 #endif
 
-void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list vlist)
+static const char* log_level_to_string(uacpi_log_level lvl)
 {
-    const char *lvl_str;
-
     switch (lvl) {
     case UACPI_LOG_DEBUG:
-        lvl_str = "DEBUG";
-        break;
+        return "DEBUG";
     case UACPI_LOG_TRACE:
-        lvl_str = "TRACE";
-        break;
+        return "TRACE";
     case UACPI_LOG_INFO:
-        lvl_str = "INFO";
-        break;
+        return "INFO";
     case UACPI_LOG_WARN:
-        lvl_str = "WARN";
-        break;
+        return "WARN";
     case UACPI_LOG_ERROR:
-        lvl_str = "ERROR";
-        break;
+        return "ERROR";
     default:
         std::abort();
     }
+}
 
-    printf("[uACPI][%s] ", lvl_str);
+#ifdef UACPI_FORMATTED_LOGGING
+void uacpi_kernel_vlog(enum uacpi_log_level lvl, const char* text, uacpi_va_list vlist)
+{
+    printf("[uACPI][%s] ", log_level_to_string(lvl));
     vprintf(text, vlist);
 }
 
@@ -298,6 +295,13 @@ void uacpi_kernel_log(enum uacpi_log_level lvl, const char* text, ...)
 
     va_end(vlist);
 }
+#else
+void uacpi_kernel_log(enum uacpi_log_level lvl, const char* text)
+{
+    printf("[uACPI][%s] %s", log_level_to_string(lvl), text);
+}
+#endif
+
 
 uacpi_u64 uacpi_kernel_get_ticks(void)
 {

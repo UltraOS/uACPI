@@ -1,8 +1,57 @@
 #pragma once
 
 #include <uacpi/internal/types.h>
-#include <uacpi/platform/stdlib.h>
+#include <uacpi/internal/helpers.h>
+#include <uacpi/platform/libc.h>
 #include <uacpi/kernel_api.h>
+
+#ifndef uacpi_memcpy
+void *uacpi_memcpy(void *dest, const void *src, uacpi_size count);
+#endif
+
+#ifndef uacpi_memmove
+void *uacpi_memmove(void *dest, const void *src, uacpi_size count);
+#endif
+
+#ifndef uacpi_memset
+void *uacpi_memset(void *dest, uacpi_i32 ch, uacpi_size count);
+#endif
+
+#ifndef uacpi_memcmp
+uacpi_i32 uacpi_memcmp(const void *lhs, const void *rhs, uacpi_size count);
+#endif
+
+#ifndef uacpi_strlen
+uacpi_size uacpi_strlen(const uacpi_char *str);
+#endif
+
+#ifndef uacpi_strlen
+uacpi_size uacpi_strnlen(const uacpi_char *str, uacpi_size max);
+#endif
+
+#ifndef uacpi_strcmp
+uacpi_i32 uacpi_strcmp(const uacpi_char *lhs, const uacpi_char *rhs);
+#endif
+
+#ifndef uacpi_strncmp
+uacpi_i32 uacpi_strncmp(
+    const uacpi_char *lhs, const uacpi_char *rhs, uacpi_size count
+);
+#endif
+
+#ifndef uacpi_snprintf
+UACPI_PRINTF_DECL(3, 4)
+uacpi_i32 uacpi_snprintf(
+    uacpi_char *buffer, uacpi_size capacity, const uacpi_char *fmt, ...
+);
+#endif
+
+#ifndef uacpi_vsnprintf
+uacpi_i32 uacpi_vsnprintf(
+    uacpi_char *buffer, uacpi_size capacity, const uacpi_char *fmt,
+    uacpi_va_list vlist
+);
+#endif
 
 #ifdef UACPI_SIZED_FREES
 #define uacpi_free(mem, size) uacpi_kernel_free(mem, size)
