@@ -536,7 +536,7 @@ static uacpi_status initialize_fadt(struct uacpi_table *tbl)
 
     uacpi_memcpy(fadt, tbl->hdr, UACPI_MIN(sizeof(*fadt), tbl->hdr->length));
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
     g_uacpi_rt_ctx.is_hardware_reduced = fadt->flags & ACPI_HW_REDUCED_ACPI;
 #endif
 

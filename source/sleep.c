@@ -6,7 +6,7 @@
 #include <uacpi/internal/event.h>
 #include <uacpi/platform/arch_helpers.h>
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
 #define CALL_SLEEP_FN(name, state)                       \
     (uacpi_is_hardware_reduced() ?                       \
         name##_hw_reduced(state) : name##_hw_full(state))
@@ -17,7 +17,7 @@
 static uacpi_status eval_wak(uacpi_u8 state);
 static uacpi_status eval_sst(uacpi_u8 value);
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
 uacpi_status uacpi_set_waking_vector(
     uacpi_phys_addr addr32, uacpi_phys_addr addr64
 )

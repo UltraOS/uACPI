@@ -42,7 +42,7 @@ struct uacpi_runtime_context {
      */
     uacpi_bool is_rev1;
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
     uacpi_bool is_hardware_reduced;
     uacpi_bool has_global_lock;
     uacpi_handle sci_handle;
@@ -72,7 +72,7 @@ static inline uacpi_bool uacpi_rt_should_log(enum uacpi_log_level lvl)
 
 static inline uacpi_bool uacpi_is_hardware_reduced(void)
 {
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
     return g_uacpi_rt_ctx.is_hardware_reduced;
 #else
     return UACPI_TRUE;
