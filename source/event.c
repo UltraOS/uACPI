@@ -12,7 +12,7 @@
 #define UACPI_EVENT_DISABLED 0
 #define UACPI_EVENT_ENABLED 1
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
 
 struct fixed_event {
     uacpi_u8 enable_field;

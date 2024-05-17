@@ -89,7 +89,7 @@ const uacpi_char *uacpi_status_to_string(uacpi_status st)
     }
 }
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
 enum hw_mode {
     HW_MODE_ACPI = 0,
     HW_MODE_LEGACY = 1,

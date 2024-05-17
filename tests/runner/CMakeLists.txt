@@ -33,6 +33,14 @@ if (NOT REDUCED_HARDWARE_BUILD)
     set(REDUCED_HARDWARE_BUILD 0)
 endif()
 
+if (REDUCED_HARDWARE_BUILD)
+    target_compile_definitions(
+        test-runner
+        PRIVATE
+        -DUACPI_REDUCED_HARDWARE
+    )
+endif ()
+
 if (NOT DEFINED SIZED_FREES_BUILD)
     set(SIZED_FREES_BUILD 1)
 endif()
@@ -44,12 +52,6 @@ if (SIZED_FREES_BUILD)
         -DUACPI_SIZED_FREES
     )
 endif ()
-
-target_compile_definitions(
-    test-runner
-    PRIVATE
-    -DUACPI_REDUCED_HARDWARE=${REDUCED_HARDWARE_BUILD}
-)
 
 if (MSVC)
     # Address sanitizer on MSVC depends on a dynamic library that is not present in
