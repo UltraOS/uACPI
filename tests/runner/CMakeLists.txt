@@ -53,6 +53,18 @@ if (SIZED_FREES_BUILD)
     )
 endif ()
 
+if (NOT FORMATTED_LOGGING_BUILD)
+    set(FORMATTED_LOGGING_BUILD 0)
+endif()
+
+if (FORMATTED_LOGGING_BUILD)
+    target_compile_definitions(
+        test-runner
+        PRIVATE
+        -DUACPI_FORMATTED_LOGGING
+    )
+endif ()
+
 if (MSVC)
     # Address sanitizer on MSVC depends on a dynamic library that is not present in
     # PATH by default. Lets just not enable it here.
