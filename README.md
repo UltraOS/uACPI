@@ -168,7 +168,7 @@ my_kernel_includes += uacpi_includes
 
 ### 2. Implement/override platform-specific headers
 
-uACPI defines all platform-specific functionality in a few headers inside [include/uacpi/platform](include/uacpi/platform)
+uACPI defines all platform/architecture-specific functionality in a few headers inside [include/uacpi/platform](include/uacpi/platform)
 
 All of the headers can be "implemented" by your project in a few ways:
 - Implement the expected helpers exposed by the headers
@@ -179,8 +179,10 @@ Currently used platform-specific headers are:
 - [arch_helpers.h](include/uacpi/platform/arch_helpers.h) - defines architecture/cpu-specific helpers
 - [compiler.h](include/uacpi/platform/compiler.h) - defines compiler-specific helpers like attributes and intrinsics.
 This already works for MSVC, clang & GCC so you most likely won't have to override it.
-- [stdlib.h](include/uacpi/platform/stdlib.h) - exports a minimal subset of libc helpers that uACPI utilizes.
-This should only be overriden if your kernel's standard library is fundumentally different from libc.
+- [libc.h](include/uacpi/platform/libc.h) - an empty header by default, but may be overriden by your project
+if it implements any of the libc functions used by uACPI (by default uACPI uses its
+own implementations to be platform-independent and to make porting easier). The
+internal implementation is just the bare minimum and not optimized in any way.
 - [types.h](include/uacpi/platform/types.h) - typedefs a bunch of uacpi-specific types using the `stdint.h` header. You don't have to override this
 unless you don't provide `stdint.h`.
 
