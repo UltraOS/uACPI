@@ -179,6 +179,8 @@ Currently used platform-specific headers are:
 - [arch_helpers.h](include/uacpi/platform/arch_helpers.h) - defines architecture/cpu-specific helpers
 - [compiler.h](include/uacpi/platform/compiler.h) - defines compiler-specific helpers like attributes and intrinsics.
 This already works for MSVC, clang & GCC so you most likely won't have to override it.
+- [atomic.h](include/uacpi/platform/atomic.h) - defines compiler-specific helpers for dealing with atomic operations.
+  Same as the header above, this should work out of the box for MSVC, clang & GCC.
 - [libc.h](include/uacpi/platform/libc.h) - an empty header by default, but may be overriden by your project
 if it implements any of the libc functions used by uACPI (by default uACPI uses its
 own implementations to be platform-independent and to make porting easier). The
