@@ -1024,9 +1024,7 @@ uacpi_status uacpi_find_devices_at(
     uacpi_iteration_callback cb, void *user
 )
 {
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
-                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
 
     struct device_find_ctx ctx = {
         .target_hids = hids,
@@ -1055,9 +1053,7 @@ uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
     uacpi_object *arg;
     uacpi_args args;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
-                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
 
     arg = uacpi_create_object(UACPI_OBJECT_INTEGER);
     if (uacpi_unlikely(arg == UACPI_NULL))
@@ -1087,9 +1083,7 @@ uacpi_status uacpi_get_pci_routing_table(
     uacpi_pci_routing_table *table;
     uacpi_size size, i;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
-                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
 
     obj = uacpi_namespace_node_get_object(parent);
     if (uacpi_unlikely(obj == UACPI_NULL || obj->type != UACPI_OBJECT_DEVICE))
