@@ -356,9 +356,8 @@ uacpi_status uacpi_prepare_for_sleep_state(enum uacpi_sleep_state state_enum)
     uacpi_u8 state = state_enum;
     uacpi_status ret;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED);
+
     if (uacpi_unlikely(state > UACPI_SLEEP_STATE_S5))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -486,9 +485,8 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
 {
     uacpi_u8 state = state_enum;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED);
+
     if (uacpi_unlikely(state > UACPI_SLEEP_STATE_MAX))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -509,9 +507,8 @@ uacpi_status uacpi_prepare_for_wake_from_sleep_state(
 {
     uacpi_u8 state = state_enum;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED);
+
     if (uacpi_unlikely(state > UACPI_SLEEP_STATE_MAX))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -524,9 +521,8 @@ uacpi_status uacpi_wake_from_sleep_state(
 {
     uacpi_u8 state = state_enum;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED);
+
     if (uacpi_unlikely(state > UACPI_SLEEP_STATE_MAX))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -543,9 +539,7 @@ uacpi_status uacpi_reboot(void)
      * Allow restarting earlier than namespace load so that the kernel can
      * use this in case of some initialization error.
      */
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
-                       UACPI_INIT_LEVEL_TABLES_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
     if (!(fadt->flags & ACPI_RESET_REG_SUP) || !reset_reg->address)
         return UACPI_STATUS_NOT_FOUND;

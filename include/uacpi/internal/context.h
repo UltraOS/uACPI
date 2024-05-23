@@ -58,6 +58,50 @@ struct uacpi_runtime_context {
     struct uacpi_params params;
 };
 
+static inline const uacpi_char *uacpi_init_level_to_string(uacpi_u8 lvl)
+{
+    switch (lvl) {
+    case UACPI_INIT_LEVEL_EARLY:
+        return "early";
+    case UACPI_INIT_LEVEL_TABLES_LOADED:
+        return "tables loaded";
+    case UACPI_INIT_LEVEL_NAMESPACE_LOADED:
+        return "namespace loaded";
+    case UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED:
+        return "namespace initialized";
+    default:
+        return "<invalid>";
+    }
+}
+
+#define UACPI_ENSURE_INIT_LEVEL_AT_LEAST(lvl)                               \
+    do {                                                                    \
+        if (uacpi_unlikely(g_uacpi_rt_ctx.init_level < lvl)) {              \
+            uacpi_error(                                                    \
+                "while evaluating %s: init level %d (%s) is too low, "      \
+                "expected at least %d (%s)\n", __FUNCTION__,                \
+                g_uacpi_rt_ctx.init_level,                                  \
+                uacpi_init_level_to_string(g_uacpi_rt_ctx.init_level), lvl, \
+                uacpi_init_level_to_string(lvl)                             \
+            );                                                              \
+            return UACPI_STATUS_INIT_LEVEL_MISMATCH;                        \
+        }                                                                   \
+    } while (0)
+
+#define UACPI_ENSURE_INIT_LEVEL_IS(lvl)                                     \
+    do {                                                                    \
+        if (uacpi_unlikely(g_uacpi_rt_ctx.init_level != lvl)) {             \
+            uacpi_error(                                                    \
+                "while evaluating %s: invalid init level %d (%s), "         \
+                "expected %d (%s)\n", __FUNCTION__,                         \
+                g_uacpi_rt_ctx.init_level,                                  \
+                uacpi_init_level_to_string(g_uacpi_rt_ctx.init_level), lvl, \
+                uacpi_init_level_to_string(lvl)                             \
+            );                                                              \
+            return UACPI_STATUS_INIT_LEVEL_MISMATCH;                        \
+        }                                                                   \
+    } while (0)
+
 extern struct uacpi_runtime_context g_uacpi_rt_ctx;
 
 static inline uacpi_bool uacpi_rt_params_check(uacpi_u64 flag)

@@ -162,9 +162,7 @@ static uacpi_status enter_mode(enum hw_mode mode)
     uacpi_status ret;
     const uacpi_char *mode_str;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level <
-                       UACPI_INIT_LEVEL_TABLES_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
     if (uacpi_is_hardware_reduced())
         return UACPI_STATUS_OK;
@@ -267,9 +265,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_EARLY))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_EARLY);
 
     g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_TABLES_LOADED;
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
@@ -377,9 +373,7 @@ uacpi_status uacpi_namespace_load(void)
     uacpi_status ret;
     struct table_load_stats st = { 0 };
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_TABLES_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_TABLES_LOADED);
 
     ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
     if (uacpi_unlikely_error(ret)) {
@@ -554,9 +548,7 @@ uacpi_status uacpi_namespace_initialize(void)
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
 
-    if (uacpi_unlikely(g_uacpi_rt_ctx.init_level !=
-                       UACPI_INIT_LEVEL_NAMESPACE_LOADED))
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
+    UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
 
     /*
      * Initialization order here is identical to ACPICA because ACPI
