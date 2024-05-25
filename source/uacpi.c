@@ -273,12 +273,11 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.s0_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.s0_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
+    g_uacpi_rt_ctx.log_level = params->log_level;
+    g_uacpi_rt_ctx.flags = params->flags;
 
     if (g_uacpi_rt_ctx.loop_timeout_seconds == 0)
         uacpi_context_set_loop_timeout(UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS);
-
-    uacpi_memcpy(&g_uacpi_rt_ctx.params, &params->rt_params,
-                 sizeof(params->rt_params));
 
     ret = uacpi_initialize_tables();
     if (uacpi_unlikely_error(ret))
@@ -289,7 +288,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
         return UACPI_STATUS_MAPPING_FAILED;
 
     if (rsdp->revision > 1 && rsdp->xsdt_addr &&
-        !uacpi_rt_params_check(UACPI_PARAM_BAD_XSDT))
+        !uacpi_check_flag(UACPI_FLAG_BAD_XSDT))
     {
         rxsdt = uacpi_truncate_phys_addr_with_warn(rsdp->xsdt_addr);
         rxsdt_entry_size = 8;
@@ -315,7 +314,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     uacpi_install_default_address_space_handlers();
 
-    if (params->no_acpi_mode)
+    if (uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE))
         return UACPI_STATUS_OK;
 
     return uacpi_enter_acpi_mode();

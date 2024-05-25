@@ -10,7 +10,7 @@ void uacpi_log(uacpi_log_level, const uacpi_char*, ...);
 #endif
 
 #define uacpi_log_lvl(lvl, ...) \
-    do { if (uacpi_rt_should_log(lvl)) uacpi_log(lvl, __VA_ARGS__); } while (0)
+    do { if (uacpi_should_log(lvl)) uacpi_log(lvl, __VA_ARGS__); } while (0)
 
 #define uacpi_debug(...) uacpi_log_lvl(UACPI_LOG_DEBUG, __VA_ARGS__)
 #define uacpi_trace(...) uacpi_log_lvl(UACPI_LOG_TRACE, __VA_ARGS__)

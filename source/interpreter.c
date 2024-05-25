@@ -2115,7 +2115,7 @@ static uacpi_status debug_store(uacpi_object *src)
      * Don't bother running the body if current log level is not set to trace.
      * All DebugOp logging is done as TRACE exclusively.
      */
-    if (!uacpi_rt_should_log(UACPI_LOG_TRACE))
+    if (!uacpi_should_log(UACPI_LOG_TRACE))
         return UACPI_STATUS_OK;
 
     src = uacpi_unwrap_internal_reference(src);
