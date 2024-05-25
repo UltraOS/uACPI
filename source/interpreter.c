@@ -16,6 +16,7 @@
 #include <uacpi/internal/resources.h>
 #include <uacpi/internal/event.h>
 #include <uacpi/internal/mutex.h>
+#include <uacpi/internal/osi.h>
 
 enum item_type {
     ITEM_NONE = 0,
@@ -5709,39 +5710,12 @@ out:
     return ret;
 }
 
-// TODO: make this dynamically configurable
-static uacpi_char *supported_osi_strings[] = {
-    "Windows 2000",
-    "Windows 2001",
-    "Windows 2001 SP1",
-    "Windows 2001.1",
-    "Windows 2001 SP2",
-    "Windows 2001.1 SP1",
-    "Windows 2006",
-    "Windows 2006.1",
-    "Windows 2006 SP1",
-    "Windows 2006 SP2",
-    "Windows 2009",
-    "Windows 2012",
-    "Windows 2013",
-    "Windows 2015",
-    "Windows 2016",
-    "Windows 2017",
-    "Windows 2017.2",
-    "Windows 2018",
-    "Windows 2018.2",
-    "Windows 2019",
-    "Windows 2020",
-    "Windows 2021",
-    "Windows 2022",
-    "Extended Address Space Descriptor",
-};
-
 uacpi_status uacpi_osi(uacpi_handle handle, uacpi_object *retval)
 {
     struct execution_context *ctx = handle;
+    uacpi_bool is_supported;
+    uacpi_status ret;
     uacpi_object *arg;
-    uacpi_size i;
 
     arg = uacpi_unwrap_internal_reference(ctx->cur_frame->args[0]);
     if (arg->type != UACPI_OBJECT_STRING) {
@@ -5755,20 +5729,13 @@ uacpi_status uacpi_osi(uacpi_handle handle, uacpi_object *retval)
 
     retval->type = UACPI_OBJECT_INTEGER;
 
-    for (i = 0; i < UACPI_ARRAY_SIZE(supported_osi_strings); ++i) {
-        uacpi_char *str = supported_osi_strings[i];
+    ret = uacpi_handle_osi(arg->buffer->text, &is_supported);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-        if (uacpi_strncmp(str, arg->buffer->text, arg->buffer->size) != 0)
-            continue;
+    retval->integer = is_supported ? ones() : 0;
 
-        retval->integer = ones();
-        goto out;
-    }
-
-    retval->integer = 0;
-
-out:
     uacpi_trace("_OSI(%s) => reporting as %ssupported\n",
-                arg->buffer->text, retval->integer ? "" : "un");
+                arg->buffer->text, is_supported ? "" : "un");
     return UACPI_STATUS_OK;
 }

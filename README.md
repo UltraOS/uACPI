@@ -22,6 +22,7 @@ What works:
 - GAS read/write API, FADT register read/write all implemented
 - PCI routing table retrieval & interrupt model API
 - Device search API
+- Interface & feature management exposed via _OSI
 
 What's missing or doesn't work:
 - No locking. This means all of the currently defined public API is not thread safe
