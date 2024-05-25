@@ -28,38 +28,37 @@
 extern "C" {
 #endif
 
+typedef struct uacpi_init_params {
+    // Physical address of the RSDP structure.
+    uacpi_phys_addr rsdp;
+
+    // Initial log level, all logs above this level are discarded
+    uacpi_log_level log_level;
+
 /*
  * Bad table checksum should be considered a fatal error
  * (table load is fully aborted in this case)
  */
-#define UACPI_PARAM_BAD_CSUM_FATAL (1 << 0)
+#define UACPI_FLAG_BAD_CSUM_FATAL (1 << 0)
 
 /*
  * Bad table header should be considered a fatal error
  * (table load is fully aborted in this case)
  */
-#define UACPI_PARAM_BAD_TBL_HDR_FATAL (1 << 1)
+#define UACPI_FLAG_BAD_TBL_HDR_FATAL (1 << 1)
 
 /*
  * Force uACPI to use RSDT even for later revisions
  */
-#define UACPI_PARAM_BAD_XSDT (1 << 2)
+#define UACPI_FLAG_BAD_XSDT (1 << 2)
 
-typedef struct uacpi_params {
-    enum uacpi_log_level log_level;
+/*
+ * If this is set, ACPI mode is not entered during the call to
+ * uacpi_initialize. The caller is expected to enter it later at thier own
+ * discretion by using uacpi_enter_acpi_mode().
+ */
+#define UACPI_FLAG_NO_ACPI_MODE (1 << 3)
     uacpi_u64 flags;
-} uacpi_params;
-
-typedef struct uacpi_init_params {
-    uacpi_phys_addr rsdp;
-    uacpi_params rt_params;
-
-    /*
-     * If this is set, ACPI mode is not entered during the call to
-     * uacpi_initialize. The caller is expected to enter it later at thier own
-     * discretion by using uacpi_enter_acpi_mode().
-     */
-    uacpi_bool no_acpi_mode;
 } uacpi_init_params;
 
 /*

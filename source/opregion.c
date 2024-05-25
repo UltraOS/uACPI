@@ -35,7 +35,7 @@ void uacpi_trace_region_io(
     uacpi_operation_region *op_region;
     const uacpi_char *type_str;
 
-    if (!uacpi_rt_should_log(UACPI_LOG_TRACE))
+    if (!uacpi_should_log(UACPI_LOG_TRACE))
         return;
 
     switch (op) {

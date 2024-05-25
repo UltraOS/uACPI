@@ -25,7 +25,7 @@ uacpi_status uacpi_verify_table_checksum_with_warn(void *table, uacpi_size size)
     if (uacpi_table_checksum(table, size) != 0) {
         enum uacpi_log_level lvl = UACPI_LOG_WARN;
 
-        if (uacpi_rt_params_check(UACPI_PARAM_BAD_CSUM_FATAL)) {
+        if (uacpi_check_flag(UACPI_FLAG_BAD_CSUM_FATAL)) {
             ret = UACPI_STATUS_BAD_CHECKSUM;
             lvl = UACPI_LOG_ERROR;
         }
@@ -48,7 +48,7 @@ uacpi_status uacpi_check_tbl_signature_with_warn(
         enum uacpi_log_level lvl = UACPI_LOG_WARN;
 
 
-        if (uacpi_rt_params_check(UACPI_PARAM_BAD_TBL_HDR_FATAL)) {
+        if (uacpi_check_flag(UACPI_FLAG_BAD_TBL_HDR_FATAL)) {
             ret = UACPI_STATUS_INVALID_SIGNATURE;
             lvl = UACPI_LOG_ERROR;
         }

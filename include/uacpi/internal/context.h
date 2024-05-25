@@ -28,6 +28,8 @@ struct uacpi_runtime_context {
     struct acpi_gas pm1a_enable_blk;
     struct acpi_gas pm1b_enable_blk;
 
+    uacpi_u64 flags;
+
 #define UACPI_SLEEP_TYP_INVALID 0xFF
     uacpi_u8 last_sleep_typ_a;
     uacpi_u8 last_sleep_typ_b;
@@ -59,13 +61,13 @@ struct uacpi_runtime_context {
     uacpi_bool global_lock_pending;
 #endif
 
+    uacpi_u8 log_level;
+
 #define UACPI_INIT_LEVEL_EARLY 0
 #define UACPI_INIT_LEVEL_TABLES_LOADED 1
 #define UACPI_INIT_LEVEL_NAMESPACE_LOADED 2
 #define UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED 3
     uacpi_u8 init_level;
-
-    struct uacpi_params params;
 };
 
 static inline const uacpi_char *uacpi_init_level_to_string(uacpi_u8 lvl)
@@ -114,14 +116,14 @@ static inline const uacpi_char *uacpi_init_level_to_string(uacpi_u8 lvl)
 
 extern struct uacpi_runtime_context g_uacpi_rt_ctx;
 
-static inline uacpi_bool uacpi_rt_params_check(uacpi_u64 flag)
+static inline uacpi_bool uacpi_check_flag(uacpi_u64 flag)
 {
-    return (g_uacpi_rt_ctx.params.flags & flag) == flag;
+    return (g_uacpi_rt_ctx.flags & flag) == flag;
 }
 
-static inline uacpi_bool uacpi_rt_should_log(enum uacpi_log_level lvl)
+static inline uacpi_bool uacpi_should_log(enum uacpi_log_level lvl)
 {
-    return lvl <= g_uacpi_rt_ctx.params.log_level;
+    return lvl <= g_uacpi_rt_ctx.log_level;
 }
 
 static inline uacpi_bool uacpi_is_hardware_reduced(void)
