@@ -10,6 +10,7 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/registers.h>
 #include <uacpi/internal/event.h>
+#include <uacpi/internal/osi.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
@@ -305,6 +306,10 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     }
 
     ret = initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_initialize_interfaces();
     if (uacpi_unlikely_error(ret))
         return ret;
 
