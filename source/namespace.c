@@ -116,8 +116,18 @@ uacpi_status uacpi_namespace_initialize_predefined(void)
     }
 
     for (ns = UACPI_PREDEFINED_NAMESPACE_GPE;
-         ns <= UACPI_PREDEFINED_NAMESPACE_MAX; ns++)
+         ns <= UACPI_PREDEFINED_NAMESPACE_MAX; ns++) {
+
+        /*
+         * Skip the installation of \_OSI if it was disabled by user.
+         * We still create the object, but it's not attached to the namespace.
+         */
+        if (ns == UACPI_PREDEFINED_NAMESPACE_OSI &&
+            uacpi_check_flag(UACPI_FLAG_NO_OSI))
+            continue;
+
         uacpi_node_install(uacpi_namespace_root(), &predefined_namespaces[ns]);
+    }
 
     return UACPI_STATUS_OK;
 }

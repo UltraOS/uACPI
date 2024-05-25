@@ -58,6 +58,13 @@ typedef struct uacpi_init_params {
  * discretion by using uacpi_enter_acpi_mode().
  */
 #define UACPI_FLAG_NO_ACPI_MODE (1 << 3)
+
+/*
+ * Don't create the \_OSI method when building the namespace.
+ * Only enable this if you're certain that having this method breaks your AML
+ * blob, a more atomic/granular interface management is available via osi.h
+ */
+#define UACPI_FLAG_NO_OSI (1 << 4)
     uacpi_u64 flags;
 } uacpi_init_params;
 
