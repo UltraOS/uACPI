@@ -9,7 +9,6 @@
  * - memcpy
  * - memset
  * - memcmp
- * - strncmp
  * - strcmp
  * - memmove
  * - strnlen

@@ -33,12 +33,6 @@ uacpi_size uacpi_strnlen(const uacpi_char *str, uacpi_size max);
 uacpi_i32 uacpi_strcmp(const uacpi_char *lhs, const uacpi_char *rhs);
 #endif
 
-#ifndef uacpi_strncmp
-uacpi_i32 uacpi_strncmp(
-    const uacpi_char *lhs, const uacpi_char *rhs, uacpi_size count
-);
-#endif
-
 #ifndef uacpi_snprintf
 UACPI_PRINTF_DECL(3, 4)
 uacpi_i32 uacpi_snprintf(

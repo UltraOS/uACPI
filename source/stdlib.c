@@ -86,32 +86,6 @@ uacpi_size uacpi_strnlen(const uacpi_char *str, uacpi_size max)
 }
 #endif
 
-#ifndef uacpi_strncmp
-uacpi_i32 uacpi_strncmp(
-    const uacpi_char *lhs, const uacpi_char *rhs, uacpi_size count
-)
-{
-    typedef const uacpi_u8 *cucp;
-
-    if (count == 0)
-        return 0;
-
-    size_t i = 0;
-
-    while (lhs[i] && rhs[i] && i < count) {
-        if (lhs[i] != rhs[i])
-            return *(cucp)&lhs[i] - *(cucp)&rhs[i];
-
-        i++;
-    }
-
-    if (i == count)
-        i--;
-
-    return *(cucp)&lhs[i] - *(cucp)&rhs[i];
-}
-#endif
-
 #ifndef uacpi_strcmp
 uacpi_i32 uacpi_strcmp(const uacpi_char *lhs, const uacpi_char *rhs)
 {
