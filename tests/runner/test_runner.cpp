@@ -9,6 +9,7 @@
 #include <uacpi/notify.h>
 #include <uacpi/utilities.h>
 #include <uacpi/resources.h>
+#include <uacpi/osi.h>
 
 void run_resource_tests();
 
@@ -264,6 +265,22 @@ static void run_test(
     st = uacpi_install_notify_handler(
         uacpi_namespace_root(), handle_notify, nullptr
     );
+    ensure_ok_status(st);
+
+    st = uacpi_install_interface("TestRunner", UACPI_INTERFACE_KIND_FEATURE);
+    ensure_ok_status(st);
+
+    st = uacpi_uninstall_interface("Windows 2006");
+    ensure_ok_status(st);
+
+    st = uacpi_uninstall_interface("Windows 2006");
+    if (st != UACPI_STATUS_NOT_FOUND)
+        throw std::runtime_error("couldn't uninstall interface");
+
+    st = uacpi_enable_host_interface(UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL);
+    ensure_ok_status(st);
+
+    st = uacpi_enable_host_interface(UACPI_HOST_INTERFACE_MODULE_DEVICE);
     ensure_ok_status(st);
 
     st = uacpi_namespace_load();
