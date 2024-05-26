@@ -292,7 +292,7 @@ static uacpi_size call_frame_code_bytes_left(struct call_frame *frame)
     return frame->method->size - frame->code_offset;
 }
 
-static bool call_frame_has_code(struct call_frame* frame)
+static uacpi_bool call_frame_has_code(struct call_frame *frame)
 {
     return call_frame_code_bytes_left(frame) > 0;
 }
@@ -3992,7 +3992,7 @@ static void refresh_ctx_pointers(struct execution_context *ctx)
     ctx->cur_block = code_block_array_last(&frame->code_blocks);
 }
 
-static bool ctx_has_non_preempted_op(struct execution_context *ctx)
+static uacpi_bool ctx_has_non_preempted_op(struct execution_context *ctx)
 {
     return ctx->cur_op_ctx && !ctx->cur_op_ctx->preempted;
 }
@@ -5218,7 +5218,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_IF_NOT_NULL:
         case UACPI_PARSE_OP_IF_NULL: {
             uacpi_u8 idx, bytes_skip;
-            bool is_null, skip_if_null;
+            uacpi_bool is_null, skip_if_null;
 
             idx = op_decode_byte(op_ctx);
             bytes_skip = op_decode_byte(op_ctx);
