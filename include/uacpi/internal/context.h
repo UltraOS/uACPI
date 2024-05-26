@@ -51,6 +51,7 @@ struct uacpi_runtime_context {
     uacpi_handle sci_handle;
 #endif
     uacpi_u32 loop_timeout_seconds;
+    uacpi_u32 max_call_stack_depth;
 
     uacpi_u32 global_lock_seq_num;
     uacpi_handle *global_lock_mutex;
