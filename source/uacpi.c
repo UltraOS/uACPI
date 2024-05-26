@@ -22,6 +22,14 @@ void uacpi_context_set_loop_timeout(uacpi_u32 seconds)
     g_uacpi_rt_ctx.loop_timeout_seconds = seconds;
 }
 
+void uacpi_context_set_max_call_stack_depth(uacpi_u32 depth)
+{
+    if (depth == 0)
+        depth = UACPI_DEFAULT_MAX_CALL_STACK_DEPTH;
+
+    g_uacpi_rt_ctx.max_call_stack_depth = depth;
+}
+
 uacpi_u32 uacpi_context_get_loop_timeout(void)
 {
     return g_uacpi_rt_ctx.loop_timeout_seconds;
@@ -87,6 +95,8 @@ const uacpi_char *uacpi_status_to_string(uacpi_status st)
         return "invalid resource template encoding or type";
     case UACPI_STATUS_AML_LOOP_TIMEOUT:
         return "hanging AML while loop";
+    case UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT:
+        return "reached maximum AML call stack depth";
     default:
         return "<invalid status>";
     }
@@ -279,6 +289,8 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     if (g_uacpi_rt_ctx.loop_timeout_seconds == 0)
         uacpi_context_set_loop_timeout(UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS);
+    if (g_uacpi_rt_ctx.max_call_stack_depth == 0)
+        uacpi_context_set_max_call_stack_depth(UACPI_DEFAULT_MAX_CALL_STACK_DEPTH);
 
     ret = uacpi_initialize_tables();
     if (uacpi_unlikely_error(ret))

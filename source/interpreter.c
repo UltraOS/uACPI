@@ -4916,6 +4916,10 @@ static uacpi_status prepare_method_call(
     uacpi_status ret;
     struct call_frame *frame;
 
+    if (uacpi_unlikely(call_frame_array_size(&ctx->call_stack) >=
+                       g_uacpi_rt_ctx.max_call_stack_depth))
+        return UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT;
+
     ret = push_new_frame(ctx, &frame);
     if (uacpi_unlikely_error(ret))
         return ret;
