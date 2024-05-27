@@ -4938,7 +4938,7 @@ static uacpi_status prepare_method_call(
 
         arg_count = args ? args->count : 0;
         if (uacpi_unlikely(arg_count != method->args)) {
-            uacpi_warn(
+            uacpi_error(
                 "invalid number of arguments %zu to call %.4s, expected %d\n",
                 args ? args->count : 0, node->name.text, method->args
             );
