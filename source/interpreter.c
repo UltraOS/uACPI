@@ -3844,7 +3844,7 @@ static uacpi_status handle_control_flow(struct execution_context *ctx)
     struct op_context *op_ctx = ctx->cur_op_ctx;
 
     if (uacpi_unlikely(frame->last_while == UACPI_NULL)) {
-        uacpi_warn(
+        uacpi_error(
             "attempting to %s outside of a While block\n",
             op_ctx->op->code == UACPI_AML_OP_BreakOp ? "Break" : "Continue"
         );
