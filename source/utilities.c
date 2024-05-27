@@ -619,11 +619,9 @@ void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list)
 uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
 {
     uacpi_status ret;
-    uacpi_object *obj;
+    uacpi_u64 value = 0;
 
-    ret = uacpi_eval_typed(
-        node, "_STA", UACPI_NULL, UACPI_OBJECT_INTEGER_BIT, &obj
-    );
+    ret = uacpi_eval_integer(node, "_STA", UACPI_NULL, &value);
 
     /*
      * ACPI 6.5 specification:
@@ -633,17 +631,11 @@ uacpi_status uacpi_eval_sta(uacpi_namespace_node *node, uacpi_u32 *flags)
      * and functioning).
      */
     if (ret == UACPI_STATUS_NOT_FOUND) {
-        *flags = 0xFFFFFFFF;
-        return UACPI_STATUS_OK;
+        value = 0xFFFFFFFF;
+        ret = UACPI_STATUS_OK;
     }
 
-    if (ret == UACPI_STATUS_OK) {
-        *flags = obj->integer;
-        uacpi_object_unref(obj);
-        return ret;
-    }
-
-    *flags = 0;
+    *flags = value;
     return ret;
 }
 
