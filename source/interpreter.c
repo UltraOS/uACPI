@@ -4399,12 +4399,17 @@ static uacpi_u8 op_decode_byte(struct op_context *ctx)
 }
 
 // MSVC doesn't support __VA_OPT__ so we do this weirdness
-#define EXEC_OP_DO_WARN(reason, ...)                                 \
-    uacpi_warn("Op 0x%04X ('%s'): "reason"\n",                       \
-               op_ctx->op->code, op_ctx->op->name __VA_ARGS__)
+#define EXEC_OP_DO_LVL(lvl, reason, ...)                              \
+    uacpi_##lvl("Op 0x%04X ('%s'): "reason"\n",                       \
+                op_ctx->op->code, op_ctx->op->name __VA_ARGS__)
 
-#define EXEC_OP_WARN_2(reason, arg0, arg1) EXEC_OP_DO_WARN(reason, ,arg0, arg1)
-#define EXEC_OP_WARN_1(reason, arg0) EXEC_OP_DO_WARN(reason, ,arg0)
+#define EXEC_OP_DO_ERR(reason, ...) EXEC_OP_DO_LVL(error, reason, __VA_ARGS__)
+#define EXEC_OP_DO_WARN(reason, ...) EXEC_OP_DO_LVL(warn, reason, __VA_ARGS__)
+
+#define EXEC_OP_ERR_2(reason, arg0, arg1) EXEC_OP_DO_ERR(reason, ,arg0, arg1)
+#define EXEC_OP_ERR_1(reason, arg0) EXEC_OP_DO_ERR(reason, ,arg0)
+#define EXEC_OP_ERR(reason) EXEC_OP_DO_ERR(reason)
+
 #define EXEC_OP_WARN(reason) EXEC_OP_DO_WARN(reason)
 
 #define SPEC_SIMPLE_NAME "SimpleName := NameString | ArgObj | LocalObj"
@@ -4511,8 +4516,8 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
     }
 
     if (!(props & ok_mask)) {
-        EXEC_OP_WARN_2("invalid argument: '%s', expected a %s",
-                       cur_op_ctx->op->name, expected_type_str);
+        EXEC_OP_ERR_2("invalid argument: '%s', expected a %s",
+                      cur_op_ctx->op->name, expected_type_str);
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
     }
 
@@ -4529,8 +4534,8 @@ static uacpi_status typecheck_obj(
     if (uacpi_likely(obj->type == expected_type))
         return UACPI_STATUS_OK;
 
-    EXEC_OP_WARN_2("invalid argument type: %s, expected a %s",
-                   uacpi_object_type_to_string(obj->type), spec_desc);
+    EXEC_OP_ERR_2("invalid argument type: %s, expected a %s",
+                  uacpi_object_type_to_string(obj->type), spec_desc);
     return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
 }
 
@@ -4561,7 +4566,7 @@ static uacpi_status typecheck_computational_data(
     case UACPI_OBJECT_INTEGER:
         return UACPI_STATUS_OK;
     default:
-        EXEC_OP_WARN_2(
+        EXEC_OP_ERR_2(
             "invalid argument type: %s, expected a %s",
             uacpi_object_type_to_string(obj->type),
             SPEC_COMPUTATIONAL_DATA
@@ -4650,7 +4655,7 @@ static uacpi_status uninstalled_op_handler(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
 
-    EXEC_OP_WARN("no dedicated handler installed");
+    EXEC_OP_ERR("no dedicated handler installed");
     return UACPI_STATUS_UNIMPLEMENTED;
 }
 
@@ -5174,9 +5179,9 @@ static uacpi_status exec_op(struct execution_context *ctx)
             expected_type = op_decode_byte(op_ctx);
 
             if (uacpi_unlikely(item->obj->type != expected_type)) {
-                EXEC_OP_WARN_2("bad object type: expected %s, got %s!",
-                               uacpi_object_type_to_string(expected_type),
-                               uacpi_object_type_to_string(item->obj->type));
+                EXEC_OP_ERR_2("bad object type: expected %s, got %s!",
+                              uacpi_object_type_to_string(expected_type),
+                              uacpi_object_type_to_string(item->obj->type));
                 ret = UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
             }
 
@@ -5185,7 +5190,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
         case UACPI_PARSE_OP_BAD_OPCODE:
         case UACPI_PARSE_OP_UNREACHABLE:
-            EXEC_OP_WARN("invalid/unexpected opcode");
+            EXEC_OP_ERR("invalid/unexpected opcode");
             ret = UACPI_STATUS_AML_INVALID_OPCODE;
             break;
 
@@ -5363,8 +5368,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 break;
 
             default:
-                EXEC_OP_WARN_1("don't know how to copy/transfer object to %d",
-                               prev_op);
+                EXEC_OP_ERR_1("don't know how to copy/transfer object to %d",
+                              prev_op);
                 ret = UACPI_STATUS_INVALID_ARGUMENT;
                 break;
             }
@@ -5521,7 +5526,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         default:
-            EXEC_OP_WARN_1("unhandled parser op '%d'", op);
+            EXEC_OP_ERR_1("unhandled parser op '%d'", op);
             ret = UACPI_STATUS_UNIMPLEMENTED;
             break;
         }
