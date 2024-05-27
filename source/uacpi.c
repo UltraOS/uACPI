@@ -439,45 +439,17 @@ struct ns_init_context {
     uacpi_size processors;
 };
 
-static void do_account_sta_ini(
-    const uacpi_char *method, uacpi_size *counter, uacpi_size *err_counter,
-    uacpi_namespace_node *node, uacpi_status ret
-)
-{
-    const uacpi_char *absolute_path;
-    uacpi_char oom_absolute_path[10] = "<...>";
-
-    if (ret == UACPI_STATUS_NOT_FOUND)
-        return;
-
-    (*counter)++;
-
-    if (ret == UACPI_STATUS_OK)
-        return;
-
-    (*err_counter)++;
-
-    absolute_path = uacpi_namespace_node_generate_absolute_path(node);
-    if (absolute_path == UACPI_NULL) {
-        absolute_path = oom_absolute_path;
-        uacpi_memcpy(oom_absolute_path + 4, node->name.text, 4);
-    }
-
-    uacpi_warn(
-        "aborted execution of '%s.%s' due to an error: %s\n",
-        absolute_path, method, uacpi_status_to_string(ret)
-    );
-
-    if (uacpi_likely(absolute_path != oom_absolute_path))
-        uacpi_free_dynamic_string(absolute_path);
-}
-
 static void ini_eval(struct ns_init_context *ctx, uacpi_namespace_node *node)
 {
     uacpi_status ret;
 
     ret = uacpi_eval(node, "_INI", UACPI_NULL, UACPI_NULL);
-    do_account_sta_ini("_INI", &ctx->ini_executed, &ctx->ini_errors, node, ret);
+    if (ret == UACPI_STATUS_NOT_FOUND)
+        return;
+
+    ctx->ini_executed++;
+    if (uacpi_unlikely_error(ret))
+        ctx->ini_errors++;
 }
 
 static uacpi_status sta_eval(
@@ -488,10 +460,12 @@ static uacpi_status sta_eval(
     uacpi_status ret;
 
     ret = uacpi_eval_sta(node, value);
-    do_account_sta_ini(
-        "_STA", &ctx->sta_executed, &ctx->sta_errors, node,
-        *value == 0xFFFFFFFF ? UACPI_STATUS_NOT_FOUND : ret
-    );
+    if (*value == 0xFFFFFFFF)
+        return ret;
+
+    ctx->sta_executed++;
+    if (uacpi_unlikely_error(ret))
+        ctx->sta_errors++;
 
     return ret;
 }
