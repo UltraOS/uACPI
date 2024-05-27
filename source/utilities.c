@@ -1089,7 +1089,7 @@ uacpi_status uacpi_get_pci_routing_table(
 
     table_pkg = obj->package;
     if (uacpi_unlikely(table_pkg->count == 0 || table_pkg->count > 1024)) {
-        uacpi_warn("invalid number of _PRT entries: %zu\n", table_pkg->count);
+        uacpi_error("invalid number of _PRT entries: %zu\n", table_pkg->count);
         uacpi_object_unref(obj);
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
@@ -1113,8 +1113,8 @@ uacpi_status uacpi_get_pci_routing_table(
 
         entry_pkg = entry_obj->package;
         if (uacpi_unlikely(entry_pkg->count != 4)) {
-            uacpi_warn("invalid _PRT sub-package entry count %zu\n",
-                       entry_pkg->count);
+            uacpi_error("invalid _PRT sub-package entry count %zu\n",
+                        entry_pkg->count);
             goto out_bad_encoding;
         }
 
