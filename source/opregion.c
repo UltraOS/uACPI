@@ -16,7 +16,7 @@ void uacpi_trace_region_error(
     path = uacpi_namespace_node_generate_absolute_path(node);
     op_region = uacpi_namespace_node_get_object(node)->op_region;
 
-    uacpi_warn(
+    uacpi_error(
         "%s operation region %s@%p: %s\n",
         message, path, op_region, uacpi_status_to_string(ret)
     );
