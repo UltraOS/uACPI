@@ -6,6 +6,7 @@
 #ifdef UACPI_FORMATTED_LOGGING
 #define uacpi_log uacpi_kernel_log
 #else
+UACPI_PRINTF_DECL(2, 3)
 void uacpi_log(uacpi_log_level, const uacpi_char*, ...);
 #endif
 
