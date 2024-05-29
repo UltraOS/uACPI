@@ -17,8 +17,9 @@ void uacpi_trace_region_error(
     op_region = uacpi_namespace_node_get_object(node)->op_region;
 
     uacpi_error(
-        "%s operation region %s@%p: %s\n",
-        message, path, op_region, uacpi_status_to_string(ret)
+        "%s (%s) operation region %s: %s\n",
+        message, uacpi_address_space_to_string(op_region->space),
+        path, uacpi_status_to_string(ret)
     );
     uacpi_free_dynamic_string(path);
 }
