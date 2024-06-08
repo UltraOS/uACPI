@@ -66,6 +66,66 @@ static uacpi_object_name facs_signature = {
     .text = { ACPI_FACS_SIGNATURE },
 };
 
+static uacpi_u8 table_checksum(void *table, uacpi_size size)
+{
+    uacpi_u8 *bytes = table;
+    uacpi_u8 csum = 0;
+    uacpi_size i;
+
+    for (i = 0; i < size; ++i)
+        csum += bytes[i];
+
+    return csum;
+}
+
+uacpi_status uacpi_verify_table_checksum(void *table, uacpi_size size)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_u8 csum;
+
+    csum = table_checksum(table, size);
+
+    if (uacpi_unlikely(csum != 0)) {
+        enum uacpi_log_level lvl = UACPI_LOG_WARN;
+        struct acpi_sdt_hdr *hdr = table;
+
+        if (uacpi_check_flag(UACPI_FLAG_BAD_CSUM_FATAL)) {
+            ret = UACPI_STATUS_BAD_CHECKSUM;
+            lvl = UACPI_LOG_ERROR;
+        }
+
+        uacpi_log_lvl(
+            lvl, "invalid table "UACPI_PRI_TBL_HDR" checksum %d!\n",
+            UACPI_FMT_TBL_HDR(hdr), csum
+        );
+    }
+
+    return ret;
+}
+
+uacpi_status uacpi_check_table_signature(void *table, const uacpi_char *expect)
+{
+    uacpi_status ret = UACPI_STATUS_OK;
+
+    if (uacpi_memcmp(table, expect, 4) != 0) {
+        enum uacpi_log_level lvl = UACPI_LOG_WARN;
+        struct acpi_sdt_hdr *hdr = table;
+
+        if (uacpi_check_flag(UACPI_FLAG_BAD_TBL_SIGNATURE_FATAL)) {
+            ret = UACPI_STATUS_INVALID_SIGNATURE;
+            lvl = UACPI_LOG_ERROR;
+        }
+
+        uacpi_log_lvl(
+            lvl,
+            "invalid table "UACPI_PRI_TBL_HDR" signature (expected '%.4s')\n",
+            UACPI_FMT_TBL_HDR(hdr), expect
+        );
+    }
+
+    return ret;
+}
+
 static uacpi_status table_alloc(
     struct uacpi_installed_table **out_tbl, uacpi_size *out_idx
 )
@@ -114,7 +174,7 @@ static uacpi_status verify_and_install_table(
      * writable fields. Don't try to validate it here.
      */
     if (signature.id != facs_signature.id) {
-        ret = uacpi_verify_table_checksum_with_warn(virt_addr, length);
+        ret = uacpi_verify_table_checksum(virt_addr, length);
         if (uacpi_unlikely_error(ret))
             return ret;
     }

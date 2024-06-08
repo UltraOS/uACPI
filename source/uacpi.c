@@ -230,7 +230,7 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
     if (rxsdt == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
 
-    ret = uacpi_check_tbl_signature_with_warn(rxsdt,
+    ret = uacpi_check_table_signature(rxsdt,
         entry_size == 8 ? ACPI_XSDT_SIGNATURE : ACPI_RSDT_SIGNATURE);
     if (uacpi_unlikely_error(ret))
         goto error_out;
@@ -249,7 +249,7 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
     if (uacpi_unlikely(rxsdt == UACPI_NULL))
         return UACPI_STATUS_MAPPING_FAILED;
 
-    ret = uacpi_verify_table_checksum_with_warn(rxsdt, map_len);
+    ret = uacpi_verify_table_checksum(rxsdt, map_len);
     if (uacpi_unlikely_error(ret))
         goto error_out;
 

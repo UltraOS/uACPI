@@ -42,10 +42,10 @@ typedef struct uacpi_init_params {
 #define UACPI_FLAG_BAD_CSUM_FATAL (1 << 0)
 
 /*
- * Bad table header should be considered a fatal error
+ * Unexpected table signature should be considered a fatal error
  * (table load is fully aborted in this case)
  */
-#define UACPI_FLAG_BAD_TBL_HDR_FATAL (1 << 1)
+#define UACPI_FLAG_BAD_TBL_SIGNATURE_FATAL (1 << 1)
 
 /*
  * Force uACPI to use RSDT even for later revisions

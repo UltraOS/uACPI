@@ -6,60 +6,6 @@
 #include <uacpi/internal/log.h>
 #include <uacpi/uacpi.h>
 
-static uacpi_u8 uacpi_table_checksum(void *table, uacpi_size size)
-{
-    uacpi_u8 *bytes = table;
-    uacpi_u8 csum = 0;
-    uacpi_size i;
-
-    for (i = 0; i < size; ++i)
-        csum += bytes[i];
-
-    return csum;
-}
-
-uacpi_status uacpi_verify_table_checksum_with_warn(void *table, uacpi_size size)
-{
-    uacpi_status ret = UACPI_STATUS_OK;
-
-    if (uacpi_table_checksum(table, size) != 0) {
-        enum uacpi_log_level lvl = UACPI_LOG_WARN;
-
-        if (uacpi_check_flag(UACPI_FLAG_BAD_CSUM_FATAL)) {
-            ret = UACPI_STATUS_BAD_CHECKSUM;
-            lvl = UACPI_LOG_ERROR;
-        }
-
-        uacpi_log_lvl(
-            lvl, "invalid table '%.4s' checksum!\n", (const uacpi_char*)table
-        );
-    }
-
-    return ret;
-}
-
-uacpi_status uacpi_check_tbl_signature_with_warn(
-    void *table, const uacpi_char *expect
-)
-{
-    uacpi_status ret = UACPI_STATUS_OK;
-
-    if (uacpi_memcmp(table, expect, 4) != 0) {
-        enum uacpi_log_level lvl = UACPI_LOG_WARN;
-
-
-        if (uacpi_check_flag(UACPI_FLAG_BAD_TBL_HDR_FATAL)) {
-            ret = UACPI_STATUS_INVALID_SIGNATURE;
-            lvl = UACPI_LOG_ERROR;
-        }
-
-        uacpi_log_lvl(lvl, "invalid table signature '%.4s' (expected '%.4s')\n",
-                      (const uacpi_char*)table, expect);
-    }
-
-    return ret;
-}
-
 void uacpi_eisa_id_to_string(uacpi_u32 id, uacpi_char *out_string)
 {
     static uacpi_char hex_to_ascii[16] = {
