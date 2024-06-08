@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <string>
+#include <cstring>
 #include <string_view>
 #include <cinttypes>
 
@@ -10,6 +11,7 @@
 #include <uacpi/utilities.h>
 #include <uacpi/resources.h>
 #include <uacpi/osi.h>
+#include <uacpi/tables.h>
 
 void run_resource_tests();
 
@@ -193,6 +195,36 @@ static void enumerate_namespace()
     );
 }
 
+/*
+ * DefinitionBlock ("x.aml", "SSDT", 1, "uTEST", "OVERRIDE", 0xF0F0F0F0)
+ * {
+ *     Name (VAL, "TestRunner")
+ * }
+ */
+uint8_t table_override[] = {
+    0x53, 0x53, 0x44, 0x54, 0x35, 0x00, 0x00, 0x00,
+    0x01, 0xa1, 0x75, 0x54, 0x45, 0x53, 0x54, 0x00,
+    0x4f, 0x56, 0x45, 0x52, 0x52, 0x49, 0x44, 0x45,
+    0xf0, 0xf0, 0xf0, 0xf0, 0x49, 0x4e, 0x54, 0x4c,
+    0x25, 0x09, 0x20, 0x20, 0x08, 0x56, 0x41, 0x4c,
+    0x5f, 0x0d, 0x54, 0x65, 0x73, 0x74, 0x52, 0x75,
+    0x6e, 0x6e, 0x65, 0x72, 0x00
+};
+
+static uacpi_table_installation_disposition handle_table_install(
+    struct acpi_sdt_hdr *hdr, uacpi_u64 *out_override
+)
+{
+    if (strncmp(hdr->oem_table_id, "DENYTABL", sizeof(hdr->oem_table_id)) == 0)
+        return UACPI_TABLE_INSTALLATION_DISPOSITON_DENY;
+
+    if (strncmp(hdr->oem_table_id, "OVERTABL", sizeof(hdr->oem_table_id)) != 0)
+        return UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW;
+
+    *out_override = (uacpi_virt_addr)table_override;
+    return UACPI_TABLE_INSTALLATION_DISPOSITON_VIRTUAL_OVERRIDE;
+}
+
 static uacpi_status handle_notify(
     uacpi_handle, uacpi_namespace_node *node, uacpi_u64 value
 )
@@ -265,6 +297,9 @@ static void run_test(
     st = uacpi_install_notify_handler(
         uacpi_namespace_root(), handle_notify, nullptr
     );
+    ensure_ok_status(st);
+
+    st = uacpi_set_table_installation_handler(handle_table_install);
     ensure_ok_status(st);
 
     st = uacpi_install_interface("TestRunner", UACPI_INTERFACE_KIND_FEATURE);
