@@ -1760,7 +1760,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
             raw_value = item_array_at(&op_ctx->items, i++)->immediate;
 
             access_type = raw_value & 0b1111;
-            access_attrib = access_type >> 6;
+            access_attrib = (raw_value >> 6) & 0b11;
 
             raw_value = item_array_at(&op_ctx->items, i++)->immediate;
 
