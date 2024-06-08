@@ -74,6 +74,10 @@ const uacpi_char *uacpi_status_to_string(uacpi_status st)
         return "timed out waiting for hardware response";
     case UACPI_STATUS_TIMEOUT:
         return "wait timed out";
+    case UACPI_STATUS_OVERRIDEN:
+        return "the requested action has been overriden";
+    case UACPI_STATUS_DENIED:
+        return "the requested action has been denied";
 
     case UACPI_STATUS_AML_UNDEFINED_REFERENCE:
         return "AML referenced an undefined object";
