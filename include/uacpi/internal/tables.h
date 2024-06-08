@@ -30,6 +30,9 @@ struct uacpi_installed_table {
 
 uacpi_status uacpi_initialize_tables(void);
 
+uacpi_status uacpi_check_table_signature(void *table, const uacpi_char *expect);
+uacpi_status uacpi_verify_table_checksum(void *table, uacpi_size size);
+
 uacpi_status uacpi_table_install_physical_with_origin(
     uacpi_phys_addr phys, enum uacpi_table_origin origin, uacpi_table *out_table
 );
