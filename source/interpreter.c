@@ -1183,7 +1183,7 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     uacpi_status ret;
     struct item_array *items = &ctx->cur_op_ctx->items;
     struct uacpi_table_identifiers table_id;
-    struct uacpi_table *table;
+    uacpi_table table;
     uacpi_namespace_node *node;
     uacpi_object *obj;
     uacpi_operation_region *op_region;
@@ -1208,8 +1208,8 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     obj = item_array_at(items, 4)->obj;
     op_region = obj->op_region;
     op_region->space = UACPI_ADDRESS_SPACE_TABLE_DATA;
-    op_region->offset = table->virt_addr;
-    op_region->length = table->length;
+    op_region->offset = table.virt_addr;
+    op_region->length = table.hdr->length;
 
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED, obj
@@ -1223,76 +1223,51 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-enum table_load_cause {
-    TABLE_LOAD_CAUSE_LOAD_OP,
-    TABLE_LOAD_CAUSE_LOAD_TABLE_OP,
-    TABLE_LOAD_CAUSE_API
-};
+static uacpi_bool is_dynamic_table_load(enum uacpi_table_load_cause cause)
+{
+    return cause != UACPI_TABLE_LOAD_CAUSE_INIT;
+}
 
-static uacpi_status prepare_table_load(
-    struct uacpi_table *table,
-    enum table_load_cause cause, uacpi_control_method *in_method
+static void prepare_table_load(
+    void *ptr, enum uacpi_table_load_cause cause, uacpi_control_method *in_method
 )
 {
-    struct acpi_dsdt *dsdt;
+    struct acpi_dsdt *dsdt = ptr;
     enum uacpi_log_level log_level = UACPI_LOG_TRACE;
     const uacpi_char *log_prefix = "load of";
 
-    /*
-     * Duplicate table loads are only disallowed for API loads. AML can load
-     * the same table multiple times, since this is allowed by NT.
-     */
-    if ((table->flags & UACPI_TABLE_LOADED) && cause == TABLE_LOAD_CAUSE_API)
-        return UACPI_STATUS_ALREADY_EXISTS;
-
-    if (cause != TABLE_LOAD_CAUSE_API) {
-        log_prefix = "dynamic load of";
+    if (is_dynamic_table_load(cause)) {
+        log_prefix = cause == UACPI_TABLE_LOAD_CAUSE_HOST ?
+               "host-invoked load of" : "dynamic load of";
         log_level = UACPI_LOG_INFO;
     }
 
     uacpi_log_lvl(
         log_level,
         "%s '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
-        log_prefix, table->signature.text, table->hdr->oemid,
-        table->hdr->oem_table_id
+        log_prefix, dsdt->hdr.signature, dsdt->hdr.oemid, dsdt->hdr.oem_table_id
     );
 
-    dsdt = UACPI_VIRT_ADDR_TO_PTR(table->virt_addr);
     in_method->code = dsdt->definition_block;
-    in_method->size = table->length - sizeof(dsdt->hdr);
+    in_method->size = dsdt->hdr.length - sizeof(dsdt->hdr);
     in_method->named_objects_persist = UACPI_TRUE;
-
-    table->flags |= UACPI_TABLE_LOADED;
-    return UACPI_STATUS_OK;
 }
 
 static uacpi_status do_load_table(
-    uacpi_namespace_node *parent, struct uacpi_table *table,
-    enum table_load_cause cause
+    uacpi_namespace_node *parent, struct acpi_sdt_hdr *tbl,
+    enum uacpi_table_load_cause cause
 )
 {
     struct uacpi_control_method method = { 0 };
     uacpi_status ret;
 
-    ret = prepare_table_load(table, cause, &method);
-    if (uacpi_unlikely_error(ret)) {
-        if (ret == UACPI_STATUS_ALREADY_EXISTS)
-            ret = UACPI_STATUS_OK;
-
-        return ret;
-    }
+    prepare_table_load(tbl, cause, &method);
 
     ret = uacpi_execute_control_method(parent, &method, UACPI_NULL, UACPI_NULL);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    /*
-     * NOTE:
-     * This will need to run if we define public API for loading additional
-     * SSDTs. Add a condition to run gpe match code for the new LOAD_CAUSE
-     * in that case.
-     */
-    if (cause != TABLE_LOAD_CAUSE_API)
+    if (is_dynamic_table_load(cause))
         ret = uacpi_events_match_post_dynamic_table_load();
 
     return ret;
@@ -1303,7 +1278,7 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     uacpi_status ret;
     struct item_array *items = &ctx->cur_op_ctx->items;
     struct uacpi_table_identifiers table_id;
-    struct uacpi_table *table;
+    uacpi_table table;
     uacpi_buffer *root_path, *param_path;
     uacpi_control_method *method;
     uacpi_namespace_node *root_node, *param_node = UACPI_NULL;
@@ -1382,16 +1357,19 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
         report_table_id_find_error("LoadTable", &table_id, ret);
         return ret;
     }
+    uacpi_table_mark_as_loaded(table.index);
 
     method = item_array_at(items, 1)->obj->method;
-    return prepare_table_load(table, TABLE_LOAD_CAUSE_LOAD_TABLE_OP, method);
+    prepare_table_load(table.hdr, UACPI_TABLE_LOAD_CAUSE_LOAD_TABLE_OP, method);
+
+    return UACPI_STATUS_OK;
 }
 
 static uacpi_status handle_load(struct execution_context *ctx)
 {
     uacpi_status ret;
     struct item_array *items = &ctx->cur_op_ctx->items;
-    struct uacpi_table *table;
+    uacpi_table table;
     uacpi_control_method *method;
     uacpi_object *src;
     struct acpi_sdt_hdr *src_table;
@@ -1499,17 +1477,21 @@ static uacpi_status handle_load(struct execution_context *ctx)
         unmap_src = UACPI_FALSE;
     }
 
-    ret = uacpi_table_append_mapped(UACPI_PTR_TO_VIRT_ADDR(table_buffer),
-                                    &table);
+    ret = uacpi_table_install_with_origin(
+        table_buffer, UACPI_TABLE_ORIGIN_FIRMWARE_VIRTUAL, &table
+    );
     if (uacpi_unlikely_error(ret)) {
         uacpi_free(table_buffer, src_table->length);
-        goto error_out;
+
+        if (ret != UACPI_STATUS_OVERRIDEN)
+            goto error_out;
     }
+    uacpi_table_mark_as_loaded(table.index);
 
     item_array_at(items, 0)->node = uacpi_namespace_root();
 
     method = item_array_at(items, 1)->obj->method;
-    prepare_table_load(table, TABLE_LOAD_CAUSE_LOAD_OP, method);
+    prepare_table_load(table.ptr, UACPI_TABLE_LOAD_CAUSE_LOAD_OP, method);
 
     return UACPI_STATUS_OK;
 
@@ -1519,12 +1501,9 @@ error_out:
     return UACPI_STATUS_OK;
 }
 
-uacpi_status uacpi_load_table(struct uacpi_table *table)
+uacpi_status uacpi_execute_table(void *tbl, enum uacpi_table_load_cause cause)
 {
-    return do_load_table(
-        uacpi_namespace_root(), table,
-        TABLE_LOAD_CAUSE_API
-    );
+    return do_load_table(uacpi_namespace_root(), tbl, cause);
 }
 
 uacpi_u32 get_field_length(struct item *item)

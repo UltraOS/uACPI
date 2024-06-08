@@ -261,7 +261,9 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
             continue;
 
         entry_addr = uacpi_truncate_phys_addr_with_warn(entry_phys_addr_large);
-        ret = uacpi_table_append(entry_addr, UACPI_NULL);
+        ret = uacpi_table_install_physical_with_origin(
+            entry_addr, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_NULL
+        );
         if (uacpi_unlikely_error(ret))
             return ret;
     }
@@ -347,68 +349,71 @@ struct table_load_stats {
 };
 
 static void trace_table_load_failure(
-    uacpi_table *tbl, enum uacpi_log_level lvl, uacpi_status ret
+    struct acpi_sdt_hdr *tbl, uacpi_log_level lvl, uacpi_status ret
 )
 {
     uacpi_log_lvl(
         lvl,
         "failed to load '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s'): %s\n",
-        tbl->signature.text, tbl->hdr->oemid, tbl->hdr->oem_table_id,
+        tbl->signature, tbl->oemid, tbl->oem_table_id,
         uacpi_status_to_string(ret)
     );
 }
 
-static uacpi_object_name ssdt_signature = {
-    .text = { ACPI_SSDT_SIGNATURE },
-};
-
-static uacpi_object_name psdt_signature = {
-    .text = { ACPI_PSDT_SIGNATURE },
-};
-
-enum uacpi_table_iteration_decision do_load_secondary_tables(
-    void *user, uacpi_table *tbl
-)
+static uacpi_bool match_ssdt_or_psdt(struct uacpi_installed_table *tbl)
 {
-    struct table_load_stats *stats = user;
-    uacpi_status ret;
+    static uacpi_object_name ssdt_signature = {
+        .text = { ACPI_SSDT_SIGNATURE },
+    };
+    static uacpi_object_name psdt_signature = {
+        .text = { ACPI_PSDT_SIGNATURE },
+    };
 
-    if (tbl->signature.id != ssdt_signature.id &&
-        tbl->signature.id != psdt_signature.id)
-        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+    if (tbl->flags & UACPI_TABLE_LOADED)
+        return UACPI_FALSE;
 
-    ret = uacpi_load_table(tbl);
-    if (uacpi_unlikely_error(ret)) {
-        trace_table_load_failure(tbl, UACPI_LOG_WARN, ret);
-        stats->failure_counter++;
-    }
-    stats->load_counter++;
-
-    return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+    return tbl->signature.id == ssdt_signature.id ||
+           tbl->signature.id == psdt_signature.id;
 }
 
 uacpi_status uacpi_namespace_load(void)
 {
-    struct uacpi_table *tbl;
+    struct uacpi_table tbl;
     uacpi_status ret;
     struct table_load_stats st = { 0 };
+    uacpi_size cur_index;
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    ret = uacpi_table_find_by_type(UACPI_TABLE_TYPE_DSDT, &tbl);
+    ret = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
     if (uacpi_unlikely_error(ret)) {
         uacpi_error("unable to find DSDT: %s\n", uacpi_status_to_string(ret));
         return ret;
     }
 
-    ret = uacpi_load_table(tbl);
+    ret = uacpi_table_load_with_cause(tbl.index, UACPI_TABLE_LOAD_CAUSE_INIT);
     if (uacpi_unlikely_error(ret)) {
-        trace_table_load_failure(tbl, UACPI_LOG_ERROR, ret);
+        trace_table_load_failure(tbl.hdr, UACPI_LOG_ERROR, ret);
         st.failure_counter++;
     }
     st.load_counter++;
 
-    uacpi_for_each_table(0, do_load_secondary_tables, &st);
+    for (cur_index = 0;; cur_index = tbl.index + 1) {
+        ret = uacpi_table_match(cur_index, match_ssdt_or_psdt, &tbl);
+        if (ret != UACPI_STATUS_OK) {
+            if (uacpi_unlikely(ret != UACPI_STATUS_NOT_FOUND))
+                return ret;
+
+            break;
+        }
+
+        ret = uacpi_table_load_with_cause(tbl.index, UACPI_TABLE_LOAD_CAUSE_INIT);
+        if (uacpi_unlikely_error(ret)) {
+            trace_table_load_failure(tbl.hdr, UACPI_LOG_WARN, ret);
+            st.failure_counter++;
+        }
+        st.load_counter++;
+    }
 
     if (uacpi_unlikely(st.failure_counter != 0)) {
         uacpi_info(
