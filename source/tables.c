@@ -210,7 +210,8 @@ static uacpi_status verify_and_install_table(
 }
 
 static uacpi_status table_install_physical_with_origin_unlocked(
-    uacpi_phys_addr phys, enum uacpi_table_origin origin, uacpi_table *out_table
+    uacpi_phys_addr phys, enum uacpi_table_origin origin,
+    const uacpi_char *expected_signature, uacpi_table *out_table
 );
 static uacpi_status table_install_with_origin_unlocked(
     void *virt, enum uacpi_table_origin origin, uacpi_table *out_table
@@ -235,6 +236,7 @@ static uacpi_status handle_table_override(
         return table_install_physical_with_origin_unlocked(
             (uacpi_phys_addr)address,
             UACPI_TABLE_ORIGIN_HOST_PHYSICAL,
+            UACPI_NULL,
             out_table
         );
     default:
@@ -244,7 +246,8 @@ static uacpi_status handle_table_override(
 }
 
 static uacpi_status table_install_physical_with_origin_unlocked(
-    uacpi_phys_addr phys, enum uacpi_table_origin origin, uacpi_table *out_table
+    uacpi_phys_addr phys, enum uacpi_table_origin origin,
+    const uacpi_char *expected_signature, uacpi_table *out_table
 )
 {
     uacpi_object_name signature;
@@ -266,6 +269,12 @@ static uacpi_status table_install_physical_with_origin_unlocked(
     if (uacpi_unlikely(!virt))
         return UACPI_STATUS_MAPPING_FAILED;
 
+    if (expected_signature != UACPI_NULL) {
+        ret = uacpi_check_table_signature(virt, expected_signature);
+        if (uacpi_unlikely_error(ret))
+            goto out;
+    }
+
     if (origin == UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL &&
         installation_handler != UACPI_NULL) {
         uacpi_u64 override;
@@ -281,26 +290,26 @@ static uacpi_status table_install_physical_with_origin_unlocked(
                 "table '%.4s' (0x016%"UACPI_PRIX64") installation denied "
                 "by host\n", signature.text, UACPI_FMT64(phys)
             );
-            uacpi_kernel_unmap(virt, length);
-            return UACPI_STATUS_DENIED;
+            ret = UACPI_STATUS_DENIED;
+            goto out;
 
         default:
             uacpi_info(
                 "table '%.4s' (0x016%"UACPI_PRIX64") installation "
                 "overriden by host\n", signature.text, UACPI_FMT64(phys)
             );
-            uacpi_kernel_unmap(virt, length);
 
             ret = handle_table_override(disposition, override, out_table);
             if (uacpi_likely_success(ret))
                 ret = UACPI_STATUS_OVERRIDEN;
 
-            return ret;
+            goto out;
         }
     }
 
     ret = verify_and_install_table(signature, length, phys, virt, origin,
                                    out_table);
+out:
     if (uacpi_unlikely_error(ret)) {
         uacpi_kernel_unmap(virt, length);
         return ret;
@@ -316,7 +325,9 @@ uacpi_status uacpi_table_install_physical_with_origin(
     uacpi_status ret;
 
     UACPI_MUTEX_ACQUIRE(table_mutex);
-    ret = table_install_physical_with_origin_unlocked(phys, origin, out_table);
+    ret = table_install_physical_with_origin_unlocked(
+        phys, origin, UACPI_NULL, out_table
+    );
     UACPI_MUTEX_RELEASE(table_mutex);
 
     return ret;
@@ -837,7 +848,7 @@ static uacpi_status initialize_fadt(struct acpi_sdt_hdr *hdr)
     if (fadt->x_dsdt) {
         ret = table_install_physical_with_origin_unlocked(
             fadt->x_dsdt, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
-            &tbl
+            ACPI_DSDT_SIGNATURE, &tbl
         );
         if (uacpi_unlikely_error(ret))
             return ret;
@@ -858,7 +869,7 @@ static uacpi_status initialize_fadt(struct acpi_sdt_hdr *hdr)
         if (fadt->x_firmware_ctrl) {
             ret = table_install_physical_with_origin_unlocked(
                 fadt->x_firmware_ctrl, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
-                &tbl
+                ACPI_FACS_SIGNATURE, &tbl
             );
             if (uacpi_unlikely_error(ret))
                 return ret;
