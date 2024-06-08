@@ -60,3 +60,6 @@ typedef uacpi_bool (*uacpi_table_match_callback)
 uacpi_status uacpi_table_match(
     uacpi_size base_idx, uacpi_table_match_callback, uacpi_table *out_table
 );
+
+#define UACPI_PRI_TBL_HDR "'%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')"
+#define UACPI_FMT_TBL_HDR(hdr) (hdr)->signature, (hdr)->oemid, (hdr)->oem_table_id

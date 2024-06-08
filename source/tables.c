@@ -290,14 +290,18 @@ static uacpi_status table_install_with_origin_unlocked(
         case UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW:
             break;
         case UACPI_TABLE_INSTALLATION_DISPOSITON_DENY:
-            uacpi_info("table '%.4s' (%p) installation denied by host\n",
-                       signature.text, virt);
+            uacpi_info(
+                "table "UACPI_PRI_TBL_HDR" installation denied by host\n",
+                UACPI_FMT_TBL_HDR(hdr)
+            );
             return UACPI_STATUS_DENIED;
 
         default: {
             uacpi_status ret;
-            uacpi_info("table '%.4s' (%p) installation overriden by host\n",
-                       signature.text, virt);
+            uacpi_info(
+                "table "UACPI_PRI_TBL_HDR" installation overriden by host\n",
+                UACPI_FMT_TBL_HDR(hdr)
+            );
 
             ret = handle_table_override(disposition, override, out_table);
             if (uacpi_likely_success(ret))

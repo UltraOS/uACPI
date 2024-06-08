@@ -1243,9 +1243,8 @@ static void prepare_table_load(
     }
 
     uacpi_log_lvl(
-        log_level,
-        "%s '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s')\n",
-        log_prefix, dsdt->hdr.signature, dsdt->hdr.oemid, dsdt->hdr.oem_table_id
+        log_level, "%s "UACPI_PRI_TBL_HDR"\n",
+        log_prefix, UACPI_FMT_TBL_HDR(&dsdt->hdr)
     );
 
     in_method->code = dsdt->definition_block;
