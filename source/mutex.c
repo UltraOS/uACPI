@@ -122,7 +122,7 @@ UACPI_STUB_IF_REDUCED_HARDWARE(
 
 uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
 {
-    uacpi_bool success;
+    uacpi_bool did_acquire;
     uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
@@ -130,15 +130,15 @@ uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
     if (uacpi_unlikely(out_seq == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    success = uacpi_kernel_acquire_mutex(
-        g_uacpi_rt_ctx.global_lock_mutex, timeout
+    UACPI_MUTEX_ACQUIRE_WITH_TIMEOUT(
+        g_uacpi_rt_ctx.global_lock_mutex, timeout, did_acquire
     );
-    if (!success)
+    if (!did_acquire)
         return UACPI_STATUS_TIMEOUT;
 
     ret = uacpi_acquire_global_lock_from_firmware();
     if (uacpi_unlikely_error(ret)) {
-        uacpi_kernel_release_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+        UACPI_MUTEX_RELEASE(g_uacpi_rt_ctx.global_lock_mutex);
         return ret;
     }
 
@@ -160,7 +160,7 @@ uacpi_status uacpi_release_global_lock(uacpi_u32 seq)
 
     g_uacpi_rt_ctx.global_lock_acquired = UACPI_FALSE;
     uacpi_release_global_lock_to_firmware();
-    uacpi_kernel_release_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+    UACPI_MUTEX_RELEASE(g_uacpi_rt_ctx.global_lock_mutex);
 
     return UACPI_STATUS_OK;
 }
@@ -176,6 +176,7 @@ uacpi_bool uacpi_this_thread_owns_aml_mutex(uacpi_mutex *mutex)
 uacpi_bool uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
 {
     uacpi_thread_id this_id;
+    uacpi_bool did_acquire;
 
     this_id = uacpi_kernel_get_thread_id();
     if (UACPI_ATOMIC_LOAD_THREAD_ID(&mutex->owner) == this_id) {
@@ -191,7 +192,8 @@ uacpi_bool uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
         return UACPI_TRUE;
     }
 
-    if (!uacpi_kernel_acquire_mutex(mutex->handle, timeout))
+    UACPI_MUTEX_ACQUIRE_WITH_TIMEOUT(mutex->handle, timeout, did_acquire);
+    if (!did_acquire)
         return UACPI_FALSE;
 
     if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex) {
@@ -199,7 +201,7 @@ uacpi_bool uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
 
         ret = uacpi_acquire_global_lock_from_firmware();
         if (uacpi_unlikely_error(ret)) {
-            uacpi_kernel_release_mutex(mutex->handle);
+            UACPI_MUTEX_RELEASE(mutex->handle);
             return UACPI_FALSE;
         }
     }
@@ -218,5 +220,5 @@ void uacpi_release_aml_mutex(uacpi_mutex *mutex)
         uacpi_release_global_lock_to_firmware();
 
     UACPI_ATOMIC_STORE_THREAD_ID(&mutex->owner, UACPI_THREAD_ID_NONE);
-    uacpi_kernel_release_mutex(mutex->handle);
+    UACPI_MUTEX_RELEASE(mutex->handle);
 }

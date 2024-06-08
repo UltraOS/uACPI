@@ -148,8 +148,7 @@ uacpi_status uacpi_install_interface(
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     interface = find_interface_unlocked(name);
     if (interface != UACPI_NULL) {
@@ -186,7 +185,7 @@ uacpi_status uacpi_install_interface(
     ret = UACPI_STATUS_OK;
 
 out:
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     return ret;
 }
 
@@ -197,8 +196,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     cur = registered_interfaces;
     prev = cur;
@@ -217,7 +215,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
                 prev->next = cur->next;
             }
 
-            uacpi_kernel_release_mutex(interface_mutex);
+            UACPI_MUTEX_RELEASE(interface_mutex);
             uacpi_free_dynamic_string(cur->name);
             uacpi_free(cur, sizeof(*cur));
             return UACPI_STATUS_OK;
@@ -237,7 +235,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
         break;
     }
 
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     return ret;
 }
 
@@ -250,8 +248,7 @@ static uacpi_status configure_host_interface(
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     interface = find_host_interface_unlocked(type);
     if (interface == UACPI_NULL)
@@ -261,7 +258,7 @@ static uacpi_status configure_host_interface(
     ret = UACPI_STATUS_OK;
 
 out:
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     return ret;
 }
 
@@ -283,8 +280,7 @@ uacpi_status uacpi_set_interface_query_handler(
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     if (interface_handler != UACPI_NULL && handler != UACPI_NULL)
         goto out;
@@ -293,7 +289,7 @@ uacpi_status uacpi_set_interface_query_handler(
     ret = UACPI_STATUS_OK;
 
 out:
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     return ret;
 }
 
@@ -305,8 +301,7 @@ uacpi_status uacpi_bulk_configure_interfaces(
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     interface = registered_interfaces;
     while (interface) {
@@ -316,7 +311,7 @@ uacpi_status uacpi_bulk_configure_interfaces(
         interface = interface->next;
     }
 
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     return UACPI_STATUS_OK;
 }
 
@@ -325,8 +320,7 @@ uacpi_status uacpi_handle_osi(const uacpi_char *string, uacpi_bool *out_value)
     struct registered_interface *interface;
     uacpi_bool is_supported = UACPI_FALSE;
 
-    if (uacpi_unlikely(!uacpi_kernel_acquire_mutex(interface_mutex, 0xFFFF)))
-        return UACPI_STATUS_INTERNAL_ERROR;
+    UACPI_MUTEX_ACQUIRE(interface_mutex);
 
     interface = find_interface_unlocked(string);
     if (interface == UACPI_NULL)
@@ -339,7 +333,7 @@ uacpi_status uacpi_handle_osi(const uacpi_char *string, uacpi_bool *out_value)
     if (interface_handler)
         is_supported = interface_handler(string, is_supported);
 out:
-    uacpi_kernel_release_mutex(interface_mutex);
+    UACPI_MUTEX_RELEASE(interface_mutex);
     *out_value = is_supported;
     return UACPI_STATUS_OK;
 }
