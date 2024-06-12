@@ -83,14 +83,6 @@ Local1 = RefOf(Local0)
 Local1++
 ```
 
-ToHexString:
-```asl
-
-// ACPICA: "000000000000000F"
-// Windows, uACPI: "0xF"
-Local0 = ToHexString(0xF)
-```
-
 Multilevel references:
 ```asl
 Local0 = 123
