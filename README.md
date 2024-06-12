@@ -13,6 +13,7 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 What works:
 - The interpreter itself, all of AML is supported and relatively well-tested
 - Namespace initialization, this includes properly running _STA and _INI, _REG for opregions
+- Table search, dynamic installation & loading API, ability to override/deny any tables being installed 
 - ACPI global firmware lock management via _GL, locked fields, as well as public API
 - The operation region subsystem. This includes public API for registering handlers, as well as builtin handlers for most common address space types
 - Notify handlers including public API
