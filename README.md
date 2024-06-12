@@ -102,6 +102,20 @@ Name (TEST, "BAR")
 // Windows, uACPI: TEST = "FOO"
 TEST = 0x4F4F46
 ```
+                                
+Buffer size mutability:
+```asl
+Name (TEST, "XXXX")
+Name (VAL, "")
+
+// ACPICA: TEST = "LONGSTRING"
+// Windows, UACPI: TEST = "LONG"
+TEST = "LONGSTRING"
+
+// ACPICA: VAL = "FOO"
+// Windows, UACPI: VAL = ""
+VAL = "FOO"
+```
 
 Returning a reference to a local object:
 ```asl
