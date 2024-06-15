@@ -6,6 +6,7 @@
 #include <cinttypes>
 
 #include "helpers.h"
+#include "argparser.h"
 #include <uacpi/context.h>
 #include <uacpi/notify.h>
 #include <uacpi/utilities.h>
@@ -259,16 +260,9 @@ static uacpi_status handle_notify(
     return UACPI_STATUS_OK;
 }
 
-enum class run_mode {
-    EMULATION,
-    EMULATION_WITH_NAMESPACE_DUMP,
-    TEST,
-    RESOURCE_TESTS,
-};
-
 static void run_test(
-    run_mode mode, std::string_view dsdt_path, uacpi_object_type expected_type,
-    std::string_view expected_value
+    std::string_view dsdt_path, uacpi_object_type expected_type,
+    std::string_view expected_value, bool dump_namespace
 )
 {
     acpi_rsdp rsdp {};
@@ -290,7 +284,7 @@ static void run_test(
     uacpi_log_level level = UACPI_LOG_TRACE;
 
     // Don't spam the log with traces if enumeration is enabled
-    if (mode == run_mode::EMULATION_WITH_NAMESPACE_DUMP)
+    if (dump_namespace)
         level = UACPI_LOG_INFO;
 
     uacpi_init_params params = {
@@ -339,7 +333,8 @@ static void run_test(
     st = uacpi_enable_host_interface(UACPI_HOST_INTERFACE_MODULE_DEVICE);
     ensure_ok_status(st);
 
-    if (mode == run_mode::TEST) {
+    auto is_test_mode = expected_type != UACPI_OBJECT_UNINITIALIZED;
+    if (is_test_mode) {
         st = uacpi_table_install(runner_id_table, UACPI_NULL);
         ensure_ok_status(st);
     }
@@ -347,7 +342,7 @@ static void run_test(
     st = uacpi_namespace_load();
     ensure_ok_status(st);
 
-    if (mode == run_mode::TEST) {
+    if (is_test_mode) {
         uacpi_object *runner_id;
         st = uacpi_eval_typed(UACPI_NULL, "\\_SI.TID", UACPI_NULL,
                               UACPI_OBJECT_STRING_BIT, &runner_id);
@@ -361,16 +356,12 @@ static void run_test(
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
-    switch (mode) {
-    case run_mode::EMULATION_WITH_NAMESPACE_DUMP:
+    if (dump_namespace)
         enumerate_namespace();
-        [[fallthrough]];
-    case run_mode::EMULATION:
+
+    if (!is_test_mode)
         // We're done with emulation mode
         return;
-    default:
-        break;
-    }
 
     uacpi_object* ret = UACPI_NULL;
     auto guard = ScopeGuard(
@@ -383,45 +374,32 @@ static void run_test(
     validate_ret_against_expected(*ret, expected_type, expected_value);
 }
 
-run_mode get_run_mode(int argc, char **argv)
-{
-    switch (argc) {
-    case 2: {
-        auto arg_view = std::string_view(argv[1]);
-
-        if (arg_view == "--test-resources")
-            return run_mode::RESOURCE_TESTS;
-
-        if (arg_view == "--help" || arg_view == "?" || arg_view == "-h")
-            break;
-
-        return run_mode::EMULATION;
-    }
-    case 3:
-        if (std::string_view(argv[2]) != "--enumerate-namespace")
-            break;
-
-        return run_mode::EMULATION_WITH_NAMESPACE_DUMP;
-    case 4:
-        return run_mode::TEST;
-    default:
-        break;
-    }
-
-    std::cout << "Usage:"
-        << "\n[EMULATION] " << argv[0] << " <dsdt_path> {--enumerate-namespace}"
-        << "\n[TEST MODE] " << argv[0]
-        << " <dsdt_path> <expected_type> <expected_value>"
-        << "\n[RESOURCE TESTS] " << argv[0] << " --test-resources\n";
-    std::exit(1);
-}
-
 int main(int argc, char** argv)
 {
-    auto mode = get_run_mode(argc, argv);
+    auto args = ArgParser {};
+    args.add_positional(
+            "dsdt-path-or-keyword",
+            "path to the DSDT to run or \"resource-tests\" to run the resource "
+            "tests and exit"
+        )
+        .add_list(
+            "expect", 'r', "test mode, evaluate \\MAIN and expect "
+            "<expected_type> <expected_value>"
+        )
+        .add_flag(
+            "enumerate-namespace", 'd',
+            "dump the entire namespace after loading it"
+        )
+        .add_help(
+            "help", 'h', "Display this menu and exit",
+            [&]() { std::cout << "uACPI test runner:\n" << args; }
+        );
 
     try {
-        if (mode == run_mode::RESOURCE_TESTS) {
+        args.parse(argc, argv);
+
+        auto dsdt_path_or_keyword = args.get("dsdt-path-or-keyword");
+        if (dsdt_path_or_keyword == "resource-tests") {
             run_resource_tests();
             return 0;
         }
@@ -429,12 +407,17 @@ int main(int argc, char** argv)
         std::string_view expected_value;
         uacpi_object_type expected_type = UACPI_OBJECT_UNINITIALIZED;
 
-        if (mode == run_mode::TEST) {
-            expected_type = string_to_object_type(argv[2]);
-            expected_value = argv[3];
+        if (args.is_set('r')) {
+            auto& expect = args.get_list('r');
+            if (expect.size() != 2)
+                throw std::runtime_error("bad --expect format");
+
+            expected_type = string_to_object_type(expect[0]);
+            expected_value = expect[1];
         }
 
-        run_test(mode, argv[1], expected_type, expected_value);
+        run_test(dsdt_path_or_keyword, expected_type, expected_value,
+                 args.is_set('d'));
     } catch (const std::exception& ex) {
         std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;
