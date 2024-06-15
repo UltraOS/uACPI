@@ -45,7 +45,7 @@ class TestCaseWithMain(TestCase):
         self.value = value
 
     def extra_runner_args(self) -> List[str]:
-        return [self.rtype, self.value]
+        return ["--expect", self.rtype, self.value]
 
 
 class TestCaseHardwareBlob(TestCase):
@@ -135,7 +135,7 @@ class TestHeaderFooter:
 
 def run_resource_tests(runner: str) -> int:
     with TestHeaderFooter("Resource Conversion Tests"):
-        return subprocess.run([runner, "--test-resources"]).returncode
+        return subprocess.run([runner, "resource-tests"]).returncode
 
 
 def compile_test_cases(
