@@ -18,16 +18,21 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
     return 256 - csum;
 }
 
-void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
-                          std::string_view path)
+void build_xsdt(
+    full_xsdt& xsdt, acpi_rsdp& rsdp, std::string_view dsdt_path,
+    const std::vector<std::string> &ssdt_paths
+)
 {
-    auto [dsdt_ptr, length] = read_entire_file(path, sizeof(acpi_sdt_hdr));
+    //std::vector<std::pair<void*, size_t>> tables(ssdt_paths.size() + 1);
+
+
+    auto [dsdt_ptr, length] = read_entire_file(dsdt_path, sizeof(acpi_sdt_hdr));
 
     auto *dsdt = reinterpret_cast<acpi_dsdt*>(dsdt_ptr);
     if (dsdt->hdr.length > length) {
         delete[] reinterpret_cast<uint8_t*>(dsdt_ptr);
         throw std::runtime_error(
-            std::string("DSDT declares that it's bigger than ") + path.data()
+            std::string("DSDT declares that it's bigger than ") + dsdt_path.data()
         );
     }
 
@@ -55,6 +60,14 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     memcpy(dsdt->hdr.signature, ACPI_DSDT_SIGNATURE,
            sizeof(ACPI_DSDT_SIGNATURE) - 1);
 
+    for (size_t i = 0; i < ssdt_paths.size(); ++i) {
+        auto [ssdt_ptr, ssdt_len] = read_entire_file(
+            ssdt_paths[i], sizeof(acpi_sdt_hdr)
+        );
+        memcpy(ssdt_ptr, ACPI_SSDT_SIGNATURE, sizeof(ACPI_SSDT_SIGNATURE) - 1);
+        xsdt.ssdts[i] = reinterpret_cast<acpi_sdt_hdr*>(ssdt_ptr);
+    }
+
     fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(dsdt);
     memcpy(fadt.hdr.signature, ACPI_FADT_SIGNATURE,
            sizeof(ACPI_FADT_SIGNATURE) - 1);
@@ -69,7 +82,7 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.hdr.checksum = gen_checksum(&fadt, sizeof(fadt));
 
     xsdt.fadt = &fadt;
-    xsdt.hdr.length = sizeof(xsdt);
+    xsdt.hdr.length = sizeof(xsdt) + sizeof(acpi_sdt_hdr*) * ssdt_paths.size();
     xsdt.hdr.revision = dsdt->hdr.revision;
     memcpy(xsdt.hdr.oemid, dsdt->hdr.oemid, sizeof(dsdt->hdr.oemid));
     xsdt.hdr.oem_revision = dsdt->hdr.oem_revision;
