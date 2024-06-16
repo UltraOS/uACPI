@@ -4,6 +4,7 @@
 #include <cstring>
 #include <string_view>
 #include <cinttypes>
+#include <vector>
 
 #include "helpers.h"
 #include "argparser.h"
@@ -13,6 +14,7 @@
 #include <uacpi/resources.h>
 #include <uacpi/osi.h>
 #include <uacpi/tables.h>
+#include <uacpi/opregion.h>
 
 void run_resource_tests();
 
@@ -247,26 +249,55 @@ static uacpi_status handle_notify(
     return UACPI_STATUS_OK;
 }
 
+static uacpi_status handle_ec(uacpi_region_op op, uacpi_handle op_data)
+{
+    switch (op) {
+    case UACPI_REGION_OP_READ: {
+        auto *rw_data = reinterpret_cast<uacpi_region_rw_data*>(op_data);
+        rw_data->value = 0;
+        [[fallthrough]];
+    }
+    case UACPI_REGION_OP_ATTACH:
+    case UACPI_REGION_OP_DETACH:
+    case UACPI_REGION_OP_WRITE:
+        return UACPI_STATUS_OK;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+}
+
 static void run_test(
-    std::string_view dsdt_path, uacpi_object_type expected_type,
-    std::string_view expected_value, bool dump_namespace
+    std::string_view dsdt_path, const std::vector<std::string>& ssdt_paths,
+    uacpi_object_type expected_type, std::string_view expected_value,
+    bool dump_namespace
 )
 {
     acpi_rsdp rsdp {};
-    full_xsdt xsdt {};
 
-    build_xsdt_from_file(xsdt, rsdp, dsdt_path);
-    auto dsdt_delete = ScopeGuard(
-        [&xsdt] {
-            delete[] reinterpret_cast<uint8_t*>(
-                static_cast<uintptr_t>(xsdt.fadt->x_dsdt)
-            );
-            delete reinterpret_cast<acpi_facs*>(
-                static_cast<uintptr_t>(xsdt.fadt->x_firmware_ctrl)
-            );
-            delete xsdt.fadt;
+    auto xsdt_bytes = sizeof(full_xsdt);
+    xsdt_bytes += ssdt_paths.size() * sizeof(acpi_sdt_hdr*);
+
+    auto *xsdt = new (std::calloc(xsdt_bytes, 1)) full_xsdt();
+    auto xsdt_delete = ScopeGuard(
+        [&xsdt, &ssdt_paths] {
+            if (xsdt->fadt) {
+                delete[] reinterpret_cast<uint8_t*>(
+                    static_cast<uintptr_t>(xsdt->fadt->x_dsdt)
+                );
+                delete reinterpret_cast<acpi_facs*>(
+                    static_cast<uintptr_t>(xsdt->fadt->x_firmware_ctrl)
+                );
+                delete xsdt->fadt;
+            }
+
+            for (size_t i = 0; i < ssdt_paths.size(); ++i)
+                delete[] xsdt->ssdts[i];
+
+            xsdt->~full_xsdt();
+            std::free(xsdt);
         }
     );
+    build_xsdt(*xsdt, rsdp, dsdt_path, ssdt_paths);
 
     uacpi_log_level level = UACPI_LOG_TRACE;
 
@@ -337,6 +368,12 @@ static void run_test(
         uacpi_object_unref(runner_id);
     }
 
+    st = uacpi_install_address_space_handler(
+        uacpi_namespace_root(), UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
+        handle_ec, nullptr
+    );
+    ensure_ok_status(st);
+
     st = uacpi_namespace_initialize();
     ensure_ok_status(st);
 
@@ -369,6 +406,9 @@ int main(int argc, char** argv)
         .add_list(
             "expect", 'r', "test mode, evaluate \\MAIN and expect "
             "<expected_type> <expected_value>"
+        )
+        .add_list(
+            "extra-tables", 'x', "a list of extra SSDTs to load"
         )
         .add_flag(
             "enumerate-namespace", 'd',
@@ -408,8 +448,8 @@ int main(int argc, char** argv)
             expected_value = expect[1];
         }
 
-        run_test(dsdt_path_or_keyword, expected_type, expected_value,
-                 args.is_set('d'));
+        run_test(dsdt_path_or_keyword, args.get_list_or("extra-tables", {}),
+                 expected_type, expected_value, args.is_set('d'));
     } catch (const std::exception& ex) {
         std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;

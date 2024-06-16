@@ -1,4 +1,5 @@
 #include <string_view>
+#include <vector>
 
 #include <uacpi/acpi.h>
 #include <uacpi/uacpi.h>
@@ -24,10 +25,11 @@ extern bool g_expect_virtual_addresses;
 UACPI_PACKED(struct full_xsdt {
     struct acpi_sdt_hdr hdr;
     acpi_fadt* fadt;
+    struct acpi_sdt_hdr* ssdts[];
 })
 
-void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
-                          std::string_view path);
+void build_xsdt(full_xsdt& xsdt, acpi_rsdp& rsdp, std::string_view dsdt_path,
+                const std::vector<std::string>& ssdt_paths);
 
 std::pair<void*, size_t>
 read_entire_file(std::string_view path, size_t min_size = 0);

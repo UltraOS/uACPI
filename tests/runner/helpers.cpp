@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 #include "helpers.h"
 
@@ -18,18 +19,53 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
     return 256 - csum;
 }
 
-void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
-                          std::string_view path)
+void build_xsdt(
+    full_xsdt& xsdt, acpi_rsdp& rsdp, std::string_view dsdt_path,
+    const std::vector<std::string> &ssdt_paths
+)
 {
-    auto [dsdt_ptr, length] = read_entire_file(path, sizeof(acpi_sdt_hdr));
+    std::vector<std::pair<void*, size_t>> tables(ssdt_paths.size() + 1);
+    auto tables_delete = ScopeGuard(
+        [&tables] {
+            for (auto& table : tables)
+                delete[] reinterpret_cast<uint8_t*>(table.first);
+        }
+    );
 
-    auto *dsdt = reinterpret_cast<acpi_dsdt*>(dsdt_ptr);
-    if (dsdt->hdr.length > length) {
-        delete[] reinterpret_cast<uint8_t*>(dsdt_ptr);
-        throw std::runtime_error(
-            std::string("DSDT declares that it's bigger than ") + path.data()
-        );
+    tables[0] = read_entire_file(dsdt_path, sizeof(acpi_sdt_hdr));
+    for (size_t i = 0; i < ssdt_paths.size(); ++i)
+        tables[1 + i] = read_entire_file(ssdt_paths[i], sizeof(acpi_sdt_hdr));
+
+    for (size_t i = 0; i < tables.size(); ++i) {
+        auto& table = tables[i];
+        auto *hdr = reinterpret_cast<acpi_sdt_hdr*>(table.first);
+
+        if (hdr->length > table.second) {
+            std::string path = i ? ssdt_paths[i - 1] : dsdt_path.data();
+
+            throw std::runtime_error(
+                "table " + std::to_string(i) +
+                " declares that it's bigger than " + path
+            );
+        }
+
+        auto *signature = ACPI_DSDT_SIGNATURE;
+        if (i > 0) {
+            signature = ACPI_SSDT_SIGNATURE;
+            xsdt.ssdts[i - 1] = hdr;
+
+            /*
+             * Make the pointer NULL here since this table is now managed by the
+             * XSDT, and it's the caller's responsibility to clean it up.
+             */
+            table.first = nullptr;
+        }
+
+        memcpy(hdr, signature, sizeof(uacpi_object_name));
+        hdr->checksum = gen_checksum(hdr, hdr->length);
     }
+
+    tables_delete.disarm();
 
     auto& fadt = *new acpi_fadt {};
     fadt.hdr.length = sizeof(fadt);
@@ -51,11 +87,7 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.gpe1_blk = 0xBEEF;
     fadt.gpe1_blk_len = 0x20;
 
-    // Always force the signature to DSDT as that's what we're building
-    memcpy(dsdt->hdr.signature, ACPI_DSDT_SIGNATURE,
-           sizeof(ACPI_DSDT_SIGNATURE) - 1);
-
-    fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(dsdt);
+    fadt.x_dsdt = reinterpret_cast<uacpi_phys_addr>(tables[0].first);
     memcpy(fadt.hdr.signature, ACPI_FADT_SIGNATURE,
            sizeof(ACPI_FADT_SIGNATURE) - 1);
 
@@ -69,10 +101,12 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
     fadt.hdr.checksum = gen_checksum(&fadt, sizeof(fadt));
 
     xsdt.fadt = &fadt;
-    xsdt.hdr.length = sizeof(xsdt);
-    xsdt.hdr.revision = dsdt->hdr.revision;
-    memcpy(xsdt.hdr.oemid, dsdt->hdr.oemid, sizeof(dsdt->hdr.oemid));
-    xsdt.hdr.oem_revision = dsdt->hdr.oem_revision;
+    xsdt.hdr.length = sizeof(xsdt) + sizeof(acpi_sdt_hdr*) * ssdt_paths.size();
+
+    auto& dsdt = *reinterpret_cast<acpi_sdt_hdr*>(tables[0].first);
+    xsdt.hdr.revision = dsdt.revision;
+    memcpy(xsdt.hdr.oemid, dsdt.oemid, sizeof(dsdt.oemid));
+    xsdt.hdr.oem_revision = dsdt.oem_revision;
 
     if constexpr (sizeof(void*) == 4) {
         memcpy(xsdt.hdr.signature, ACPI_RSDT_SIGNATURE,
@@ -95,7 +129,7 @@ void build_xsdt_from_file(full_xsdt& xsdt, acpi_rsdp& rsdp,
         );
         rsdp.extended_checksum = gen_checksum(&rsdp, sizeof(rsdp));
     }
-    xsdt.hdr.checksum = gen_checksum(&xsdt, sizeof(xsdt));
+    xsdt.hdr.checksum = gen_checksum(&xsdt, xsdt.hdr.length);
 }
 
 std::pair<void*, size_t>
