@@ -304,9 +304,6 @@ static void run_test(
     uacpi_status st = uacpi_initialize(&params);
     ensure_ok_status(st);
 
-    // We really don't need more than this
-    uacpi_context_set_loop_timeout(3);
-
     g_expect_virtual_addresses = false;
 
     st = uacpi_install_notify_handler(
@@ -390,6 +387,10 @@ int main(int argc, char** argv)
             "enumerate-namespace", 'd',
             "dump the entire namespace after loading it"
         )
+        .add_param(
+            "while-loop-timeout", 't',
+            "number of seconds to use for the while loop timeout"
+        )
         .add_help(
             "help", 'h', "Display this menu and exit",
             [&]() { std::cout << "uACPI test runner:\n" << args; }
@@ -397,6 +398,10 @@ int main(int argc, char** argv)
 
     try {
         args.parse(argc, argv);
+
+        uacpi_context_set_loop_timeout(
+            args.get_uint_or("while-loop-timeout", 3)
+        );
 
         auto dsdt_path_or_keyword = args.get("dsdt-path-or-keyword");
         if (dsdt_path_or_keyword == "resource-tests") {
