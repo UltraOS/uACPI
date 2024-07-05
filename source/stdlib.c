@@ -666,15 +666,34 @@ uacpi_u8 uacpi_popcount(uacpi_u64 value)
     #define UACPI_PLAIN_LOG_BUFFER_SIZE 128
 #endif
 
+UACPI_BUILD_BUG_ON_WITH_MSG(
+    UACPI_PLAIN_LOG_BUFFER_SIZE < 16,
+    "configured log buffer size is too small (expecting at least 16 bytes)"
+);
+
 void uacpi_log(uacpi_log_level lvl, const uacpi_char *str, ...)
 {
     uacpi_char buf[UACPI_PLAIN_LOG_BUFFER_SIZE];
+    int ret;
 
     uacpi_va_list vlist;
     uacpi_va_start(vlist, str);
 
-    if (uacpi_vsnprintf(buf, sizeof(buf), str, vlist) < 0)
+    ret = uacpi_vsnprintf(buf, sizeof(buf), str, vlist);
+    if (uacpi_unlikely(ret < 0))
         return;
+
+    /*
+     * If this log message is too large for the configured buffer size, cut off
+     * the end and transform into "...\n" to indicate that it didn't fit and
+     * prevent the newline from being truncated.
+     */
+    if (uacpi_unlikely(ret >= UACPI_PLAIN_LOG_BUFFER_SIZE)) {
+        buf[UACPI_PLAIN_LOG_BUFFER_SIZE - 5] = '.';
+        buf[UACPI_PLAIN_LOG_BUFFER_SIZE - 4] = '.';
+        buf[UACPI_PLAIN_LOG_BUFFER_SIZE - 3] = '.';
+        buf[UACPI_PLAIN_LOG_BUFFER_SIZE - 2] = '\n';
+    }
 
     uacpi_kernel_log(lvl, buf);
 
