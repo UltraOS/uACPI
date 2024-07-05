@@ -2307,7 +2307,7 @@ static uacpi_status handle_ref_or_deref_of(struct execution_context *ctx)
 
         if (!was_a_reference) {
             uacpi_error(
-                "Invalid DerefOf argument: %s, expected a reference\n",
+                "invalid DerefOf argument: %s, expected a reference\n",
                 uacpi_object_type_to_string(src->type)
             );
             return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
