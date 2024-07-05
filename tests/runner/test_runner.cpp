@@ -269,7 +269,7 @@ static uacpi_status handle_ec(uacpi_region_op op, uacpi_handle op_data)
 static void run_test(
     std::string_view dsdt_path, const std::vector<std::string>& ssdt_paths,
     uacpi_object_type expected_type, std::string_view expected_value,
-    bool dump_namespace
+    uacpi_log_level log_level, bool dump_namespace
 )
 {
     acpi_rsdp rsdp {};
@@ -299,15 +299,9 @@ static void run_test(
     );
     build_xsdt(*xsdt, rsdp, dsdt_path, ssdt_paths);
 
-    uacpi_log_level level = UACPI_LOG_TRACE;
-
-    // Don't spam the log with traces if enumeration is enabled
-    if (dump_namespace)
-        level = UACPI_LOG_INFO;
-
     uacpi_init_params params = {
         reinterpret_cast<uacpi_phys_addr>(&rsdp),
-        level,
+        log_level,
         UACPI_FLAG_NO_ACPI_MODE, // don't attempt to enter ACPI mode in userspace
     };
 
@@ -395,6 +389,24 @@ static void run_test(
     validate_ret_against_expected(*ret, expected_type, expected_value);
 }
 
+static uacpi_log_level log_level_from_string(std::string_view arg)
+{
+    static std::pair<std::string_view, uacpi_log_level> log_levels[] = {
+        { "debug", UACPI_LOG_DEBUG },
+        { "trace", UACPI_LOG_TRACE },
+        { "info", UACPI_LOG_INFO },
+        { "warning", UACPI_LOG_WARN },
+        { "error", UACPI_LOG_ERROR },
+    };
+
+    for (auto& lvl : log_levels) {
+        if (lvl.first == arg)
+            return lvl.second;
+    }
+
+    throw std::runtime_error(std::string("invalid log level ") + arg.data());
+}
+
 int main(int argc, char** argv)
 {
     auto args = ArgParser {};
@@ -417,6 +429,10 @@ int main(int argc, char** argv)
         .add_param(
             "while-loop-timeout", 't',
             "number of seconds to use for the while loop timeout"
+        )
+        .add_param(
+            "log-level", 'l',
+            "log level to set, one of: debug, trace, info, warning, error"
         )
         .add_help(
             "help", 'h', "Display this menu and exit",
@@ -448,8 +464,15 @@ int main(int argc, char** argv)
             expected_value = expect[1];
         }
 
+        auto dump_namespace = args.is_set('d');
+        // Don't spam the log with traces if enumeration is enabled
+        auto log_level = dump_namespace ? UACPI_LOG_INFO : UACPI_LOG_TRACE;
+
+        if (args.is_set('l'))
+            log_level = log_level_from_string(args.get('l'));
+
         run_test(dsdt_path_or_keyword, args.get_list_or("extra-tables", {}),
-                 expected_type, expected_value, args.is_set('d'));
+                 expected_type, expected_value, log_level, dump_namespace);
     } catch (const std::exception& ex) {
         std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;
