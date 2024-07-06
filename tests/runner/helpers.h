@@ -3,6 +3,19 @@
 #include <uacpi/acpi.h>
 #include <uacpi/uacpi.h>
 
+template <typename ExprT>
+class ScopeGuard
+{
+public:
+    ScopeGuard(ExprT expr)
+            : callback(std::move(expr)) {}
+
+    ~ScopeGuard() { callback(); }
+
+private:
+    ExprT callback;
+};
+
 extern bool g_expect_virtual_addresses;
 
 UACPI_PACKED(struct full_xsdt {
