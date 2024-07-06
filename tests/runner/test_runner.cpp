@@ -77,19 +77,6 @@ static void validate_ret_against_expected(
     }
 }
 
-template <typename ExprT>
-class ScopeGuard
-{
-public:
-    ScopeGuard(ExprT expr)
-        : callback(std::move(expr)) {}
-
-    ~ScopeGuard() { callback(); }
-
-private:
-    ExprT callback;
-};
-
 static void enumerate_namespace()
 {
     uacpi_namespace_for_each_node_depth_first(
