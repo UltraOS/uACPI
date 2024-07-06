@@ -10,10 +10,13 @@ public:
     ScopeGuard(ExprT expr)
             : callback(std::move(expr)) {}
 
-    ~ScopeGuard() { callback(); }
+    ~ScopeGuard() { if (!disarmed) callback(); }
+
+    void disarm() { disarmed = true; }
 
 private:
     ExprT callback;
+    bool disarmed { false };
 };
 
 extern bool g_expect_virtual_addresses;
