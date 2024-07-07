@@ -62,6 +62,8 @@ void build_xsdt(
         }
 
         memcpy(hdr, signature, sizeof(uacpi_object_name));
+
+        hdr->checksum = 0;
         hdr->checksum = gen_checksum(hdr, hdr->length);
     }
 
