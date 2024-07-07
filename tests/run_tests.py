@@ -40,7 +40,7 @@ class TestCaseWithMain(TestCase):
     def __init__(
         self, path: str, name: str, rtype: str, value: str
     ) -> None:
-        super().__init__(path, name)
+        super().__init__(path, f"{os.path.basename(path)}:{name}")
         self.rtype = rtype
         self.value = value
 
@@ -50,10 +50,41 @@ class TestCaseWithMain(TestCase):
 
 class TestCaseHardwareBlob(TestCase):
     def __init__(self, path: str) -> None:
-        super().__init__(path, "hw-blob")
+        dsdt_path = os.path.join(path, "dsdt.dat")
+        super().__init__(dsdt_path, os.path.basename(path))
+
+        self.ssdt_paths = [
+            path for path in os.listdir(path)
+            if path.startswith("ssdt") and path.endswith(".dat")
+        ]
+
+        def extract_ssdt_number(path: str) -> int:
+            number = ""
+
+            assert path.startswith("ssdt")
+            for c in path[4:]:
+                if not c.isdigit():
+                    break
+                number += c
+
+            # some blobs apparently come with just "ssdt.dat" and not
+            # "ssdtX.dat", take that into account here.
+            return 0 if not number else int(number)
+
+        if self.ssdt_paths:
+            self.ssdt_paths.sort(key=extract_ssdt_number)
+            self.ssdt_paths = [
+                os.path.join(path, ssdt_path) for ssdt_path in self.ssdt_paths
+            ]
 
     def extra_runner_args(self) -> List[str]:
-        return ["--enumerate-namespace"]
+        args = ["--enumerate-namespace"]
+
+        if self.ssdt_paths:
+            args.append("--extra-tables")
+            args.extend(self.ssdt_paths)
+
+        return args
 
 
 def generate_large_test_cases(extractor: str, bin_dir: str) -> List[TestCase]:
@@ -88,19 +119,27 @@ def generate_large_test_cases(extractor: str, bin_dir: str) -> List[TestCase]:
             ]
 
             test_case_name = "_".join(fixed_up_path).replace(".bin", "")
-            test_case_name += ".aml"
-            output_test_name = os.path.join(large_tests_dir, test_case_name)
+            this_test_dir = os.path.join(large_tests_dir, test_case_name)
 
-            if not os.path.exists(output_test_name):
-                xtractor_output = os.path.join(large_tests_dir, "dsdt.dat")
+            if (not os.path.exists(this_test_dir) or not
+               os.path.exists(os.path.join(this_test_dir, "dsdt.dat"))):
+                os.makedirs(this_test_dir, exist_ok=True)
 
+                # These are two separate invocations because of a bug in
+                # acpixtract where it exits with -1 when there isn't an SSDT
+                # inside a blob, even though it's specified as optional in
+                # code. Merge once https://github.com/acpica/acpica/pull/959
+                # is shipped everywhere.
                 subprocess.check_call(
-                    [extractor, "-sDSDT", obj_path], cwd=large_tests_dir,
+                    [extractor, "-sDSDT", obj_path], cwd=this_test_dir,
                     stdout=subprocess.DEVNULL
                 )
-                os.rename(xtractor_output, output_test_name)
+                subprocess.run(
+                    [extractor, "-sSSDT", obj_path], cwd=this_test_dir,
+                    stdout=subprocess.DEVNULL
+                )
 
-            test_cases.append(TestCaseHardwareBlob(output_test_name))
+            test_cases.append(TestCaseHardwareBlob(this_test_dir))
 
     recurse_one(acpi_dumps_dir)
     return test_cases
@@ -176,9 +215,7 @@ def run_tests(cases: List[TestCase], runner: str) -> bool:
     fail_count = 0
 
     for case in cases:
-        case_name = os.path.basename(os.path.basename(case.path))
-
-        print(f"{case_name}:{case.name}...", end=" ", flush=True)
+        print(f"{case.name}...", end=" ", flush=True)
 
         proc = subprocess.Popen(
             [runner, case.path, *case.extra_runner_args()],
@@ -186,7 +223,7 @@ def run_tests(cases: List[TestCase], runner: str) -> bool:
             universal_newlines=True
         )
         try:
-            stdout, stderr = proc.communicate(timeout=30)
+            stdout, stderr = proc.communicate(timeout=60)
             if proc.returncode == 0:
                 print("OK", flush=True)
                 continue
