@@ -582,6 +582,9 @@ static void free_field_unit(uacpi_handle handle)
         break;
     case UACPI_FIELD_UNIT_KIND_BANK:
         uacpi_namespace_node_unref(field_unit->bank_region);
+        uacpi_shareable_unref_and_delete_if_last(
+            field_unit->bank_selection, free_field_unit
+        );
         break;
     case UACPI_FIELD_UNIT_KIND_INDEX:
         uacpi_shareable_unref_and_delete_if_last(
