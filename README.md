@@ -5,30 +5,28 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 [![CI](https://github.com/UltraOS/uACPI/actions/workflows/main.yml/badge.svg)](https://github.com/UltraOS/uACPI/actions/workflows/main.yml)
 
 > [!WARNING]
-> The project is still in active development and not yet ready for production use!  
-> [Known issues](#state-of-the-project)
+> Not yet ready for production use! While the project is mostly feature-complete,
+> it is still under active development. Public API may change, get added or
+> removed without notice. Thread safety is currently lacking, see
+> [#74](/../../issues/74) for more info & progress. 
 
-## State of the project
+## Features
 
-What works:
-- The interpreter itself, all of AML is supported and relatively well-tested
-- Namespace initialization, this includes properly running _STA and _INI, _REG for opregions
-- Table search, dynamic installation & loading API, ability to override/deny any tables being installed 
-- ACPI global firmware lock management via _GL, locked fields, as well as public API
-- The operation region subsystem. This includes public API for registering handlers, as well as builtin handlers for most common address space types
-- Notify handlers including public API
-- The resource subsystem. Every resource defined by ACPI 6.5 (last release) is supported
-- Sleep API, allowing transition to any sleep state, wake vector programming API
-- Fairly advanced event subsystem, supporting GPE/fixed events, wake, implicit notify, AML handlers
-- GAS read/write API, FADT register read/write all implemented
+- A fast and well-tested AML interpreter optimized to use very little stack space
+- NT-compatible on a fundamental level (see [examples](#more-detailed-overview))
+- Very easy to integrate (ships with own overridable standard library implementation)
+- Highly flexible and configurable (optional sized frees, reduced-hw-only mode, etc.)
+- A fairly advanced event subsystem (GPE/fixed, wake, implicit notify, AML handlers)
+- Table management API (search, dynamic installation/loading, overrides, etc.)
+- Operation region subsystem (user handlers, builtins for common types)
+- Sleep state management (transition to any S state, wake vector programming)
 - PCI routing table retrieval & interrupt model API
 - Device search API
+- Resource subsystem supporting every resource defined by ACPI 6.5
 - Interface & feature management exposed via _OSI
-
-What's missing or doesn't work:
-- No locking. This means all of the currently defined public API is not thread safe
-- A lot of general utility API is missing and/or is currently internal-only
-- Public API is not set in stone and may change, get added/removed without notice
+- Client-defined Notify() handlers
+- Firmware global lock management (_GL, locked fields, public API)
+- GAS read/write API
 
 ## Why would I use this over ACPICA?
 
