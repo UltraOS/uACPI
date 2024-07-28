@@ -537,6 +537,100 @@ UACPI_PACKED(struct acpi_slit {
 })
 UACPI_EXPECT_SIZEOF(struct acpi_slit, 44);
 
+/*
+ * acpi_gtdt->el*_flags
+ * acpi_gtdt_timer_entry->physical_flags
+ * acpi_gtdt_timer_entry->virtual_flags
+ * acpi_gtdt_watchdog->flags
+ */
+#define ACPI_GTDT_TRIGGERING (1 << 0)
+#define ACPI_GTDT_TRIGGERING_EDGE 1
+#define ACPI_GTDT_TRIGGERING_LEVEL 0
+
+/*
+ * acpi_gtdt->el*_flags
+ * acpi_gtdt_timer_entry->physical_flags
+ * acpi_gtdt_timer_entry->virtual_flags
+ * acpi_gtdt_watchdog->flags
+ */
+#define ACPI_GTDT_POLARITY (1 << 1)
+#define ACPI_GTDT_POLARITY_ACTIVE_LOW 1
+#define ACPI_GTDT_POLARITY_ACTIVE_HIGH 0
+
+// acpi_gtdt->el*_flags
+#define ACPI_GTDT_ALWAYS_ON_CAPABLE (1 << 2)
+
+UACPI_PACKED(struct acpi_gtdt {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u64 cnt_control_base;
+    uacpi_u32 rsvd;
+    uacpi_u32 el1_secure_gsiv;
+    uacpi_u32 el1_secure_flags;
+    uacpi_u32 el1_non_secure_gsiv;
+    uacpi_u32 el1_non_secure_flags;
+    uacpi_u32 el1_virtual_gsiv;
+    uacpi_u32 el1_virtual_flags;
+    uacpi_u32 el2_gsiv;
+    uacpi_u32 el2_flags;
+    uacpi_u64 cnt_read_base;
+    uacpi_u32 platform_timer_count;
+    uacpi_u32 platform_timer_offset;
+
+    // revision >= 3
+    uacpi_u32 el2_virtual_gsiv;
+    uacpi_u32 el2_virtual_flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_gtdt, 104);
+
+enum acpi_gtdt_entry_type {
+    ACPI_GTDT_ENTRY_TYPE_TIMER = 0,
+    ACPI_GTDT_ENTRY_TYPE_WATCHDOG = 1,
+};
+
+UACPI_PACKED(struct acpi_gtdt_entry_hdr {
+    uacpi_u8 type;
+    uacpi_u16 length;
+})
+
+UACPI_PACKED(struct acpi_gtdt_timer {
+    struct acpi_gtdt_entry_hdr hdr;
+    uacpi_u8 rsvd;
+    uacpi_u64 cnt_ctl_base;
+    uacpi_u32 timer_count;
+    uacpi_u32 timer_offset;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_gtdt_timer, 20);
+
+// acpi_gtdt_timer_entry->common_flags
+#define ACPI_GTDT_TIMER_ENTRY_SECURE (1 << 0)
+#define ACPI_GTDT_TIMER_ENTRY_ALWAYS_ON_CAPABLE (1 << 1)
+
+UACPI_PACKED(struct acpi_gtdt_timer_entry {
+    uacpi_u8 frame_number;
+    uacpi_u8 rsvd[3];
+    uacpi_u64 cnt_base;
+    uacpi_u64 el0_cnt_base;
+    uacpi_u32 physical_gsiv;
+    uacpi_u32 physical_flags;
+    uacpi_u32 virtual_gsiv;
+    uacpi_u32 virtual_flags;
+    uacpi_u32 common_flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_gtdt_timer_entry, 40);
+
+// acpi_gtdt_watchdog->flags
+#define ACPI_GTDT_WATCHDOG_SECURE (1 << 2)
+
+UACPI_PACKED(struct acpi_gtdt_watchdog {
+    struct acpi_gtdt_entry_hdr hdr;
+    uacpi_u8 rsvd;
+    uacpi_u64 refresh_frame;
+    uacpi_u64 control_frame;
+    uacpi_u32 gsiv;
+    uacpi_u32 flags;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_gtdt_watchdog, 28);
+
 // acpi_fdt->iapc_flags
 #define ACPI_IA_PC_LEGACY_DEVS  (1 << 0)
 #define ACPI_IA_PC_8042         (1 << 1)
