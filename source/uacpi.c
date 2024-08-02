@@ -265,7 +265,7 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
             entry_addr, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_NULL
         );
         if (uacpi_unlikely_error(ret))
-            return ret;
+            goto error_out;
     }
 
     ret = UACPI_STATUS_OK;
