@@ -1790,8 +1790,13 @@ uacpi_status uacpi_initialize_events(void)
         g_uacpi_rt_ctx.fadt.sci_int, handle_sci, gpe_interrupt_head,
         &g_uacpi_rt_ctx.sci_handle
     );
-    if (uacpi_unlikely_error(ret))
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_error(
+            "unable to install SCI interrupt handler: %s\n",
+            uacpi_status_to_string(ret)
+        );
         return ret;
+    }
 
     g_uacpi_rt_ctx.global_lock_event = uacpi_kernel_create_event();
     if (uacpi_unlikely(g_uacpi_rt_ctx.global_lock_event == UACPI_NULL))
