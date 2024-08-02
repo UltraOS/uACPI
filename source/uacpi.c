@@ -191,7 +191,7 @@ static uacpi_status enter_mode(enum hw_mode mode)
 
     ret = set_mode(mode);
     if (uacpi_unlikely_error(ret)) {
-        uacpi_error(
+        uacpi_warn(
             "unable to enter %s mode: %s\n",
             mode_str, uacpi_status_to_string(ret)
         );
