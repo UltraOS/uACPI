@@ -300,7 +300,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     ret = uacpi_initialize_tables();
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out_fatal_error;
 
     rsdp = uacpi_kernel_map(params->rsdp, sizeof(struct acpi_rsdp));
     if (rsdp == UACPI_NULL)
@@ -320,27 +320,32 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     if (!rxsdt) {
         uacpi_error("both RSDT & XSDT tables are NULL!\n");
-        return UACPI_STATUS_INVALID_ARGUMENT;
+        ret = UACPI_STATUS_INVALID_ARGUMENT;
+        goto out_fatal_error;
     }
 
     ret = initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out_fatal_error;
 
     ret = uacpi_initialize_interfaces();
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out_fatal_error;
 
     ret = uacpi_namespace_initialize_predefined();
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out_fatal_error;
 
     uacpi_install_default_address_space_handlers();
 
-    if (uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE))
-        return UACPI_STATUS_OK;
+    if (!uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE)) {
+        // This is not critical, so just ignore the return status
+        uacpi_enter_acpi_mode();
+    }
+    return UACPI_STATUS_OK;
 
-    return uacpi_enter_acpi_mode();
+out_fatal_error:
+    return ret;
 }
 
 struct table_load_stats {
