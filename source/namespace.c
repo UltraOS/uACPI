@@ -98,7 +98,7 @@ static uacpi_object *make_object_for_predefined(
     return obj;
 }
 
-uacpi_status uacpi_namespace_initialize_predefined(void)
+uacpi_status uacpi_initialize_namespace(void)
 {
     enum uacpi_predefined_namespace ns;
     uacpi_object *obj;
