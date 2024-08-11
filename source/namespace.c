@@ -171,7 +171,16 @@ static void free_namespace_node(uacpi_handle handle)
     if (node->object)
         uacpi_object_unref(node->object);
 
-    uacpi_free(node, sizeof(*node));
+    if (uacpi_likely(!uacpi_namespace_node_is_predefined(node))) {
+        uacpi_free(node, sizeof(*node));
+        return;
+    }
+
+    node->flags = UACPI_NAMESPACE_NODE_PREDEFINED;
+    node->object = UACPI_NULL;
+    node->parent = UACPI_NULL;
+    node->child = UACPI_NULL;
+    node->next = UACPI_NULL;
 }
 
 void uacpi_namespace_node_unref(uacpi_namespace_node *node)
@@ -211,6 +220,11 @@ uacpi_status uacpi_node_install(
 uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node)
 {
     return node->flags & UACPI_NAMESPACE_NODE_FLAG_DANGLING;
+}
+
+uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node)
+{
+    return node->flags & UACPI_NAMESPACE_NODE_PREDEFINED;
 }
 
 void uacpi_node_uninstall(uacpi_namespace_node *node)
