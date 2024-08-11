@@ -332,7 +332,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 
-    ret = uacpi_namespace_initialize_predefined();
+    ret = uacpi_initialize_namespace();
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 
