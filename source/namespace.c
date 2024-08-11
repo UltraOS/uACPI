@@ -11,18 +11,24 @@
 #define UACPI_REV_VALUE 2
 #define UACPI_OS_VALUE "Microsoft Windows NT"
 
-uacpi_namespace_node
+#define MAKE_PREDEFINED(name_str)                \
+    {                                            \
+        .name.text = name_str,                   \
+        .flags = UACPI_NAMESPACE_NODE_PREDEFINED \
+    }
+
+static uacpi_namespace_node
 predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_MAX + 1] = {
-    [UACPI_PREDEFINED_NAMESPACE_ROOT] = { .name.text = "\\" },
-    [UACPI_PREDEFINED_NAMESPACE_GPE] = { .name.text = "_GPE" },
-    [UACPI_PREDEFINED_NAMESPACE_PR] = { .name.text = "_PR_" },
-    [UACPI_PREDEFINED_NAMESPACE_SB] = { .name.text = "_SB_" },
-    [UACPI_PREDEFINED_NAMESPACE_SI] = { .name.text = "_SI_" },
-    [UACPI_PREDEFINED_NAMESPACE_TZ] = { .name.text = "_TZ_" },
-    [UACPI_PREDEFINED_NAMESPACE_GL] = { .name.text = "_GL_" },
-    [UACPI_PREDEFINED_NAMESPACE_OS] = { .name.text = "_OS_" },
-    [UACPI_PREDEFINED_NAMESPACE_OSI] = { .name.text = "_OSI" },
-    [UACPI_PREDEFINED_NAMESPACE_REV] = { .name.text = "_REV" },
+    [UACPI_PREDEFINED_NAMESPACE_ROOT] = MAKE_PREDEFINED("\\"),
+    [UACPI_PREDEFINED_NAMESPACE_GPE] = MAKE_PREDEFINED("_GPE"),
+    [UACPI_PREDEFINED_NAMESPACE_PR] = MAKE_PREDEFINED("_PR_"),
+    [UACPI_PREDEFINED_NAMESPACE_SB] = MAKE_PREDEFINED("_SB_"),
+    [UACPI_PREDEFINED_NAMESPACE_SI] = MAKE_PREDEFINED("_SI_"),
+    [UACPI_PREDEFINED_NAMESPACE_TZ] = MAKE_PREDEFINED("_TZ_"),
+    [UACPI_PREDEFINED_NAMESPACE_GL] = MAKE_PREDEFINED("_GL_"),
+    [UACPI_PREDEFINED_NAMESPACE_OS] = MAKE_PREDEFINED("_OS_"),
+    [UACPI_PREDEFINED_NAMESPACE_OSI] = MAKE_PREDEFINED("_OSI"),
+    [UACPI_PREDEFINED_NAMESPACE_REV] = MAKE_PREDEFINED("_REV"),
 };
 
 static uacpi_object *make_object_for_predefined(
