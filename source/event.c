@@ -1825,6 +1825,31 @@ uacpi_status uacpi_initialize_events(void)
     return ret;
 }
 
+void uacpi_deinitialize_events(void)
+{
+    struct gpe_interrupt_ctx *ctx, *next_ctx = gpe_interrupt_head;
+    uacpi_size i;
+
+    while (next_ctx) {
+        ctx = next_ctx;
+        next_ctx = ctx->next;
+
+        struct gpe_block *block, *next_block = ctx->gpe_head;
+        while (next_block) {
+            block = next_block;
+            next_block = block->next;
+            uninstall_gpe_block(block);
+        }
+    }
+
+    for (i = 0; i < UACPI_FIXED_EVENT_MAX; ++i) {
+        if (fixed_event_handlers[i].handler)
+            uacpi_uninstall_fixed_event_handler(i);
+    }
+
+    gpe_interrupt_head = UACPI_NULL;
+}
+
 uacpi_status uacpi_install_fixed_event_handler(
     uacpi_fixed_event event, uacpi_interrupt_handler handler,
     uacpi_handle user
