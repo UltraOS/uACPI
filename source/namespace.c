@@ -98,6 +98,25 @@ static uacpi_object *make_object_for_predefined(
     return obj;
 }
 
+static void free_namespace_node(uacpi_handle handle)
+{
+    uacpi_namespace_node *node = handle;
+
+    if (node->object)
+        uacpi_object_unref(node->object);
+
+    if (uacpi_likely(!uacpi_namespace_node_is_predefined(node))) {
+        uacpi_free(node, sizeof(*node));
+        return;
+    }
+
+    node->flags = UACPI_NAMESPACE_NODE_PREDEFINED;
+    node->object = UACPI_NULL;
+    node->parent = UACPI_NULL;
+    node->child = UACPI_NULL;
+    node->next = UACPI_NULL;
+}
+
 uacpi_status uacpi_initialize_namespace(void)
 {
     enum uacpi_predefined_namespace ns;
@@ -140,6 +159,60 @@ uacpi_status uacpi_initialize_namespace(void)
     return UACPI_STATUS_OK;
 }
 
+void uacpi_deinitialize_namespace(void)
+{
+    uacpi_namespace_node *current, *next = UACPI_NULL;
+    uacpi_object *obj;
+    uacpi_u32 depth = 1;
+
+    current = uacpi_namespace_root();
+
+    while (depth) {
+        next = next == UACPI_NULL ? current->child : next->next;
+
+        /*
+         * The previous value of 'next' was the last child of this subtree,
+         * we can now remove the entire scope of 'current->child'
+         */
+        if (next == UACPI_NULL) {
+            depth--;
+
+            // Wipe the subtree
+            while (current->child != UACPI_NULL)
+                uacpi_node_uninstall(current->child);
+
+            // Reset the pointers back as if this iteration never happened
+            next = current;
+            current = current->parent;
+
+            continue;
+        }
+
+        /*
+         * We have more nodes to process, proceed to the next one, either the
+         * child of the 'next' node, if one exists, or its peer
+         */
+        if (next->child) {
+            depth++;
+            current = next;
+            next = UACPI_NULL;
+        }
+
+        // This node has no children, move on to its peer
+    }
+
+    /*
+     * Set the type back to DEVICE as that's what this node contained originally
+     * See make_object_for_predefined() for root for reasoning
+     */
+    current = uacpi_namespace_root();
+    obj = uacpi_namespace_node_get_object(current);
+    if (obj != UACPI_NULL && obj->type == UACPI_OBJECT_UNINITIALIZED)
+        obj->type = UACPI_OBJECT_DEVICE;
+
+    free_namespace_node(uacpi_namespace_root());
+}
+
 uacpi_namespace_node *uacpi_namespace_root(void)
 {
     return &predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_ROOT];
@@ -168,25 +241,6 @@ uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
     uacpi_shareable_init(ret);
     ret->name = name;
     return ret;
-}
-
-static void free_namespace_node(uacpi_handle handle)
-{
-    uacpi_namespace_node *node = handle;
-
-    if (node->object)
-        uacpi_object_unref(node->object);
-
-    if (uacpi_likely(!uacpi_namespace_node_is_predefined(node))) {
-        uacpi_free(node, sizeof(*node));
-        return;
-    }
-
-    node->flags = UACPI_NAMESPACE_NODE_PREDEFINED;
-    node->object = UACPI_NULL;
-    node->parent = UACPI_NULL;
-    node->child = UACPI_NULL;
-    node->next = UACPI_NULL;
 }
 
 void uacpi_namespace_node_unref(uacpi_namespace_node *node)
