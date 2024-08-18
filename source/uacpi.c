@@ -14,6 +14,23 @@
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
+void uacpi_state_reset(void)
+{
+    uacpi_deinitialize_namespace();
+    uacpi_deinitialize_interfaces();
+    uacpi_deinitialize_events();
+    uacpi_deinitialize_tables();
+
+#ifndef UACPI_REDUCED_HARDWARE
+    if (g_uacpi_rt_ctx.global_lock_event)
+        uacpi_kernel_free_event(g_uacpi_rt_ctx.global_lock_event);
+    if (g_uacpi_rt_ctx.global_lock_spinlock)
+        uacpi_kernel_free_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
+#endif
+
+    uacpi_memzero(&g_uacpi_rt_ctx, sizeof(g_uacpi_rt_ctx));
+}
+
 void uacpi_context_set_loop_timeout(uacpi_u32 seconds)
 {
     if (seconds == 0)

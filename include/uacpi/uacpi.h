@@ -133,6 +133,17 @@ UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
 uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq);
 uacpi_status uacpi_release_global_lock(uacpi_u32 seq);
 
+/*
+ * Reset the global uACPI state by freeing all internally allocated data
+ * structures & resetting any global variables. After this call, uACPI must be
+ * re-initialized from scratch to be used again.
+ *
+ * This is called by uACPI automatically if a fatal error occurs during a call
+ * to uacpi_initialize/uacpi_namespace_load etc. in order to prevent accidental
+ * use of partially uninitialized subsystems.
+ */
+void uacpi_state_reset(void);
+
 #ifdef __cplusplus
 }
 #endif
