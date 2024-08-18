@@ -113,6 +113,8 @@ uacpi_status uacpi_namespace_initialize_predefined(void)
             uacpi_object_unref(obj);
             return UACPI_STATUS_OUT_OF_MEMORY;
         }
+
+        uacpi_object_unref(obj);
     }
 
     for (ns = UACPI_PREDEFINED_NAMESPACE_GPE;
