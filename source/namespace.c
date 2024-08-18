@@ -298,6 +298,14 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
         return;
     }
 
+    if (uacpi_unlikely(node->child != UACPI_NULL)) {
+        uacpi_warn(
+            "BUG: refusing to uninstall node %.4s with a child (%.4s)\n",
+            node->name.text, node->child->name.text
+        );
+        return;
+    }
+
     /*
      * Even though namespace_node is reference-counted it still has an 'invalid'
      * state that is entered after it is uninstalled from the global namespace.
