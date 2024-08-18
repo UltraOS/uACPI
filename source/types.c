@@ -576,6 +576,9 @@ static void free_field_unit(uacpi_handle handle)
 {
     uacpi_field_unit *field_unit = handle;
 
+    if (field_unit->connection)
+        uacpi_object_unref(field_unit->connection);
+
     switch (field_unit->kind) {
     case UACPI_FIELD_UNIT_KIND_NORMAL:
         uacpi_namespace_node_unref(field_unit->region);
