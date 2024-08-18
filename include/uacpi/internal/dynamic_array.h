@@ -128,4 +128,5 @@
         );                                                                   \
         arr->size_including_inline = 0;                                      \
         arr->dynamic_capacity = 0;                                           \
+        arr->dynamic_storage = UACPI_NULL;                                   \
     }
