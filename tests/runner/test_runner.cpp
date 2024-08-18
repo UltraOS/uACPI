@@ -280,6 +280,8 @@ static void run_test(
     auto *xsdt = new (std::calloc(xsdt_bytes, 1)) full_xsdt();
     auto xsdt_delete = ScopeGuard(
         [&xsdt, &ssdt_paths] {
+            uacpi_state_reset();
+
             if (xsdt->fadt) {
                 delete[] reinterpret_cast<uint8_t*>(
                     static_cast<uintptr_t>(xsdt->fadt->x_dsdt)
