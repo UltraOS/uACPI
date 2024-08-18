@@ -28,6 +28,7 @@ typedef struct uacpi_namespace_node {
 } uacpi_namespace_node;
 
 uacpi_status uacpi_initialize_namespace(void);
+void uacpi_deinitialize_namespace(void);
 
 uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name);
 void uacpi_namespace_node_unref(uacpi_namespace_node *node);
