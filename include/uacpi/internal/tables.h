@@ -29,6 +29,7 @@ struct uacpi_installed_table {
 };
 
 uacpi_status uacpi_initialize_tables(void);
+void uacpi_deinitialize_tables(void);
 
 uacpi_status uacpi_check_table_signature(void *table, const uacpi_char *expect);
 uacpi_status uacpi_verify_table_checksum(void *table, uacpi_size size);
