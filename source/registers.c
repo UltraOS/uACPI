@@ -24,7 +24,7 @@ struct register_spec {
     uacpi_u64 preserve_mask;
 };
 
-static struct register_spec registers[UACPI_REGISTER_MAX + 1] = {
+static const struct register_spec registers[UACPI_REGISTER_MAX + 1] = {
     [UACPI_REGISTER_PM1_STS] = {
         .kind = REGISTER_KIND_GAS,
         .access_kind = REGISTER_ACCESS_KIND_WRITE_TO_CLEAR,
@@ -84,7 +84,7 @@ static struct register_spec registers[UACPI_REGISTER_MAX + 1] = {
     },
 };
 
-static struct register_spec *get_reg(uacpi_u8 idx)
+static const struct register_spec *get_reg(uacpi_u8 idx)
 {
     if (idx > UACPI_REGISTER_MAX)
         return UACPI_NULL;
@@ -127,7 +127,7 @@ static uacpi_status write_one(
 }
 
 static uacpi_status do_read_register(
-    struct register_spec *reg, uacpi_u64 *out_value
+    const struct register_spec *reg, uacpi_u64 *out_value
 )
 {
     uacpi_status ret;
@@ -154,7 +154,7 @@ uacpi_status uacpi_read_register(
     enum uacpi_register reg_enum, uacpi_u64 *out_value
 )
 {
-    struct register_spec *reg;
+    const struct register_spec *reg;
 
     reg = get_reg(reg_enum);
     if (uacpi_unlikely(reg == UACPI_NULL))
@@ -164,7 +164,7 @@ uacpi_status uacpi_read_register(
 }
 
 static uacpi_status do_write_register(
-        struct register_spec *reg, uacpi_u64 in_value
+    const struct register_spec *reg, uacpi_u64 in_value
 )
 {
     uacpi_status ret;
@@ -197,7 +197,7 @@ uacpi_status uacpi_write_register(
     enum uacpi_register reg_enum, uacpi_u64 in_value
 )
 {
-    struct register_spec *reg;
+    const struct register_spec *reg;
 
     reg = get_reg(reg_enum);
     if (uacpi_unlikely(reg == UACPI_NULL))
@@ -211,7 +211,7 @@ uacpi_status uacpi_write_registers(
 )
 {
     uacpi_status ret;
-    struct register_spec *reg;
+    const struct register_spec *reg;
 
     reg = get_reg(reg_enum);
     if (uacpi_unlikely(reg == UACPI_NULL))
@@ -233,7 +233,7 @@ struct register_field {
     uacpi_u16 mask;
 };
 
-static struct register_field fields[UACPI_REGISTER_FIELD_MAX + 1] = {
+static const struct register_field fields[UACPI_REGISTER_FIELD_MAX + 1] = {
     [UACPI_REGISTER_FIELD_TMR_STS] = {
         .reg = UACPI_REGISTER_PM1_STS,
         .offset = ACPI_PM1_STS_TMR_STS_IDX,
@@ -357,8 +357,8 @@ uacpi_status uacpi_read_register_field(
 {
     uacpi_status ret;
     uacpi_u8 field_idx = field_enum;
-    struct register_field *field;
-    struct register_spec *reg;
+    const struct register_field *field;
+    const struct register_spec *reg;
 
     if (uacpi_unlikely(field_idx > UACPI_REGISTER_FIELD_MAX))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -380,8 +380,8 @@ uacpi_status uacpi_write_register_field(
 {
     uacpi_status ret;
     uacpi_u8 field_idx = field_enum;
-    struct register_field *field;
-    struct register_spec *reg;
+    const struct register_field *field;
+    const struct register_spec *reg;
     uacpi_u64 data;
 
     if (uacpi_unlikely(field_idx > UACPI_REGISTER_FIELD_MAX))
