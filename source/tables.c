@@ -27,6 +27,35 @@ uacpi_status uacpi_initialize_tables(void)
     return UACPI_STATUS_OK;
 }
 
+void uacpi_deinitialize_tables(void)
+{
+    uacpi_size i;
+
+    for (i = 0; i < table_array_size(&tables); ++i) {
+        struct uacpi_installed_table *tbl = table_array_at(&tables, i);
+
+        switch (tbl->origin) {
+        case UACPI_TABLE_ORIGIN_FIRMWARE_VIRTUAL:
+            uacpi_free(tbl->ptr, tbl->length);
+            break;
+        case UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL:
+        case UACPI_TABLE_ORIGIN_HOST_PHYSICAL:
+            uacpi_kernel_unmap(tbl->ptr, tbl->length);
+            break;
+        default:
+            break;
+        }
+    }
+
+    table_array_clear(&tables);
+
+    if (table_mutex)
+        uacpi_kernel_free_mutex(table_mutex);
+
+    installation_handler = UACPI_NULL;
+    table_mutex = UACPI_NULL;
+}
+
 uacpi_status uacpi_set_table_installation_handler(
     uacpi_table_installation_handler handler
 )
