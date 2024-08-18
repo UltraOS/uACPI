@@ -100,6 +100,36 @@ uacpi_status uacpi_initialize_interfaces(void)
     return UACPI_STATUS_OK;
 }
 
+void uacpi_deinitialize_interfaces(void)
+{
+    struct registered_interface *iface, *next_iface = registered_interfaces;
+
+    while (next_iface) {
+        iface = next_iface;
+        next_iface = iface->next;
+
+        iface->next = UACPI_NULL;
+
+        if (iface->dynamic) {
+            uacpi_free_dynamic_string(iface->name);
+            uacpi_free(iface, sizeof(*iface));
+            continue;
+        }
+
+        // Only features are disabled by default
+        iface->disabled = iface->kind == UACPI_INTERFACE_KIND_FEATURE ?
+                UACPI_TRUE : UACPI_FALSE;
+    }
+
+    if (interface_mutex)
+        uacpi_kernel_free_mutex(interface_mutex);
+
+    interface_mutex = UACPI_NULL;
+    interface_handler = UACPI_NULL;
+    latest_queried_interface = 0;
+    registered_interfaces = UACPI_NULL;
+}
+
 uacpi_vendor_interface uacpi_latest_queried_vendor_interface(void)
 {
     return uacpi_atomic_load32(&latest_queried_interface);
