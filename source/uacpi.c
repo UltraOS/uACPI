@@ -362,6 +362,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     return UACPI_STATUS_OK;
 
 out_fatal_error:
+    uacpi_state_reset();
     return ret;
 }
 
@@ -410,7 +411,7 @@ uacpi_status uacpi_namespace_load(void)
     ret = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
     if (uacpi_unlikely_error(ret)) {
         uacpi_error("unable to find DSDT: %s\n", uacpi_status_to_string(ret));
-        return ret;
+        goto out_fatal_error;
     }
 
     ret = uacpi_table_load_with_cause(tbl.index, UACPI_TABLE_LOAD_CAUSE_INIT);
@@ -454,9 +455,14 @@ uacpi_status uacpi_namespace_load(void)
     if (uacpi_unlikely_error(ret)) {
         uacpi_warn("event initialization failed: %s\n",
                    uacpi_status_to_string(ret));
+        goto out_fatal_error;
     }
 
     g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_LOADED;
+    return UACPI_STATUS_OK;
+
+out_fatal_error:
+    uacpi_state_reset();
     return ret;
 }
 
