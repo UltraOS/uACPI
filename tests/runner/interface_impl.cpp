@@ -28,6 +28,14 @@
 
 #include <uacpi/kernel_api.h>
 
+#ifdef UACPI_KERNEL_INITIALIZATION
+uacpi_status uacpi_kernel_initialize(uacpi_init_level)
+{
+    return UACPI_STATUS_OK;
+}
+void uacpi_kernel_deinitialize(void) { }
+#endif
+
 uacpi_status uacpi_kernel_raw_memory_read(
     uacpi_phys_addr, uacpi_u8, uacpi_u64 *ret
 )
