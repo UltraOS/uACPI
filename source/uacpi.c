@@ -292,6 +292,11 @@ error_out:
     return ret;
 }
 
+uacpi_init_level uacpi_get_current_init_level(void)
+{
+    return g_uacpi_rt_ctx.init_level;
+}
+
 uacpi_status uacpi_initialize(const uacpi_init_params *params)
 {
     uacpi_status ret;
