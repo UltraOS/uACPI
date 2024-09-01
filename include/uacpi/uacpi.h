@@ -86,6 +86,9 @@ uacpi_status uacpi_namespace_load(void);
  */
 uacpi_status uacpi_namespace_initialize(void);
 
+// Returns the current subsystem initialization level
+uacpi_init_level uacpi_get_current_init_level(void);
+
 /*
  * Evaluate an object within the namespace and get back its value.
  * Either root or path must be valid.
