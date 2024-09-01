@@ -54,7 +54,7 @@ typedef struct uacpi_init_params {
 
 /*
  * If this is set, ACPI mode is not entered during the call to
- * uacpi_initialize. The caller is expected to enter it later at thier own
+ * uacpi_initialize. The caller is expected to enter it later at their own
  * discretion by using uacpi_enter_acpi_mode().
  */
 #define UACPI_FLAG_NO_ACPI_MODE (1 << 3)

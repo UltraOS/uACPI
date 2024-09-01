@@ -95,7 +95,7 @@ void uacpi_free_pnp_id_list(uacpi_pnp_id_list *list);
 
 /*
  * Evaluate a device's _CID method and get its value.
- * The returned strucutre msut be freed using uacpi_free_pnp_id_list.
+ * The returned structure must be freed using uacpi_free_pnp_id_list.
  */
 uacpi_status uacpi_eval_cid(uacpi_namespace_node*, uacpi_pnp_id_list **out_list);
 
