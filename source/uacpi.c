@@ -29,6 +29,10 @@ void uacpi_state_reset(void)
 #endif
 
     uacpi_memzero(&g_uacpi_rt_ctx, sizeof(g_uacpi_rt_ctx));
+
+#ifdef UACPI_KERNEL_INITIALIZATION
+    uacpi_kernel_deinitialize();
+#endif
 }
 
 void uacpi_context_set_loop_timeout(uacpi_u32 seconds)
@@ -306,6 +310,12 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_EARLY);
 
+#ifdef UACPI_KERNEL_INITIALIZATION
+    ret = uacpi_kernel_initialize(UACPI_INIT_LEVEL_EARLY);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+#endif
+
     g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED;
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
     g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
@@ -412,6 +422,12 @@ uacpi_status uacpi_namespace_load(void)
     uacpi_size cur_index;
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
+
+#ifdef UACPI_KERNEL_INITIALIZATION
+    ret = uacpi_kernel_initialize(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
+    if (uacpi_unlikely_error(ret))
+        goto out_fatal_error;
+#endif
 
     ret = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
     if (uacpi_unlikely_error(ret)) {
@@ -579,8 +595,15 @@ uacpi_status uacpi_namespace_initialize(void)
     uacpi_namespace_node *root;
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
+    uacpi_status ret = UACPI_STATUS_OK;
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
+
+#ifdef UACPI_KERNEL_INITIALIZATION
+    ret = uacpi_kernel_initialize(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
+    if (uacpi_unlikely_error(ret))
+        goto out;
+#endif
 
     /*
      * Initialization order here is identical to ACPICA because ACPI
@@ -628,7 +651,13 @@ uacpi_status uacpi_namespace_initialize(void)
     );
 
     g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED;
-    return UACPI_STATUS_OK;
+#ifdef UACPI_KERNEL_INITIALIZATION
+    ret = uacpi_kernel_initialize(UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED);
+out:
+    if (uacpi_unlikely_error(ret))
+        uacpi_state_reset();
+#endif
+    return ret;
 }
 
 uacpi_status

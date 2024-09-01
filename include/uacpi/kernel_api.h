@@ -8,6 +8,26 @@ extern "C" {
 #endif
 
 /*
+ * Convenience initialization/deinitialization hooks that will be called by
+ * uACPI automatically when appropriate if compiled-in.
+ */
+#ifdef UACPI_KERNEL_INITIALIZATION
+/*
+ * This API is invoked for each initialization level so that appropriate parts
+ * of the host kernel and/or glue code can be initialized at different stages.
+ *
+ * uACPI API that triggers calls to uacpi_kernel_initialize and the respective
+ * 'current_init_lvl' passed to the hook at that stage:
+ * 1. uacpi_initialize() -> UACPI_INIT_LEVEL_EARLY
+ * 2. uacpi_namespace_load() -> UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED
+ * 3. (start of) uacpi_namespace_initialize() -> UACPI_INIT_LEVEL_NAMESPACE_LOADED
+ * 4. (end of) uacpi_namespace_initialize() -> UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED
+ */
+uacpi_status uacpi_kernel_initialize(uacpi_init_level current_init_lvl);
+void uacpi_kernel_deinitialize(void);
+#endif
+
+/*
  * Raw IO API, this is only used for accessing verified data from
  * "safe" code (aka not indirectly invoked by the AML interpreter),
  * e.g. programming FADT & FACS registers.
