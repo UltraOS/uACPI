@@ -125,7 +125,7 @@ uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
     uacpi_bool did_acquire;
     uacpi_status ret;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     if (uacpi_unlikely(out_seq == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -152,7 +152,7 @@ uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
 
 uacpi_status uacpi_release_global_lock(uacpi_u32 seq)
 {
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     if (uacpi_unlikely(!g_uacpi_rt_ctx.global_lock_acquired ||
                        seq != g_uacpi_rt_ctx.global_lock_seq_num))

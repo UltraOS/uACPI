@@ -176,7 +176,7 @@ uacpi_status uacpi_install_interface(
     uacpi_char *name_copy;
     uacpi_size name_size;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(interface_mutex);
 
@@ -224,7 +224,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
     struct registered_interface *cur, *prev;
     uacpi_status ret = UACPI_STATUS_NOT_FOUND;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(interface_mutex);
 
@@ -276,7 +276,7 @@ static uacpi_status configure_host_interface(
     struct registered_interface *interface;
     uacpi_status ret = UACPI_STATUS_NOT_FOUND;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(interface_mutex);
 
@@ -308,7 +308,7 @@ uacpi_status uacpi_set_interface_query_handler(
 {
     uacpi_status ret = UACPI_STATUS_ALREADY_EXISTS;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(interface_mutex);
 
@@ -329,7 +329,7 @@ uacpi_status uacpi_bulk_configure_interfaces(
 {
     struct registered_interface *interface;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(interface_mutex);
 

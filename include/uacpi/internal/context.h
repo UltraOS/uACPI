@@ -63,11 +63,6 @@ struct uacpi_runtime_context {
 #endif
 
     uacpi_u8 log_level;
-
-#define UACPI_INIT_LEVEL_EARLY 0
-#define UACPI_INIT_LEVEL_TABLES_LOADED 1
-#define UACPI_INIT_LEVEL_NAMESPACE_LOADED 2
-#define UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED 3
     uacpi_u8 init_level;
 };
 
@@ -76,8 +71,8 @@ static inline const uacpi_char *uacpi_init_level_to_string(uacpi_u8 lvl)
     switch (lvl) {
     case UACPI_INIT_LEVEL_EARLY:
         return "early";
-    case UACPI_INIT_LEVEL_TABLES_LOADED:
-        return "tables loaded";
+    case UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED:
+        return "subsystem initialized";
     case UACPI_INIT_LEVEL_NAMESPACE_LOADED:
         return "namespace loaded";
     case UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED:
