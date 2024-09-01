@@ -539,7 +539,7 @@ uacpi_status uacpi_reboot(void)
      * Allow restarting earlier than namespace load so that the kernel can
      * use this in case of some initialization error.
      */
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     if (!(fadt->flags & ACPI_RESET_REG_SUP) || !reset_reg->address)
         return UACPI_STATUS_NOT_FOUND;

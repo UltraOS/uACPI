@@ -194,7 +194,7 @@ static uacpi_status enter_mode(enum hw_mode mode)
     uacpi_status ret;
     const uacpi_char *mode_str;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     if (uacpi_is_hardware_reduced())
         return UACPI_STATUS_OK;
@@ -301,7 +301,7 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_EARLY);
 
-    g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_TABLES_LOADED;
+    g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED;
     g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
     g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
@@ -406,7 +406,7 @@ uacpi_status uacpi_namespace_load(void)
     struct table_load_stats st = { 0 };
     uacpi_size cur_index;
 
-    UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     ret = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
     if (uacpi_unlikely_error(ret)) {

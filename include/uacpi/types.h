@@ -8,6 +8,29 @@
 extern "C" {
 #endif
 
+typedef enum uacpi_init_level {
+    // Reboot state, nothing is available
+    UACPI_INIT_LEVEL_EARLY = 0,
+
+    /*
+     * State after a successfull call to uacpi_initialize. Table API and
+     * other helpers that don't depend on the ACPI namespace may be used.
+     */
+    UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED = 1,
+
+    /*
+     * State after a successfull call to uacpi_namespace_load. Most API may be
+     * used, namespace can be iterated, etc.
+     */
+    UACPI_INIT_LEVEL_NAMESPACE_LOADED = 2,
+
+    /*
+     * The final initialization stage, this is entered after the call to
+     * uacpi_namespace_initialize. All API is available to use.
+     */
+    UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED = 3,
+} uacpi_init_level;
+
 #if UACPI_POINTER_SIZE == 4 && defined(UACPI_PHYS_ADDR_IS_32BITS)
 typedef uacpi_u32 uacpi_phys_addr;
 typedef uacpi_u32 uacpi_io_addr;

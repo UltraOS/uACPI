@@ -432,7 +432,7 @@ uacpi_status uacpi_table_install_with_origin(
 
 uacpi_status uacpi_table_install(void *virt, uacpi_table *out_table)
 {
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     return uacpi_table_install_with_origin(
         virt, UACPI_TABLE_ORIGIN_HOST_VIRTUAL, out_table
@@ -443,7 +443,7 @@ uacpi_status uacpi_table_install_physical(
     uacpi_phys_addr addr, uacpi_table *out_table
 )
 {
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     return uacpi_table_install_physical_with_origin(
         addr, UACPI_TABLE_ORIGIN_HOST_PHYSICAL, out_table
@@ -458,7 +458,7 @@ uacpi_status uacpi_for_each_table(
     struct uacpi_installed_table *tbl;
     enum uacpi_table_iteration_decision ret;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(table_mutex);
 
@@ -581,7 +581,7 @@ uacpi_status uacpi_table_find_by_signature(
         }
     };
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
     return find_table(0, &id, out_table);
 }
 
@@ -590,7 +590,7 @@ uacpi_table_find_next_with_same_signature(uacpi_table *in_out_table)
 {
     struct uacpi_table_identifiers id = { 0 };
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     uacpi_memcpy(&id.signature, in_out_table->hdr->signature,
                  sizeof(id.signature));
@@ -602,7 +602,7 @@ uacpi_status uacpi_table_find(
     const uacpi_table_identifiers *id, uacpi_table *out_table
 )
 {
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
     return find_table(0, id, out_table);
 }
 
@@ -614,7 +614,7 @@ static uacpi_status table_ctl(
     uacpi_status ret = UACPI_STATUS_OK;
     struct uacpi_installed_table *tbl;
 
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     UACPI_MUTEX_ACQUIRE(table_mutex);
     if (uacpi_unlikely(table_array_size(&tables) <= idx)) {
@@ -912,7 +912,7 @@ static uacpi_status initialize_fadt(struct acpi_sdt_hdr *hdr)
 
 uacpi_status uacpi_table_fadt(struct acpi_fadt **out_fadt)
 {
-    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_TABLES_LOADED);
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
     *out_fadt = &g_uacpi_rt_ctx.fadt;
     return UACPI_STATUS_OK;
