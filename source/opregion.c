@@ -411,7 +411,7 @@ uacpi_status uacpi_reg_all_opregions(
         return UACPI_STATUS_NO_HANDLER;
 
     uacpi_namespace_for_each_node_depth_first(
-        device_node->child, do_run_reg, &ctx
+        device_node, do_run_reg, &ctx
     );
 
     uacpi_trace(
@@ -455,7 +455,7 @@ uacpi_status uacpi_install_address_space_handler(
     iter_ctx.action = OPREGION_ITER_ACTION_INSTALL;
 
     uacpi_namespace_for_each_node_depth_first(
-        device_node->child, do_install_or_uninstall_handler, &iter_ctx
+        device_node, do_install_or_uninstall_handler, &iter_ctx
     );
 
     if (!space_needs_reg(space))
@@ -506,7 +506,7 @@ uacpi_status uacpi_uninstall_address_space_handler(
     iter_ctx.action = OPREGION_ITER_ACTION_UNINSTALL;
 
     uacpi_namespace_for_each_node_depth_first(
-        device_node->child, do_install_or_uninstall_handler, &iter_ctx
+        device_node, do_install_or_uninstall_handler, &iter_ctx
     );
 
     prev_handler = handlers->head;
