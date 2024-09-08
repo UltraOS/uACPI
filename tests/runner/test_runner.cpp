@@ -81,108 +81,111 @@ static void validate_ret_against_expected(
 
 static void enumerate_namespace()
 {
-    uacpi_namespace_for_each_node_depth_first(
-        uacpi_namespace_root(), [] (void*, uacpi_namespace_node *node) {
-            uacpi_namespace_node_info *info;
+    auto dump_one_node = [](void*, uacpi_namespace_node *node) {
+        uacpi_namespace_node_info *info;
 
-            auto depth = uacpi_namespace_node_depth(node);
+        auto depth = uacpi_namespace_node_depth(node);
 
-            auto nested_printf = [depth](const char *fmt, ...) {
-                va_list va;
-                size_t padding = depth * 4;
+        auto nested_printf = [depth](const char *fmt, ...) {
+            va_list va;
+            size_t padding = depth * 4;
 
-                while (padding-- > 0)
-                    std::printf(" ");
+            while (padding-- > 0)
+                std::printf(" ");
 
-                va_start(va, fmt);
-                std::vprintf(fmt, va);
-                va_end(va);
+            va_start(va, fmt);
+            std::vprintf(fmt, va);
+            va_end(va);
+        };
+
+        auto ret = uacpi_get_namespace_node_info(node, &info);
+        if (uacpi_unlikely_error(ret)) {
+            fprintf(
+                stderr, "unable to get node %.4s info: %s\n",
+                uacpi_namespace_node_name(node).text,
+                uacpi_status_to_string(ret)
+            );
+            std::exit(1);
+        }
+
+        auto *path = uacpi_namespace_node_generate_absolute_path(node);
+        nested_printf(
+            "%s [%s]", path, uacpi_object_type_to_string(info->type)
+        );
+        uacpi_free_absolute_path(path);
+
+        if (info->type == UACPI_OBJECT_METHOD)
+            std::printf(" (%d args)", info->num_params);
+
+        if (info->flags)
+            std::printf(" {\n");
+
+        if (info->flags)
+            nested_printf("  _ADR: %016" PRIX64 "\n", info->adr);
+
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_HID)
+            nested_printf("  _HID: %s\n", info->hid.value);
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_CID) {
+            nested_printf("  _CID: ");
+            for (size_t i = 0; i < info->cid.num_ids; ++i)
+                std::printf("%s ", info->cid.ids[i].value);
+
+            std::printf("\n");
+        }
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_UID)
+            nested_printf("  _UID: %s\n", info->uid.value);
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_CLS)
+            nested_printf("  _CLS: %s\n", info->cls.value);
+
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_SXD) {
+            nested_printf(
+                "  _SxD: S1->D%d S2->D%d S3->D%d S4->D%d\n",
+                info->sxd[0], info->sxd[1], info->sxd[2], info->sxd[3]
+            );
+        }
+        if (info->flags & UACPI_NS_NODE_INFO_HAS_SXW) {
+            nested_printf(
+                "  _SxW: S0->D%d S1->D%d S2->D%d S3->D%d S4->D%d\n",
+                info->sxw[0], info->sxw[1], info->sxw[2], info->sxw[3],
+                info->sxw[4]
+            );
+        }
+
+        if (info->flags) {
+            auto dump_resources = [=](auto cb, const char *name) {
+                uacpi_resources *res;
+
+                auto ret = cb(node, &res);
+                if (ret == UACPI_STATUS_OK) {
+                    // TODO: dump resources here
+                    nested_printf("  %s: <%u bytes>\n", name, res->length);
+                    uacpi_free_resources(res);
+                } else if (ret != UACPI_STATUS_NOT_FOUND) {
+                    nested_printf(
+                        "  %s: unable to evaluate (%s)\n",
+                        name, uacpi_status_to_string(ret)
+                    );
+                }
             };
 
-            auto ret = uacpi_get_namespace_node_info(node, &info);
-            if (uacpi_unlikely_error(ret)) {
-                fprintf(
-                    stderr, "unable to get node %.4s info: %s\n",
-                    uacpi_namespace_node_name(node).text,
-                    uacpi_status_to_string(ret)
-                );
-                std::exit(1);
+            if (info->type == UACPI_OBJECT_DEVICE) {
+                dump_resources(uacpi_get_current_resources, "_CRS");
+                dump_resources(uacpi_get_possible_resources, "_PRS");
             }
 
-            auto *path = uacpi_namespace_node_generate_absolute_path(node);
-            nested_printf(
-                "%s [%s]", path, uacpi_object_type_to_string(info->type)
-            );
-            uacpi_free_absolute_path(path);
+            nested_printf("}\n");
+        } else {
+            std::printf("\n");
+        }
 
-            if (info->type == UACPI_OBJECT_METHOD)
-                std::printf(" (%d args)", info->num_params);
+        uacpi_free_namespace_node_info(info);
+        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    };
 
-            if (info->flags)
-                std::printf(" {\n");
+    auto *root = uacpi_namespace_root();
 
-            if (info->flags)
-                nested_printf("  _ADR: %016" PRIX64 "\n", info->adr);
-
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_HID)
-                nested_printf("  _HID: %s\n", info->hid.value);
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_CID) {
-                nested_printf("  _CID: ");
-                for (size_t i = 0; i < info->cid.num_ids; ++i)
-                    std::printf("%s ", info->cid.ids[i].value);
-
-                std::printf("\n");
-            }
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_UID)
-                nested_printf("  _UID: %s\n", info->uid.value);
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_CLS)
-                nested_printf("  _CLS: %s\n", info->cls.value);
-
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_SXD) {
-                nested_printf(
-                    "  _SxD: S1->D%d S2->D%d S3->D%d S4->D%d\n",
-                    info->sxd[0], info->sxd[1], info->sxd[2], info->sxd[3]
-                );
-            }
-            if (info->flags & UACPI_NS_NODE_INFO_HAS_SXW) {
-                nested_printf(
-                    "  _SxW: S0->D%d S1->D%d S2->D%d S3->D%d S4->D%d\n",
-                    info->sxw[0], info->sxw[1], info->sxw[2], info->sxw[3],
-                    info->sxw[4]
-                );
-            }
-
-            if (info->flags) {
-                auto dump_resources = [=](auto cb, const char *name) {
-                    uacpi_resources *res;
-
-                    auto ret = cb(node, &res);
-                    if (ret == UACPI_STATUS_OK) {
-                        // TODO: dump resources here
-                        nested_printf("  %s: <%u bytes>\n", name, res->length);
-                        uacpi_free_resources(res);
-                    } else if (ret != UACPI_STATUS_NOT_FOUND) {
-                        nested_printf(
-                            "  %s: unable to evaluate (%s)\n",
-                            name, uacpi_status_to_string(ret)
-                        );
-                    }
-                };
-
-                if (info->type == UACPI_OBJECT_DEVICE) {
-                    dump_resources(uacpi_get_current_resources, "_CRS");
-                    dump_resources(uacpi_get_possible_resources, "_PRS");
-                }
-
-                nested_printf("}\n");
-            } else {
-                std::printf("\n");
-            }
-
-            uacpi_free_namespace_node_info(info);
-            return UACPI_NS_ITERATION_DECISION_CONTINUE;
-        }, nullptr
-    );
+    dump_one_node(nullptr, root);
+    uacpi_namespace_for_each_node_depth_first(root, dump_one_node, nullptr);
 }
 
 /*
