@@ -25,7 +25,7 @@ uacpi_i32 uacpi_memcmp(const void *lhs, const void *rhs, uacpi_size count);
 uacpi_size uacpi_strlen(const uacpi_char *str);
 #endif
 
-#ifndef uacpi_strlen
+#ifndef uacpi_strnlen
 uacpi_size uacpi_strnlen(const uacpi_char *str, uacpi_size max);
 #endif
 
