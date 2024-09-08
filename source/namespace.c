@@ -553,8 +553,10 @@ void uacpi_namespace_for_each_node_depth_first(
     uacpi_bool walking_up = UACPI_FALSE;
     uacpi_u32 depth = 1;
 
-    if (node == UACPI_NULL)
+    if (node == UACPI_NULL || node->child == UACPI_NULL)
         return;
+
+    node = node->child;
 
     while (depth) {
         if (walking_up) {
