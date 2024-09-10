@@ -272,7 +272,7 @@ static uacpi_status handle_ec(uacpi_region_op op, uacpi_handle op_data)
 static void run_test(
     std::string_view dsdt_path, const std::vector<std::string>& ssdt_paths,
     uacpi_object_type expected_type, std::string_view expected_value,
-    uacpi_log_level log_level, bool dump_namespace
+    bool dump_namespace
 )
 {
     acpi_rsdp rsdp {};
@@ -304,12 +304,6 @@ static void run_test(
     );
     build_xsdt(*xsdt, rsdp, dsdt_path, ssdt_paths);
 
-    g_rsdp = reinterpret_cast<uacpi_phys_addr>(&rsdp);
-    uacpi_init_params params = {
-        log_level,
-        UACPI_FLAG_NO_ACPI_MODE, // don't attempt to enter ACPI mode in userspace
-    };
-
     auto ensure_ok_status = [] (uacpi_status st) {
         if (st == UACPI_STATUS_OK)
             return;
@@ -318,7 +312,9 @@ static void run_test(
         throw std::runtime_error(std::string("uACPI error: ") + msg);
     };
 
-    uacpi_status st = uacpi_initialize(&params);
+    g_rsdp = reinterpret_cast<uacpi_phys_addr>(&rsdp);
+
+    uacpi_status st = uacpi_initialize(UACPI_FLAG_NO_ACPI_MODE);
     ensure_ok_status(st);
 
     g_expect_virtual_addresses = false;
@@ -476,8 +472,10 @@ int main(int argc, char** argv)
         if (args.is_set('l'))
             log_level = log_level_from_string(args.get('l'));
 
+        uacpi_context_set_log_level(log_level);
+
         run_test(dsdt_path_or_keyword, args.get_list_or("extra-tables", {}),
-                 expected_type, expected_value, log_level, dump_namespace);
+                 expected_type, expected_value, dump_namespace);
     } catch (const std::exception& ex) {
         std::cerr << "unexpected error: " << ex.what() << std::endl;
         return 1;
