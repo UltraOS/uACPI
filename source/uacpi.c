@@ -304,6 +304,7 @@ uacpi_init_level uacpi_get_current_init_level(void)
 uacpi_status uacpi_initialize(const uacpi_init_params *params)
 {
     uacpi_status ret;
+    uacpi_phys_addr rsdp_phys;
     struct acpi_rsdp *rsdp;
     uacpi_phys_addr rxsdt;
     uacpi_size rxsdt_entry_size;
@@ -330,11 +331,15 @@ uacpi_status uacpi_initialize(const uacpi_init_params *params)
     if (g_uacpi_rt_ctx.max_call_stack_depth == 0)
         uacpi_context_set_max_call_stack_depth(UACPI_DEFAULT_MAX_CALL_STACK_DEPTH);
 
+    ret = uacpi_kernel_get_rsdp(&rsdp_phys);
+    if (uacpi_unlikely_error(ret))
+        goto out_fatal_error;
+
     ret = uacpi_initialize_tables();
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 
-    rsdp = uacpi_kernel_map(params->rsdp, sizeof(struct acpi_rsdp));
+    rsdp = uacpi_kernel_map(rsdp_phys, sizeof(struct acpi_rsdp));
     if (rsdp == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
 

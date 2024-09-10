@@ -21,6 +21,7 @@ private:
 };
 
 extern bool g_expect_virtual_addresses;
+extern uacpi_phys_addr g_rsdp;
 
 UACPI_PACKED(struct full_xsdt {
     struct acpi_sdt_hdr hdr;

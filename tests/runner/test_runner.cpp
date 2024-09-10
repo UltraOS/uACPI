@@ -304,8 +304,8 @@ static void run_test(
     );
     build_xsdt(*xsdt, rsdp, dsdt_path, ssdt_paths);
 
+    g_rsdp = reinterpret_cast<uacpi_phys_addr>(&rsdp);
     uacpi_init_params params = {
-        reinterpret_cast<uacpi_phys_addr>(&rsdp),
         log_level,
         UACPI_FLAG_NO_ACPI_MODE, // don't attempt to enter ACPI mode in userspace
     };

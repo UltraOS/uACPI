@@ -28,6 +28,14 @@
 
 #include <uacpi/kernel_api.h>
 
+uacpi_phys_addr g_rsdp;
+
+uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rdsp_address)
+{
+    *out_rdsp_address = g_rsdp;
+    return UACPI_STATUS_OK;
+}
+
 #ifdef UACPI_KERNEL_INITIALIZATION
 uacpi_status uacpi_kernel_initialize(uacpi_init_level)
 {
