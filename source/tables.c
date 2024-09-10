@@ -606,10 +606,24 @@ uacpi_status uacpi_table_find(
     return find_table(0, id, out_table);
 }
 
-static uacpi_status table_ctl(
-    uacpi_size idx, uacpi_u8 expect_set, uacpi_u8 expect_clear,
-    uacpi_u8 set, uacpi_u8 clear, void **out_tbl
-)
+#define TABLE_CTL_SET_FLAGS (1 << 0)
+#define TABLE_CTL_CLEAR_FLAGS (1 << 1)
+#define TABLE_CTL_VALIDATE_SET_FLAGS (1 << 2)
+#define TABLE_CTL_VALIDATE_CLEAR_FLAGS (1 << 3)
+#define TABLE_CTL_GET (1 << 4)
+
+struct table_ctl_request {
+    uacpi_u8 type;
+
+    uacpi_u8 expect_set;
+    uacpi_u8 expect_clear;
+    uacpi_u8 set;
+    uacpi_u8 clear;
+
+    void *out_tbl;
+};
+
+static uacpi_status table_ctl(uacpi_size idx, struct table_ctl_request *req)
 {
     uacpi_status ret = UACPI_STATUS_OK;
     struct uacpi_installed_table *tbl;
@@ -627,29 +641,38 @@ static uacpi_status table_ctl(
     }
 
     tbl = table_array_at(&tables, idx);
-    if (uacpi_unlikely((tbl->flags & expect_set) != expect_set)) {
-        uacpi_error(
-            "unexpected table '%.4s' flags %02X, expected %02X to be set\n",
-            tbl->signature.text, tbl->flags, expect_set
-        );
-        ret = UACPI_STATUS_INVALID_ARGUMENT;
-        goto out;
+    if (req->type & TABLE_CTL_VALIDATE_SET_FLAGS) {
+        uacpi_u8 mask = req->expect_set;
+
+        if (uacpi_unlikely((tbl->flags & mask) != mask)) {
+            uacpi_error(
+                "unexpected table '%.4s' flags %02X, expected %02X to be set\n",
+                tbl->signature.text, tbl->flags, mask
+            );
+            ret = UACPI_STATUS_INVALID_ARGUMENT;
+            goto out;
+        }
     }
 
-    if (uacpi_unlikely((tbl->flags & expect_clear) != 0)) {
-        uacpi_error(
-            "unexpected table '%.4s' flags %02X, expected %02X to be clear\n",
-            tbl->signature.text, tbl->flags, expect_clear
-        );
-        ret = UACPI_STATUS_ALREADY_EXISTS;
-        goto out;
+    if (req->type & TABLE_CTL_VALIDATE_CLEAR_FLAGS) {
+        uacpi_u8 mask = req->expect_clear;
+
+        if (uacpi_unlikely((tbl->flags & mask) != 0)) {
+            uacpi_error(
+                "unexpected table '%.4s' flags %02X, expected %02X "
+                "to be clear\n", tbl->signature.text, tbl->flags, mask
+            );
+            ret = UACPI_STATUS_ALREADY_EXISTS;
+            goto out;
+        }
     }
 
-    if (out_tbl != UACPI_NULL)
-        *out_tbl = tbl->ptr;
-
-    tbl->flags |= set;
-    tbl->flags &= ~clear;
+    if (req->type & TABLE_CTL_SET_FLAGS)
+        tbl->flags |= req->set;
+    if (req->type & TABLE_CTL_CLEAR_FLAGS)
+        tbl->flags &= ~req->clear;
+    if (req->type & TABLE_CTL_GET)
+        req->out_tbl = tbl->ptr;
 
 out:
     UACPI_MUTEX_RELEASE(table_mutex);
@@ -661,15 +684,18 @@ uacpi_status uacpi_table_load_with_cause(
 )
 {
     uacpi_status ret;
-    void *tbl;
-    uacpi_u8 set = UACPI_TABLE_LOADED;
-    uacpi_u8 expect_clear = set;
+    struct table_ctl_request req = {
+        .type = TABLE_CTL_SET_FLAGS | TABLE_CTL_VALIDATE_CLEAR_FLAGS |
+                TABLE_CTL_GET,
+        .set = UACPI_TABLE_LOADED,
+        .expect_clear = UACPI_TABLE_LOADED,
+    };
 
-    ret = table_ctl(idx, 0, expect_clear, set, 0, &tbl);
+    ret = table_ctl(idx, &req);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    return uacpi_execute_table(tbl, cause);
+    return uacpi_execute_table(req.out_tbl, cause);
 }
 
 uacpi_status uacpi_table_load(uacpi_size idx)
@@ -679,7 +705,9 @@ uacpi_status uacpi_table_load(uacpi_size idx)
 
 void uacpi_table_mark_as_loaded(uacpi_size idx)
 {
-    table_ctl(idx, 0, 0, UACPI_TABLE_LOADED, 0, UACPI_NULL);
+    table_ctl(idx, &(struct table_ctl_request) {
+        .type = TABLE_CTL_SET_FLAGS, .set = UACPI_TABLE_LOADED
+    });
 }
 
 uacpi_u16 fadt_version_sizes[] = {
