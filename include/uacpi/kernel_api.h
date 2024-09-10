@@ -27,6 +27,9 @@ uacpi_status uacpi_kernel_initialize(uacpi_init_level current_init_lvl);
 void uacpi_kernel_deinitialize(void);
 #endif
 
+// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
+uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rdsp_address);
+
 /*
  * Raw IO API, this is only used for accessing verified data from
  * "safe" code (aka not indirectly invoked by the AML interpreter),

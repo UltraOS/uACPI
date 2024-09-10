@@ -29,9 +29,6 @@ extern "C" {
 #endif
 
 typedef struct uacpi_init_params {
-    // Physical address of the RSDP structure.
-    uacpi_phys_addr rsdp;
-
     // Initial log level, all logs above this level are discarded
     uacpi_log_level log_level;
 
