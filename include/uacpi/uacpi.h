@@ -28,10 +28,6 @@
 extern "C" {
 #endif
 
-typedef struct uacpi_init_params {
-    // Initial log level, all logs above this level are discarded
-    uacpi_log_level log_level;
-
 /*
  * Bad table checksum should be considered a fatal error
  * (table load is fully aborted in this case)
@@ -62,14 +58,14 @@ typedef struct uacpi_init_params {
  * blob, a more atomic/granular interface management is available via osi.h
  */
 #define UACPI_FLAG_NO_OSI (1 << 4)
-    uacpi_u64 flags;
-} uacpi_init_params;
 
 /*
  * Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT
  * tables. Enters ACPI mode.
+ *
+ * 'flags' is any combination of UACPI_FLAG_* above
  */
-uacpi_status uacpi_initialize(const struct uacpi_init_params*);
+uacpi_status uacpi_initialize(uacpi_u64 flags);
 
 /*
  * Parses & executes all of the DSDT/SSDT tables.
