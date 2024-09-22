@@ -50,6 +50,16 @@ uacpi_status uacpi_table_install_physical(
  */
 uacpi_status uacpi_table_load(uacpi_size index);
 
+/*
+ * Helpers for finding tables.
+ *
+ * NOTE:
+ * The returned table's reference count is incremented by 1, which keeps its
+ * mapping alive forever unless uacpi_table_unref() is called for this table
+ * later on. Calling uacpi_table_find_next_with_same_signature() on a table also
+ * drops its reference count by 1, so if you want to keep it mapped you must
+ * manually call uacpi_table_ref() beforehand.
+ */
 uacpi_status uacpi_table_find_by_signature(
     const uacpi_char *signature, uacpi_table *out_table
 );
@@ -59,6 +69,13 @@ uacpi_status uacpi_table_find_next_with_same_signature(
 uacpi_status uacpi_table_find(
     const uacpi_table_identifiers *id, uacpi_table *out_table
 );
+
+/*
+ * Increment/decrement a table's reference count.
+ * The table is unmapped when the reference count drops to 0.
+ */
+uacpi_status uacpi_table_ref(uacpi_table*);
+uacpi_status uacpi_table_unref(uacpi_table*);
 
 /*
  * Returns the pointer to a sanitized internal version of FADT.
