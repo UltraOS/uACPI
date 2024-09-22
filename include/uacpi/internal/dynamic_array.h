@@ -31,6 +31,12 @@
         return sizeof(arr->inline_storage) / sizeof(arr->inline_storage[0]); \
     }                                                                        \
                                                                              \
+    UACPI_MAYBE_UNUSED                                                       \
+    prefix uacpi_size name##_capacity(struct name *arr)                      \
+    {                                                                        \
+        return name##_inline_capacity(arr) + arr->dynamic_capacity;          \
+    }                                                                        \
+                                                                             \
     prefix type *name##_at(struct name *arr, uacpi_size idx)                 \
     {                                                                        \
         if (idx >= arr->size_including_inline)                               \
