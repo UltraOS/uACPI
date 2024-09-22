@@ -325,12 +325,12 @@ static uacpi_status table_install_physical_with_origin_unlocked(
         default:
             uacpi_info(
                 "table '%.4s' (0x016%"UACPI_PRIX64") installation "
-                "overriden by host\n", signature.text, UACPI_FMT64(phys)
+                "overridden by host\n", signature.text, UACPI_FMT64(phys)
             );
 
             ret = handle_table_override(disposition, override, out_table);
             if (uacpi_likely_success(ret))
-                ret = UACPI_STATUS_OVERRIDEN;
+                ret = UACPI_STATUS_OVERRIDDEN;
 
             goto out;
         }
@@ -399,13 +399,13 @@ static uacpi_status table_install_with_origin_unlocked(
         default: {
             uacpi_status ret;
             uacpi_info(
-                "table "UACPI_PRI_TBL_HDR" installation overriden by host\n",
+                "table "UACPI_PRI_TBL_HDR" installation overridden by host\n",
                 UACPI_FMT_TBL_HDR(hdr)
             );
 
             ret = handle_table_override(disposition, override, out_table);
             if (uacpi_likely_success(ret))
-                ret = UACPI_STATUS_OVERRIDEN;
+                ret = UACPI_STATUS_OVERRIDDEN;
 
             return ret;
         }

@@ -27,7 +27,7 @@ typedef enum uacpi_status {
     UACPI_STATUS_COMPILED_OUT = 16,
     UACPI_STATUS_HARDWARE_TIMEOUT = 17,
     UACPI_STATUS_TIMEOUT = 18,
-    UACPI_STATUS_OVERRIDEN = 19,
+    UACPI_STATUS_OVERRIDDEN = 19,
     UACPI_STATUS_DENIED = 20,
 
     // All errors that have bytecode-related origin should go here
