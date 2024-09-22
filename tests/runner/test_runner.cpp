@@ -314,7 +314,23 @@ static void run_test(
 
     g_rsdp = reinterpret_cast<uacpi_phys_addr>(&rsdp);
 
-    uacpi_status st = uacpi_initialize(UACPI_FLAG_NO_ACPI_MODE);
+    static uint8_t early_table_buf[4096];
+    auto st = uacpi_setup_early_table_access(
+        early_table_buf, sizeof(early_table_buf)
+    );
+    ensure_ok_status(st);
+
+    uacpi_table tbl;
+    st = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
+    ensure_ok_status(st);
+
+    if (strncmp(tbl.hdr->signature, ACPI_DSDT_SIGNATURE, 4) != 0)
+        throw std::runtime_error("broken early table access!");
+
+    st = uacpi_table_unref(&tbl);
+    ensure_ok_status(st);
+
+    st = uacpi_initialize(UACPI_FLAG_NO_ACPI_MODE);
     ensure_ok_status(st);
 
     /*
@@ -325,7 +341,6 @@ static void run_test(
      * tables that we constructed earlier) or a real physical address that comes
      * from some operation region or any other AML code or action.
      */
-    uacpi_table tbl;
     uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
 
     st = uacpi_table_find_by_signature(ACPI_SSDT_SIGNATURE, &tbl);

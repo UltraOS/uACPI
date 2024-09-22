@@ -15,17 +15,15 @@ enum uacpi_table_origin {
 };
 
 struct uacpi_installed_table {
-    uacpi_object_name signature;
     uacpi_phys_addr phys_addr;
-    union {
-        void *ptr;
-        struct acpi_sdt_hdr *hdr;
-    };
-    uacpi_u32 length;
+    struct acpi_sdt_hdr hdr;
+    void *ptr;
 
     uacpi_u16 reference_count;
 
 #define UACPI_TABLE_LOADED (1 << 0)
+#define UACPI_TABLE_CSUM_VERIFIED (1 << 1)
+#define UACPI_TABLE_INVALID (1 << 2)
     uacpi_u8 flags;
     uacpi_u8 origin;
 };
@@ -33,6 +31,7 @@ struct uacpi_installed_table {
 uacpi_status uacpi_initialize_tables(void);
 void uacpi_deinitialize_tables(void);
 
+uacpi_bool uacpi_signatures_match(const void *const lhs, const void *const rhs);
 uacpi_status uacpi_check_table_signature(void *table, const uacpi_char *expect);
 uacpi_status uacpi_verify_table_checksum(void *table, uacpi_size size);
 

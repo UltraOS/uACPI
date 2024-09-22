@@ -45,6 +45,8 @@ void uacpi_context_set_max_call_stack_depth(uacpi_u32 depth);
 
 uacpi_u32 uacpi_context_get_loop_timeout(void);
 
+void uacpi_context_set_proactive_table_checksum(uacpi_bool);
+
 #ifdef __cplusplus
 }
 #endif
