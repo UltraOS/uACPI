@@ -58,7 +58,7 @@ static uacpi_status uacpi_acquire_global_lock_from_firmware(void)
     if (!g_uacpi_rt_ctx.has_global_lock)
         return UACPI_STATUS_OK;
 
-    flags = uacpi_kernel_spinlock_lock(g_uacpi_rt_ctx.global_lock_spinlock);
+    flags = uacpi_kernel_lock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
     for (;;) {
         spins++;
         uacpi_trace(
@@ -80,14 +80,14 @@ static uacpi_status uacpi_acquire_global_lock_from_firmware(void)
             "global lock is owned by firmware, waiting for a release "
             "notification...\n"
         );
-        uacpi_kernel_spinlock_unlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
+        uacpi_kernel_unlock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
 
         uacpi_kernel_wait_for_event(g_uacpi_rt_ctx.global_lock_event, 0xFFFF);
-        flags = uacpi_kernel_spinlock_lock(g_uacpi_rt_ctx.global_lock_spinlock);
+        flags = uacpi_kernel_lock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
     }
 
     g_uacpi_rt_ctx.global_lock_pending = UACPI_FALSE;
-    uacpi_kernel_spinlock_unlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
+    uacpi_kernel_unlock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
 
     if (uacpi_unlikely(!success)) {
         uacpi_error("unable to acquire global lock after %u attempts\n", spins);

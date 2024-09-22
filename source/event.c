@@ -1745,7 +1745,7 @@ static uacpi_interrupt_ret handle_global_lock(uacpi_handle ctx)
         return UACPI_INTERRUPT_HANDLED;
     }
 
-    flags = uacpi_kernel_spinlock_lock(g_uacpi_rt_ctx.global_lock_spinlock);
+    flags = uacpi_kernel_lock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
     if (!g_uacpi_rt_ctx.global_lock_pending) {
         uacpi_trace("spurious firmware global lock release notification\n");
         goto out;
@@ -1757,7 +1757,7 @@ static uacpi_interrupt_ret handle_global_lock(uacpi_handle ctx)
     g_uacpi_rt_ctx.global_lock_pending = UACPI_FALSE;
 
 out:
-    uacpi_kernel_spinlock_unlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
+    uacpi_kernel_unlock_spinlock(g_uacpi_rt_ctx.global_lock_spinlock, flags);
     return UACPI_INTERRUPT_HANDLED;
 }
 
