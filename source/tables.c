@@ -170,10 +170,9 @@ static uacpi_status table_alloc(
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status
-get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
-                                        uacpi_object_name *out_sign,
-                                        uacpi_u32 *out_len)
+static uacpi_status get_external_table_signature_and_length(
+    uacpi_phys_addr phys_addr, uacpi_object_name *out_sign, uacpi_u32 *out_len
+)
 {
     struct acpi_sdt_hdr *hdr;
 
@@ -186,6 +185,37 @@ get_external_table_signature_and_length(uacpi_phys_addr phys_addr,
 
     uacpi_kernel_unmap(hdr, sizeof(struct acpi_sdt_hdr));
     return UACPI_STATUS_OK;
+}
+
+static uacpi_status table_ref_unlocked(struct uacpi_installed_table *tbl)
+{
+    if (tbl->reference_count++ > 0)
+        return UACPI_STATUS_OK;
+
+    if (tbl->origin != UACPI_TABLE_ORIGIN_HOST_PHYSICAL &&
+        tbl->origin != UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL)
+        return UACPI_STATUS_OK;
+
+    tbl->ptr = uacpi_kernel_map(tbl->phys_addr, tbl->length);
+    if (uacpi_unlikely(tbl->ptr == UACPI_NULL)) {
+        tbl->reference_count--;
+        return UACPI_STATUS_MAPPING_FAILED;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+static void table_unref_unlocked(struct uacpi_installed_table *tbl)
+{
+    if (tbl->reference_count-- > 1)
+        return;
+
+    if (tbl->origin != UACPI_TABLE_ORIGIN_HOST_PHYSICAL &&
+        tbl->origin != UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL)
+        return;
+
+    uacpi_kernel_unmap(tbl->ptr, tbl->length);
+    tbl->ptr = UACPI_NULL;
 }
 
 static uacpi_status verify_and_install_table(
@@ -228,13 +258,16 @@ static uacpi_status verify_and_install_table(
     table->ptr = virt_addr;
     table->length = length;
     table->flags = 0;
+    table->reference_count = 1;
     table->origin = origin;
 
-    if (out_table != UACPI_NULL) {
-        out_table->ptr = virt_addr;
-        out_table->index = idx;
+    if (out_table == UACPI_NULL) {
+        table_unref_unlocked(table);
+        return UACPI_STATUS_OK;
     }
 
+    out_table->ptr = virt_addr;
+    out_table->index = idx;
     return UACPI_STATUS_OK;
 }
 
@@ -487,7 +520,7 @@ struct table_search_ctx {
 
     uacpi_table *out_table;
     uacpi_u8 search_type;
-    uacpi_bool found;
+    uacpi_status status;
 };
 
 static enum uacpi_table_iteration_decision do_search_tables(
@@ -519,13 +552,20 @@ static enum uacpi_table_iteration_decision do_search_tables(
     case SEARCH_TYPE_MATCH:
         if (!ctx->match_cb(tbl))
             return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+        break;
 
+    default:
+        ctx->status = UACPI_STATUS_INVALID_ARGUMENT;
+        return UACPI_TABLE_ITERATION_DECISION_BREAK;
     }
+
+    ctx->status = table_ref_unlocked(tbl);
+    if (uacpi_unlikely_error(ctx->status))
+        return UACPI_TABLE_ITERATION_DECISION_BREAK;
 
     out_table = ctx->out_table;
     out_table->ptr = tbl->ptr;
     out_table->index = idx;
-    ctx->found = UACPI_TRUE;
 
     return UACPI_TABLE_ITERATION_DECISION_BREAK;
 }
@@ -534,36 +574,39 @@ uacpi_status uacpi_table_match(
     uacpi_size base_idx, uacpi_table_match_callback cb, uacpi_table *out_table
 )
 {
-    struct table_search_ctx  ctx = {
+    uacpi_status ret;
+    struct table_search_ctx ctx = {
         .match_cb = cb,
         .search_type = SEARCH_TYPE_MATCH,
         .out_table = out_table,
+        .status = UACPI_STATUS_NOT_FOUND,
     };
 
-    uacpi_for_each_table(base_idx, do_search_tables, &ctx);
-    if (!ctx.found)
-        return UACPI_STATUS_NOT_FOUND;
+    ret = uacpi_for_each_table(base_idx, do_search_tables, &ctx);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-    return UACPI_STATUS_OK;
+    return ctx.status;
 }
-
 
 static uacpi_status find_table(
     uacpi_size base_idx, const uacpi_table_identifiers *id,
     uacpi_table *out_table
 )
 {
+    uacpi_status ret;
     struct table_search_ctx ctx = {
         .id = id,
         .out_table = out_table,
         .search_type = SEARCH_TYPE_BY_ID,
+        .status = UACPI_STATUS_NOT_FOUND,
     };
 
-    uacpi_for_each_table(base_idx, do_search_tables, &ctx);
-    if (!ctx.found)
-        return UACPI_STATUS_NOT_FOUND;
+    ret = uacpi_for_each_table(base_idx, do_search_tables, &ctx);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-    return UACPI_STATUS_OK;
+    return ctx.status;
 }
 
 uacpi_status uacpi_table_find_by_signature(
@@ -585,15 +628,20 @@ uacpi_status uacpi_table_find_by_signature(
     return find_table(0, &id, out_table);
 }
 
-uacpi_status
-uacpi_table_find_next_with_same_signature(uacpi_table *in_out_table)
+uacpi_status uacpi_table_find_next_with_same_signature(
+    uacpi_table *in_out_table
+)
 {
     struct uacpi_table_identifiers id = { 0 };
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
+    if (uacpi_unlikely(in_out_table->ptr == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
     uacpi_memcpy(&id.signature, in_out_table->hdr->signature,
                  sizeof(id.signature));
+    uacpi_table_unref(in_out_table);
 
     return find_table(in_out_table->index + 1, &id, in_out_table);
 }
@@ -611,6 +659,7 @@ uacpi_status uacpi_table_find(
 #define TABLE_CTL_VALIDATE_SET_FLAGS (1 << 2)
 #define TABLE_CTL_VALIDATE_CLEAR_FLAGS (1 << 3)
 #define TABLE_CTL_GET (1 << 4)
+#define TABLE_CTL_PUT (1 << 5)
 
 struct table_ctl_request {
     uacpi_u8 type;
@@ -667,12 +716,21 @@ static uacpi_status table_ctl(uacpi_size idx, struct table_ctl_request *req)
         }
     }
 
+    if (req->type & TABLE_CTL_GET) {
+        ret = table_ref_unlocked(tbl);
+        if (uacpi_unlikely_error(ret))
+            goto out;
+
+        req->out_tbl = tbl->ptr;
+    }
+
+    if (req->type & TABLE_CTL_PUT)
+        table_unref_unlocked(tbl);
+
     if (req->type & TABLE_CTL_SET_FLAGS)
         tbl->flags |= req->set;
     if (req->type & TABLE_CTL_CLEAR_FLAGS)
         tbl->flags &= ~req->clear;
-    if (req->type & TABLE_CTL_GET)
-        req->out_tbl = tbl->ptr;
 
 out:
     UACPI_MUTEX_RELEASE(table_mutex);
@@ -695,6 +753,18 @@ uacpi_status uacpi_table_load_with_cause(
     if (uacpi_unlikely_error(ret))
         return ret;
 
+    /*
+     * FIXME:
+     * The reference to the table is leaked intentionally as any created
+     * methods inside still reference the virtual mapping here.
+     *
+     * There are two solutions I can think of:
+     * 1. Allocate a heap buffer for method code and copy it there, then the
+     *    methods no longer need to execute tables after the first pass.
+     * 2. Make methods explicitly take references to the table they're a part
+     *    of. This would allows us to drop the leaked reference here after the
+     *    table load.
+     */
     return uacpi_execute_table(req.out_tbl, cause);
 }
 
@@ -707,6 +777,20 @@ void uacpi_table_mark_as_loaded(uacpi_size idx)
 {
     table_ctl(idx, &(struct table_ctl_request) {
         .type = TABLE_CTL_SET_FLAGS, .set = UACPI_TABLE_LOADED
+    });
+}
+
+uacpi_status uacpi_table_ref(uacpi_table *tbl)
+{
+    return table_ctl(tbl->index, &(struct table_ctl_request) {
+        .type = TABLE_CTL_GET
+    });
+}
+
+uacpi_status uacpi_table_unref(uacpi_table *tbl)
+{
+    return table_ctl(tbl->index, &(struct table_ctl_request) {
+        .type = TABLE_CTL_PUT
     });
 }
 
@@ -905,9 +989,10 @@ static uacpi_status initialize_fadt(struct acpi_sdt_hdr *hdr)
     if (fadt->x_dsdt) {
         ret = table_install_physical_with_origin_unlocked(
             fadt->x_dsdt, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
-            ACPI_DSDT_SIGNATURE, &tbl
+            ACPI_DSDT_SIGNATURE, UACPI_NULL
         );
-        if (uacpi_unlikely_error(ret))
+        if (uacpi_unlikely(ret != UACPI_STATUS_OK &&
+                           ret != UACPI_STATUS_OVERRIDDEN))
             return ret;
     }
 
@@ -928,7 +1013,8 @@ static uacpi_status initialize_fadt(struct acpi_sdt_hdr *hdr)
                 fadt->x_firmware_ctrl, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
                 ACPI_FACS_SIGNATURE, &tbl
             );
-            if (uacpi_unlikely_error(ret))
+            if (uacpi_unlikely(ret != UACPI_STATUS_OK &&
+                               ret != UACPI_STATUS_OVERRIDDEN))
                 return ret;
 
             g_uacpi_rt_ctx.facs = tbl.ptr;

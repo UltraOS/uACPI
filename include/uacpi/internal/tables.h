@@ -23,6 +23,8 @@ struct uacpi_installed_table {
     };
     uacpi_u32 length;
 
+    uacpi_u16 reference_count;
+
 #define UACPI_TABLE_LOADED (1 << 0)
     uacpi_u8 flags;
     uacpi_u8 origin;

@@ -317,6 +317,23 @@ static void run_test(
     uacpi_status st = uacpi_initialize(UACPI_FLAG_NO_ACPI_MODE);
     ensure_ok_status(st);
 
+    /*
+     * Go through all AML tables and manually bump their reference counts here
+     * so that they're mapped before the call to uacpi_namespace_load(). The
+     * reason we need this is to disambiguate calls to uacpi_kernel_map() with
+     * a synthetic physical address (that is actually a virtual address for
+     * tables that we constructed earlier) or a real physical address that comes
+     * from some operation region or any other AML code or action.
+     */
+    uacpi_table tbl;
+    uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
+
+    st = uacpi_table_find_by_signature(ACPI_SSDT_SIGNATURE, &tbl);
+    while (st == UACPI_STATUS_OK) {
+        uacpi_table_ref(&tbl);
+        st = uacpi_table_find_next_with_same_signature(&tbl);
+    }
+
     g_expect_virtual_addresses = false;
 
     st = uacpi_install_notify_handler(

@@ -293,7 +293,8 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
         ret = uacpi_table_install_physical_with_origin(
             entry_addr, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_NULL
         );
-        if (uacpi_unlikely_error(ret))
+        if (uacpi_unlikely(ret != UACPI_STATUS_OK &&
+                           ret != UACPI_STATUS_OVERRIDDEN))
             goto error_out;
     }
 
@@ -455,6 +456,7 @@ uacpi_status uacpi_namespace_load(void)
         st.failure_counter++;
     }
     st.load_counter++;
+    uacpi_table_unref(&tbl);
 
     for (cur_index = 0;; cur_index = tbl.index + 1) {
         ret = uacpi_table_match(cur_index, match_ssdt_or_psdt, &tbl);
@@ -471,6 +473,7 @@ uacpi_status uacpi_namespace_load(void)
             st.failure_counter++;
         }
         st.load_counter++;
+        uacpi_table_unref(&tbl);
     }
 
     if (uacpi_unlikely(st.failure_counter != 0)) {
