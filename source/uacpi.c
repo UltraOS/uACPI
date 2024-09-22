@@ -64,6 +64,14 @@ uacpi_u32 uacpi_context_get_loop_timeout(void)
     return g_uacpi_rt_ctx.loop_timeout_seconds;
 }
 
+void uacpi_context_set_proactive_table_checksum(uacpi_bool setting)
+{
+    if (setting)
+        g_uacpi_rt_ctx.flags |= UACPI_FLAG_PROACTIVE_TBL_CSUM;
+    else
+        g_uacpi_rt_ctx.flags &= ~UACPI_FLAG_PROACTIVE_TBL_CSUM;
+}
+
 const uacpi_char *uacpi_status_to_string(uacpi_status st)
 {
     switch (st) {
@@ -242,69 +250,6 @@ uacpi_status uacpi_leave_acpi_mode(void)
 }
 #endif
 
-UACPI_PACKED(struct uacpi_rxsdt {
-    struct acpi_sdt_hdr hdr;
-    uacpi_u8 ptr_bytes[];
-})
-
-static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
-                                          uacpi_size entry_size)
-{
-    struct uacpi_rxsdt *rxsdt;
-    uacpi_size i, entry_bytes, map_len = sizeof(*rxsdt);
-    uacpi_phys_addr entry_addr;
-    uacpi_status ret;
-
-    rxsdt = uacpi_kernel_map(rxsdt_addr, map_len);
-    if (rxsdt == UACPI_NULL)
-        return UACPI_STATUS_MAPPING_FAILED;
-
-    ret = uacpi_check_table_signature(rxsdt,
-        entry_size == 8 ? ACPI_XSDT_SIGNATURE : ACPI_RSDT_SIGNATURE);
-    if (uacpi_unlikely_error(ret))
-        goto error_out;
-
-    map_len = rxsdt->hdr.length;
-    uacpi_kernel_unmap(rxsdt, sizeof(*rxsdt));
-
-    if (uacpi_unlikely(map_len < (sizeof(*rxsdt) + entry_size)))
-        return UACPI_STATUS_INVALID_TABLE_LENGTH;
-
-    // Make sure length is aligned to entry size so we don't OOB
-    entry_bytes = map_len - sizeof(*rxsdt);
-    entry_bytes &= ~(entry_size - 1);
-
-    rxsdt = uacpi_kernel_map(rxsdt_addr, map_len);
-    if (uacpi_unlikely(rxsdt == UACPI_NULL))
-        return UACPI_STATUS_MAPPING_FAILED;
-
-    ret = uacpi_verify_table_checksum(rxsdt, map_len);
-    if (uacpi_unlikely_error(ret))
-        goto error_out;
-
-    for (i = 0; i < entry_bytes; i += entry_size) {
-        uacpi_u64 entry_phys_addr_large = 0;
-        uacpi_memcpy(&entry_phys_addr_large, &rxsdt->ptr_bytes[i], entry_size);
-
-        if (!entry_phys_addr_large)
-            continue;
-
-        entry_addr = uacpi_truncate_phys_addr_with_warn(entry_phys_addr_large);
-        ret = uacpi_table_install_physical_with_origin(
-            entry_addr, UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_NULL
-        );
-        if (uacpi_unlikely(ret != UACPI_STATUS_OK &&
-                           ret != UACPI_STATUS_OVERRIDDEN))
-            goto error_out;
-    }
-
-    ret = UACPI_STATUS_OK;
-
-error_out:
-    uacpi_kernel_unmap(rxsdt, map_len);
-    return ret;
-}
-
 uacpi_init_level uacpi_get_current_init_level(void)
 {
     return g_uacpi_rt_ctx.init_level;
@@ -313,10 +258,6 @@ uacpi_init_level uacpi_get_current_init_level(void)
 uacpi_status uacpi_initialize(uacpi_u64 flags)
 {
     uacpi_status ret;
-    uacpi_phys_addr rsdp_phys;
-    struct acpi_rsdp *rsdp;
-    uacpi_phys_addr rxsdt;
-    uacpi_size rxsdt_entry_size;
 
     UACPI_ENSURE_INIT_LEVEL_IS(UACPI_INIT_LEVEL_EARLY);
 
@@ -327,7 +268,6 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
 #endif
 
     g_uacpi_rt_ctx.init_level = UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED;
-    g_uacpi_rt_ctx.is_rev1 = UACPI_TRUE;
     g_uacpi_rt_ctx.last_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.last_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.s0_sleep_typ_a = UACPI_SLEEP_TYP_INVALID;
@@ -341,37 +281,7 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
     if (g_uacpi_rt_ctx.max_call_stack_depth == 0)
         uacpi_context_set_max_call_stack_depth(UACPI_DEFAULT_MAX_CALL_STACK_DEPTH);
 
-    ret = uacpi_kernel_get_rsdp(&rsdp_phys);
-    if (uacpi_unlikely_error(ret))
-        goto out_fatal_error;
-
     ret = uacpi_initialize_tables();
-    if (uacpi_unlikely_error(ret))
-        goto out_fatal_error;
-
-    rsdp = uacpi_kernel_map(rsdp_phys, sizeof(struct acpi_rsdp));
-    if (rsdp == UACPI_NULL)
-        return UACPI_STATUS_MAPPING_FAILED;
-
-    if (rsdp->revision > 1 && rsdp->xsdt_addr &&
-        !uacpi_check_flag(UACPI_FLAG_BAD_XSDT))
-    {
-        rxsdt = uacpi_truncate_phys_addr_with_warn(rsdp->xsdt_addr);
-        rxsdt_entry_size = 8;
-    } else {
-        rxsdt = (uacpi_phys_addr)rsdp->rsdt_addr;
-        rxsdt_entry_size = 4;
-    }
-
-    uacpi_kernel_unmap(rsdp, sizeof(struct acpi_rsdp));
-
-    if (!rxsdt) {
-        uacpi_error("both RSDT & XSDT tables are NULL!\n");
-        ret = UACPI_STATUS_INVALID_ARGUMENT;
-        goto out_fatal_error;
-    }
-
-    ret = initialize_from_rxsdt(rxsdt, rxsdt_entry_size);
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 
@@ -415,18 +325,11 @@ static void trace_table_load_failure(
 
 static uacpi_bool match_ssdt_or_psdt(struct uacpi_installed_table *tbl)
 {
-    static uacpi_object_name ssdt_signature = {
-        .text = { ACPI_SSDT_SIGNATURE },
-    };
-    static uacpi_object_name psdt_signature = {
-        .text = { ACPI_PSDT_SIGNATURE },
-    };
-
     if (tbl->flags & UACPI_TABLE_LOADED)
         return UACPI_FALSE;
 
-    return tbl->signature.id == ssdt_signature.id ||
-           tbl->signature.id == psdt_signature.id;
+    return uacpi_signatures_match(tbl->hdr.signature, ACPI_SSDT_SIGNATURE) ||
+           uacpi_signatures_match(tbl->hdr.signature, ACPI_PSDT_SIGNATURE);
 }
 
 uacpi_status uacpi_namespace_load(void)

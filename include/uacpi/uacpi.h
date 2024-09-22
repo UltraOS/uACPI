@@ -29,35 +29,64 @@ extern "C" {
 #endif
 
 /*
+ * Set up early access to the table subsystem. What this means is:
+ * - uacpi_table_find() and similar API becomes usable before the call to
+ *   uacpi_initialize().
+ * - No kernel API besides logging and map/unmap will be invoked at this stage,
+ *   allowing for heap and scheduling to still be fully offline.
+ * - The provided 'temporary_buffer' will be used as a temporary storage for the
+ *   internal metadata about the tables (list, reference count, addresses,
+ *   sizes, etc).
+ * - The 'temporary_buffer' is replaced with a normal heap buffer allocated via
+ *   uacpi_kernel_alloc() after the call to uacpi_initialize() and can therefore
+ *   be reclaimed by the kernel.
+ *
+ * The approximate overhead per table is 56 bytes, so a buffer of 4096 bytes
+ * yields about 73 tables in terms of capacity. uACPI also has an internal
+ * static buffer for tables, "UACPI_STATIC_TABLE_ARRAY_LEN", which is configured
+ * as 16 descriptors in length by default.
+ */
+uacpi_status uacpi_setup_early_table_access(
+    void *temporary_buffer, uacpi_size buffer_size
+);
+
+/*
  * Bad table checksum should be considered a fatal error
  * (table load is fully aborted in this case)
  */
-#define UACPI_FLAG_BAD_CSUM_FATAL (1 << 0)
+#define UACPI_FLAG_BAD_CSUM_FATAL (1ull << 0)
 
 /*
  * Unexpected table signature should be considered a fatal error
  * (table load is fully aborted in this case)
  */
-#define UACPI_FLAG_BAD_TBL_SIGNATURE_FATAL (1 << 1)
+#define UACPI_FLAG_BAD_TBL_SIGNATURE_FATAL (1ull << 1)
 
 /*
  * Force uACPI to use RSDT even for later revisions
  */
-#define UACPI_FLAG_BAD_XSDT (1 << 2)
+#define UACPI_FLAG_BAD_XSDT (1ull << 2)
 
 /*
  * If this is set, ACPI mode is not entered during the call to
  * uacpi_initialize. The caller is expected to enter it later at their own
  * discretion by using uacpi_enter_acpi_mode().
  */
-#define UACPI_FLAG_NO_ACPI_MODE (1 << 3)
+#define UACPI_FLAG_NO_ACPI_MODE (1ull << 3)
 
 /*
  * Don't create the \_OSI method when building the namespace.
  * Only enable this if you're certain that having this method breaks your AML
  * blob, a more atomic/granular interface management is available via osi.h
  */
-#define UACPI_FLAG_NO_OSI (1 << 4)
+#define UACPI_FLAG_NO_OSI (1ull << 4)
+
+/*
+ * Validate table checksums at installation time instead of first use.
+ * Note that this makes uACPI map the entire table at once, which not all
+ * hosts are able to handle at early init.
+ */
+#define UACPI_FLAG_PROACTIVE_TBL_CSUM (1ull << 5)
 
 /*
  * Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT
