@@ -1483,7 +1483,7 @@ static uacpi_status handle_load(struct execution_context *ctx)
     if (uacpi_unlikely_error(ret)) {
         uacpi_free(table_buffer, src_table->length);
 
-        if (ret != UACPI_STATUS_OVERRIDEN)
+        if (ret != UACPI_STATUS_OVERRIDDEN)
             goto error_out;
     }
     uacpi_table_mark_as_loaded(table.index);
