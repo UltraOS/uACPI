@@ -252,8 +252,8 @@ void uacpi_kernel_free_spinlock(uacpi_handle);
  *
  * Note that lock is infalliable.
  */
-uacpi_cpu_flags uacpi_kernel_spinlock_lock(uacpi_handle);
-void uacpi_kernel_spinlock_unlock(uacpi_handle, uacpi_cpu_flags);
+uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle);
+void uacpi_kernel_unlock_spinlock(uacpi_handle, uacpi_cpu_flags);
 
 typedef enum uacpi_work_type {
     /*

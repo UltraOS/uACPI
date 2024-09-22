@@ -553,13 +553,13 @@ void uacpi_kernel_free_spinlock(uacpi_handle handle)
     return uacpi_kernel_free_mutex(handle);
 }
 
-uacpi_cpu_flags uacpi_kernel_spinlock_lock(uacpi_handle handle)
+uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle handle)
 {
     uacpi_kernel_acquire_mutex(handle, 0xFFFF);
     return 0;
 }
 
-void uacpi_kernel_spinlock_unlock(uacpi_handle handle, uacpi_cpu_flags)
+void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags)
 {
     uacpi_kernel_release_mutex(handle);
 }
