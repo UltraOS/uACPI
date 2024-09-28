@@ -901,6 +901,7 @@ static uacpi_status get_object_storage(uacpi_object *obj,
         break;
     case UACPI_OBJECT_BUFFER:
         if (obj->buffer->size == 0) {
+            out_buf->ptr = UACPI_NULL;
             out_buf->len = 0;
             break;
         }
@@ -4492,6 +4493,8 @@ static uacpi_status op_typecheck(const struct op_context *op_ctx,
         expected_type_str = SPEC_TERM_ARG;
         ok_mask |= UACPI_OP_PROPERTY_TERM_ARG;
         break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     if (!(props & ok_mask)) {

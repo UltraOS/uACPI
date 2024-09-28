@@ -369,7 +369,7 @@ uacpi_status uacpi_eval_hid(uacpi_namespace_node *node, uacpi_id_string **out_id
 {
     uacpi_status ret;
     uacpi_object *hid_ret;
-    uacpi_id_string *id;
+    uacpi_id_string *id = UACPI_NULL;
     uacpi_u32 size;
 
     ret = uacpi_eval_typed(
