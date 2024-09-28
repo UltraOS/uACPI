@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+// Forward-declared to avoid including the entire acpi.h here
+struct acpi_fadt;
+
 typedef struct uacpi_table_identifiers {
     uacpi_object_name signature;
 
