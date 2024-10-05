@@ -181,9 +181,21 @@ uacpi_thread_id uacpi_kernel_get_thread_id(void);
 
 /*
  * Try to acquire the mutex with a millisecond timeout.
- * A timeout value of 0xFFFF implies infinite wait.
+ *
+ * The timeout value has the following meanings:
+ * 0x0000 - Attempt to acquire the mutex once, in a non-blocking manner
+ * 0x0001...0xFFFE - Attempt to acquire the mutex for at least 'timeout'
+ *                   milliseconds
+ * 0xFFFF - Infinite wait, block until the mutex is acquired
+ *
+ * The following are possible return values:
+ * 1. UACPI_STATUS_OK - successful acquire operation
+ * 2. UACPI_STATUS_TIMEOUT - timeout reached while attempting to acquire (or the
+ *                           single attempt to acquire was not successful for
+ *                           calls with timeout=0)
+ * 3. Any other value - signifies a host internal error and is treated as such
  */
-uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16);
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16);
 void uacpi_kernel_release_mutex(uacpi_handle);
 
 /*

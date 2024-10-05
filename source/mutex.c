@@ -120,9 +120,31 @@ UACPI_STUB_IF_REDUCED_HARDWARE(
     void uacpi_release_global_lock_to_firmware(void)
 )
 
+uacpi_status uacpi_acquire_native_mutex_with_timeout(
+    uacpi_handle mtx, uacpi_u16 timeout
+)
+{
+    uacpi_status ret;
+
+    if (uacpi_unlikely(mtx == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    ret = uacpi_kernel_acquire_mutex(mtx, timeout);
+    if (uacpi_likely_success(ret))
+        return ret;
+
+    if (uacpi_unlikely(ret != UACPI_STATUS_TIMEOUT || timeout == 0xFFFF)) {
+        uacpi_error(
+            "unexpected status %08X (%s) while acquiring %p (timeout=%04X)\n",
+            ret, uacpi_status_to_string(ret), mtx, timeout
+        );
+    }
+
+    return ret;
+}
+
 uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
 {
-    uacpi_bool did_acquire;
     uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
@@ -130,15 +152,15 @@ uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
     if (uacpi_unlikely(out_seq == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    UACPI_MUTEX_ACQUIRE_WITH_TIMEOUT(
-        g_uacpi_rt_ctx.global_lock_mutex, timeout, did_acquire
+    ret = uacpi_acquire_native_mutex_with_timeout(
+        g_uacpi_rt_ctx.global_lock_mutex, timeout
     );
-    if (!did_acquire)
-        return UACPI_STATUS_TIMEOUT;
+    if (ret != UACPI_STATUS_OK)
+        return ret;
 
     ret = uacpi_acquire_global_lock_from_firmware();
     if (uacpi_unlikely_error(ret)) {
-        UACPI_MUTEX_RELEASE(g_uacpi_rt_ctx.global_lock_mutex);
+        uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex);
         return ret;
     }
 
@@ -160,7 +182,7 @@ uacpi_status uacpi_release_global_lock(uacpi_u32 seq)
 
     g_uacpi_rt_ctx.global_lock_acquired = UACPI_FALSE;
     uacpi_release_global_lock_to_firmware();
-    UACPI_MUTEX_RELEASE(g_uacpi_rt_ctx.global_lock_mutex);
+    uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex);
 
     return UACPI_STATUS_OK;
 }
@@ -173,10 +195,10 @@ uacpi_bool uacpi_this_thread_owns_aml_mutex(uacpi_mutex *mutex)
     return id == uacpi_kernel_get_thread_id();
 }
 
-uacpi_bool uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
+uacpi_status uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
 {
     uacpi_thread_id this_id;
-    uacpi_bool did_acquire;
+    uacpi_status ret = UACPI_STATUS_OK;
 
     this_id = uacpi_kernel_get_thread_id();
     if (UACPI_ATOMIC_LOAD_THREAD_ID(&mutex->owner) == this_id) {
@@ -185,40 +207,40 @@ uacpi_bool uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
                 "failing an attempt to acquire mutex @%p, too many recursive "
                 "acquires\n", mutex
             );
-            return UACPI_FALSE;
+            return UACPI_STATUS_DENIED;
         }
 
         mutex->depth++;
-        return UACPI_TRUE;
+        return ret;
     }
 
-    UACPI_MUTEX_ACQUIRE_WITH_TIMEOUT(mutex->handle, timeout, did_acquire);
-    if (!did_acquire)
-        return UACPI_FALSE;
+    ret = uacpi_acquire_native_mutex_with_timeout(mutex->handle, timeout);
+    if (ret != UACPI_STATUS_OK)
+        return ret;
 
     if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex) {
-        uacpi_status ret;
-
         ret = uacpi_acquire_global_lock_from_firmware();
         if (uacpi_unlikely_error(ret)) {
-            UACPI_MUTEX_RELEASE(mutex->handle);
-            return UACPI_FALSE;
+            uacpi_release_native_mutex(mutex->handle);
+            return ret;
         }
     }
 
     UACPI_ATOMIC_STORE_THREAD_ID(&mutex->owner, this_id);
     mutex->depth = 1;
-    return UACPI_TRUE;
+    return ret;
 }
 
-void uacpi_release_aml_mutex(uacpi_mutex *mutex)
+uacpi_status uacpi_release_aml_mutex(uacpi_mutex *mutex)
 {
     if (mutex->depth-- > 1)
-        return;
+        return UACPI_STATUS_OK;
 
     if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex)
         uacpi_release_global_lock_to_firmware();
 
     UACPI_ATOMIC_STORE_THREAD_ID(&mutex->owner, UACPI_THREAD_ID_NONE);
-    UACPI_MUTEX_RELEASE(mutex->handle);
+    uacpi_release_native_mutex(mutex->handle);
+
+    return UACPI_STATUS_OK;
 }

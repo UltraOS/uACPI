@@ -414,19 +414,20 @@ uacpi_thread_id uacpi_kernel_get_thread_id(void)
 #endif
 }
 
-uacpi_bool uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle handle, uacpi_u16 timeout)
 {
     auto *mutex = (std::timed_mutex*)handle;
 
     if (timeout == 0)
-        return mutex->try_lock();
+        return mutex->try_lock() ? UACPI_STATUS_OK : UACPI_STATUS_TIMEOUT;
 
     if (timeout == 0xFFFF) {
         mutex->lock();
-        return UACPI_TRUE;
+        return UACPI_STATUS_OK;
     }
 
-    return mutex->try_lock_for(std::chrono::milliseconds(timeout));
+    return mutex->try_lock_for(std::chrono::milliseconds(timeout)) ?
+        UACPI_STATUS_OK : UACPI_STATUS_TIMEOUT;
 }
 
 void uacpi_kernel_release_mutex(uacpi_handle handle)
