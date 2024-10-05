@@ -3,6 +3,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/interpreter.h>
 #include <uacpi/platform/config.h>
+#include <uacpi/internal/mutex.h>
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
     table_array, struct uacpi_installed_table, UACPI_STATIC_TABLE_ARRAY_LEN
@@ -10,18 +11,6 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
     table_array, struct uacpi_installed_table,
 )
-
-#define UACPI_MUTEX_ACQUIRE_IF_EXISTS(mtx) \
-    do {                                   \
-        if ((mtx) != UACPI_NULL)           \
-            UACPI_MUTEX_ACQUIRE(mtx);      \
-    } while (0)
-
-#define UACPI_MUTEX_RELEASE_IF_EXISTS(mtx) \
-    do {                                   \
-        if ((mtx) != UACPI_NULL)           \
-            UACPI_MUTEX_RELEASE(mtx);      \
-    } while (0)
 
 static struct table_array tables;
 static uacpi_bool early_table_access;
@@ -287,14 +276,11 @@ uacpi_status uacpi_set_table_installation_handler(
     uacpi_table_installation_handler handler
 )
 {
-    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_status ret;
 
-    /*
-     * The mutex might not exist yet because uacpi_initialize_tables might not
-     * have been called at this point, allow that possibility since the user
-     * might want to install this handler early.
-     */
-    UACPI_MUTEX_ACQUIRE_IF_EXISTS(table_mutex);
+    ret = uacpi_acquire_native_mutex_may_be_null(table_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     if (installation_handler != UACPI_NULL && handler != UACPI_NULL)
         goto out;
@@ -302,7 +288,7 @@ uacpi_status uacpi_set_table_installation_handler(
     installation_handler = handler;
 
 out:
-    UACPI_MUTEX_RELEASE_IF_EXISTS(table_mutex);
+    uacpi_release_native_mutex_may_be_null(table_mutex);
     return ret;
 }
 
@@ -659,11 +645,14 @@ uacpi_status uacpi_table_install_physical_with_origin(
 {
     uacpi_status ret;
 
-    UACPI_MUTEX_ACQUIRE_IF_EXISTS(table_mutex);
+    ret = uacpi_acquire_native_mutex_may_be_null(table_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
     ret = table_install_physical_with_origin_unlocked(
         phys, origin, UACPI_NULL, out_table
     );
-    UACPI_MUTEX_RELEASE_IF_EXISTS(table_mutex);
+    uacpi_release_native_mutex_may_be_null(table_mutex);
 
     return ret;
 }
@@ -724,10 +713,13 @@ uacpi_status uacpi_table_install_with_origin(
 {
     uacpi_status ret;
 
-    UACPI_MUTEX_ACQUIRE_IF_EXISTS(table_mutex);
-    ret = table_install_with_origin_unlocked(virt, origin, out_table);
-    UACPI_MUTEX_RELEASE_IF_EXISTS(table_mutex);
+    ret = uacpi_acquire_native_mutex_may_be_null(table_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
+    ret = table_install_with_origin_unlocked(virt, origin, out_table);
+
+    uacpi_release_native_mutex_may_be_null(table_mutex);
     return ret;
 }
 
@@ -757,14 +749,17 @@ uacpi_status uacpi_for_each_table(
     uacpi_size base_idx, uacpi_table_iteration_callback cb, void *user
 )
 {
+    uacpi_status ret;
     uacpi_size idx;
     struct uacpi_installed_table *tbl;
-    enum uacpi_table_iteration_decision ret;
+    enum uacpi_table_iteration_decision dec;
 
     if (!early_table_access)
         UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE_IF_EXISTS(table_mutex);
+    ret = uacpi_acquire_native_mutex_may_be_null(table_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     for (idx = base_idx; idx < table_array_size(&tables); ++idx) {
         tbl = table_array_at(&tables, idx);
@@ -772,13 +767,13 @@ uacpi_status uacpi_for_each_table(
         if (tbl->flags & UACPI_TABLE_INVALID)
             continue;
 
-        ret = cb(user, tbl, idx);
-        if (ret == UACPI_TABLE_ITERATION_DECISION_BREAK)
+        dec = cb(user, tbl, idx);
+        if (dec == UACPI_TABLE_ITERATION_DECISION_BREAK)
             break;
     }
 
-    UACPI_MUTEX_RELEASE_IF_EXISTS(table_mutex);
-    return UACPI_STATUS_OK;
+    uacpi_release_native_mutex_may_be_null(table_mutex);
+    return ret;
 }
 
 enum search_type {
@@ -960,13 +955,16 @@ struct table_ctl_request {
 
 static uacpi_status table_ctl(uacpi_size idx, struct table_ctl_request *req)
 {
-    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_status ret;
     struct uacpi_installed_table *tbl;
 
     if (!early_table_access)
         UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE_IF_EXISTS(table_mutex);
+    ret = uacpi_acquire_native_mutex_may_be_null(table_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
     if (uacpi_unlikely(table_array_size(&tables) <= idx)) {
         uacpi_error(
             "requested invalid table index %zu (%zu tables installed)\n",
@@ -1026,7 +1024,7 @@ static uacpi_status table_ctl(uacpi_size idx, struct table_ctl_request *req)
         tbl->flags &= ~req->clear;
 
 out:
-    UACPI_MUTEX_RELEASE_IF_EXISTS(table_mutex);
+    uacpi_release_native_mutex_may_be_null(table_mutex);
     return ret;
 }
 

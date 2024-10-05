@@ -3551,12 +3551,14 @@ static uacpi_status handle_mutex_ctl(struct execution_context *ctx)
             timeout = 0xFFFF;
 
         if (uacpi_this_thread_owns_aml_mutex(obj->mutex)) {
-            if (uacpi_likely(uacpi_acquire_aml_mutex(obj->mutex, timeout)))
+            ret = uacpi_acquire_aml_mutex(obj->mutex, timeout);
+            if (uacpi_likely_success(ret))
                 *return_value = 0;
             break;
         }
 
-        if (!uacpi_acquire_aml_mutex(obj->mutex, timeout))
+        ret = uacpi_acquire_aml_mutex(obj->mutex, timeout);
+        if (uacpi_unlikely_error(ret))
             break;
 
         ret = held_mutexes_array_push(&ctx->held_mutexes, obj->mutex);
@@ -4267,8 +4269,9 @@ static uacpi_status enter_method(
     }
 
     if (!uacpi_this_thread_owns_aml_mutex(method->mutex)) {
-        if (uacpi_unlikely(!uacpi_acquire_aml_mutex(method->mutex, 0xFFFF)))
-            return UACPI_STATUS_INTERNAL_ERROR;
+        ret = uacpi_acquire_aml_mutex(method->mutex, 0xFFFF);
+        if (uacpi_unlikely_error(ret))
+            return ret;
 
         ret = held_mutexes_array_push(&ctx->held_mutexes, method->mutex);
         if (uacpi_unlikely_error(ret)) {
