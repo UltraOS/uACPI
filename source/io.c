@@ -260,8 +260,9 @@ static uacpi_status access_field_unit(
         if (uacpi_likely(obj != UACPI_NULL && obj->type == UACPI_OBJECT_MUTEX))
             gl = obj->mutex;
 
-        if (uacpi_unlikely(!uacpi_acquire_aml_mutex(gl, 0xFFFF)))
-            return UACPI_STATUS_INTERNAL_ERROR;
+        ret = uacpi_acquire_aml_mutex(gl, 0xFFFF);
+        if (uacpi_unlikely_error(ret))
+            return ret;
     }
 
     switch (field->kind) {
