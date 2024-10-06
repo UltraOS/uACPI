@@ -628,7 +628,7 @@ static uacpi_status do_install_node_item(struct call_frame *frame,
 {
     uacpi_status ret;
 
-    ret = uacpi_node_install(item->node->parent, item->node);
+    ret = uacpi_namespace_node_install(item->node->parent, item->node);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -4339,7 +4339,7 @@ static void call_frame_clear(struct call_frame *frame)
         uacpi_namespace_node *node;
 
         node = *temp_namespace_node_array_last(&frame->temp_nodes);
-        uacpi_node_uninstall(node);
+        uacpi_namespace_node_uninstall(node);
         temp_namespace_node_array_pop(&frame->temp_nodes);
     }
     temp_namespace_node_array_clear(&frame->temp_nodes);

@@ -153,7 +153,9 @@ uacpi_status uacpi_initialize_namespace(void)
             uacpi_check_flag(UACPI_FLAG_NO_OSI))
             continue;
 
-        uacpi_node_install(uacpi_namespace_root(), &predefined_namespaces[ns]);
+        uacpi_namespace_node_install(
+            uacpi_namespace_root(), &predefined_namespaces[ns]
+        );
     }
 
     return UACPI_STATUS_OK;
@@ -179,7 +181,7 @@ void uacpi_deinitialize_namespace(void)
 
             // Wipe the subtree
             while (current->child != UACPI_NULL)
-                uacpi_node_uninstall(current->child);
+                uacpi_namespace_node_uninstall(current->child);
 
             // Reset the pointers back as if this iteration never happened
             next = current;
@@ -248,7 +250,7 @@ void uacpi_namespace_node_unref(uacpi_namespace_node *node)
     uacpi_shareable_unref_and_delete_if_last(node, free_namespace_node);
 }
 
-uacpi_status uacpi_node_install(
+uacpi_status uacpi_namespace_node_install(
     uacpi_namespace_node *parent,
     uacpi_namespace_node *node
 )
@@ -287,7 +289,7 @@ uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node)
     return node->flags & UACPI_NAMESPACE_NODE_PREDEFINED;
 }
 
-void uacpi_node_uninstall(uacpi_namespace_node *node)
+uacpi_status uacpi_namespace_node_uninstall(uacpi_namespace_node *node)
 {
     uacpi_namespace_node *prev;
     uacpi_object *object;
@@ -295,15 +297,37 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
     if (uacpi_unlikely(uacpi_namespace_node_is_dangling(node))) {
         uacpi_warn("attempting to uninstall a dangling namespace node %.4s\n",
                    node->name.text);
-        return;
+        return UACPI_STATUS_INTERNAL_ERROR;
     }
 
+    /*
+     * The way to trigger this is as follows:
+     *
+     * Method (FOO) {
+     *     // Temporary device, will be deleted upon returning from FOO
+     *     Device (\BAR) {
+     *     }
+     *
+     *     //
+     *     // Load TBL where TBL is:
+     *     //     Scope (\BAR) {
+     *     //         Name (TEST, 123)
+     *     //     }
+     *     //
+     *     Load(TBL)
+     * }
+     *
+     * In the above example, TEST is a permanent node attached by bad AML to a
+     * temporary node created inside the FOO method at \BAR. The cleanup code
+     * will attempt to remove the \BAR device upon exit from FOO, but that is
+     * no longer possible as there's now a permanent child attached to it.
+     */
     if (uacpi_unlikely(node->child != UACPI_NULL)) {
         uacpi_warn(
-            "BUG: refusing to uninstall node %.4s with a child (%.4s)\n",
+            "refusing to uninstall node %.4s with a child (%.4s)\n",
             node->name.text, node->child->name.text
         );
-        return;
+        return UACPI_STATUS_DENIED;
     }
 
     /*
@@ -358,7 +382,7 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
                 "trying to uninstall a node %.4s (%p) not linked to any peer\n",
                 node->name.text, node
             );
-            return;
+            return UACPI_STATUS_INTERNAL_ERROR;
         }
 
         prev->next = node->next;
@@ -366,6 +390,8 @@ void uacpi_node_uninstall(uacpi_namespace_node *node)
 
     node->flags |= UACPI_NAMESPACE_NODE_FLAG_DANGLING;
     uacpi_namespace_node_unref(node);
+
+    return UACPI_STATUS_OK;
 }
 
 uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
