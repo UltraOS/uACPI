@@ -332,7 +332,7 @@ struct execution_context {
     uacpi_u8 sync_level;
 };
 
-#define AML_READ(ptr, offset) (*(((uacpi_u8*)(code)) + offset))
+#define AML_READ(ptr, offset) (*(((uacpi_u8*)(ptr)) + offset))
 
 static uacpi_status parse_nameseg(uacpi_u8 *cursor,
                                   uacpi_object_name *out_name)
