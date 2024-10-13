@@ -16,6 +16,12 @@
  */
 #define UACPI_NAMESPACE_NODE_FLAG_DANGLING (1u << 1)
 
+/*
+ * This node is method-local and must not be exposed via public API as its
+ * lifetime is limited.
+ */
+#define UACPI_NAMESPACE_NODE_FLAG_TEMPORARY (1u << 2)
+
 #define UACPI_NAMESPACE_NODE_PREDEFINED (1u << 31)
 
 typedef struct uacpi_namespace_node {
@@ -45,4 +51,5 @@ uacpi_namespace_node *uacpi_namespace_node_find_sub_node(
 );
 
 uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node);
+uacpi_bool uacpi_namespace_node_is_temporary(uacpi_namespace_node *node);
 uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node);

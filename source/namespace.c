@@ -284,6 +284,11 @@ uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node)
     return node->flags & UACPI_NAMESPACE_NODE_FLAG_DANGLING;
 }
 
+uacpi_bool uacpi_namespace_node_is_temporary(uacpi_namespace_node *node)
+{
+    return node->flags & UACPI_NAMESPACE_NODE_FLAG_TEMPORARY;
+}
+
 uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node)
 {
     return node->flags & UACPI_NAMESPACE_NODE_PREDEFINED;
