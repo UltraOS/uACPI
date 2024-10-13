@@ -244,3 +244,83 @@ uacpi_status uacpi_release_aml_mutex(uacpi_mutex *mutex)
 
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_rw_lock_init(struct uacpi_rw_lock *lock)
+{
+    lock->read_mutex = uacpi_kernel_create_mutex();
+    if (uacpi_unlikely(lock->read_mutex == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    lock->write_mutex = uacpi_kernel_create_mutex();
+    if (uacpi_unlikely(lock->write_mutex == UACPI_NULL)) {
+        uacpi_kernel_free_mutex(lock->read_mutex);
+        lock->read_mutex = UACPI_NULL;
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    lock->num_readers = 0;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_rw_lock_deinit(struct uacpi_rw_lock *lock)
+{
+    if (uacpi_unlikely(lock->num_readers)) {
+        uacpi_warn("de-initializing rw_lock %p with %zu active readers\n",
+                   lock, lock->num_readers);
+        lock->num_readers = 0;
+    }
+
+    if (lock->read_mutex != UACPI_NULL) {
+        uacpi_kernel_free_mutex(lock->read_mutex);
+        lock->read_mutex = UACPI_NULL;
+    }
+    if (lock->write_mutex != UACPI_NULL) {
+        uacpi_kernel_free_mutex(lock->write_mutex);
+        lock->write_mutex = UACPI_NULL;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_rw_lock_read(struct uacpi_rw_lock *lock)
+{
+    uacpi_status ret;
+
+    ret = uacpi_acquire_native_mutex(lock->read_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    if (lock->num_readers++ == 0) {
+        ret = uacpi_acquire_native_mutex(lock->write_mutex);
+        if (uacpi_unlikely_error(ret))
+            lock->num_readers = 0;
+    }
+
+    uacpi_kernel_release_mutex(lock->read_mutex);
+    return ret;
+}
+
+uacpi_status uacpi_rw_unlock_read(struct uacpi_rw_lock *lock)
+{
+    uacpi_status ret;
+
+    ret = uacpi_acquire_native_mutex(lock->read_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    if (lock->num_readers-- == 1)
+        uacpi_release_native_mutex(lock->write_mutex);
+
+    uacpi_kernel_release_mutex(lock->read_mutex);
+    return ret;
+}
+
+uacpi_status uacpi_rw_lock_write(struct uacpi_rw_lock *lock)
+{
+    return uacpi_acquire_native_mutex(lock->write_mutex);
+}
+
+uacpi_status uacpi_rw_unlock_write(struct uacpi_rw_lock *lock)
+{
+    return uacpi_release_native_mutex(lock->write_mutex);
+}

@@ -49,3 +49,18 @@ static inline uacpi_status uacpi_release_native_mutex_may_be_null(
     uacpi_kernel_release_mutex(mtx);
     return UACPI_STATUS_OK;
 }
+
+struct uacpi_rw_lock {
+    uacpi_handle read_mutex;
+    uacpi_handle write_mutex;
+    uacpi_size num_readers;
+};
+
+uacpi_status uacpi_rw_lock_init(struct uacpi_rw_lock *lock);
+uacpi_status uacpi_rw_lock_deinit(struct uacpi_rw_lock *lock);
+
+uacpi_status uacpi_rw_lock_read(struct uacpi_rw_lock *lock);
+uacpi_status uacpi_rw_unlock_read(struct uacpi_rw_lock *lock);
+
+uacpi_status uacpi_rw_lock_write(struct uacpi_rw_lock *lock);
+uacpi_status uacpi_rw_unlock_write(struct uacpi_rw_lock *lock);
