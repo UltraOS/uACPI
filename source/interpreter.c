@@ -5299,7 +5299,7 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 enum uacpi_log_level lvl = UACPI_LOG_ERROR;
                 uacpi_status trace_ret = ret;
 
-                if (ctx->cur_frame->method->named_objects_persist) {
+                if (frame->method->named_objects_persist) {
                     uacpi_bool is_ok;
 
                     is_ok = op_allows_unresolved_if_load(op);
@@ -5319,6 +5319,10 @@ static uacpi_status exec_op(struct execution_context *ctx)
                 if (ret == UACPI_STATUS_NOT_FOUND)
                     ret = UACPI_STATUS_AML_UNDEFINED_REFERENCE;
             }
+
+            if (behavior == RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS &&
+                !frame->method->named_objects_persist)
+                item->node->flags |= UACPI_NAMESPACE_NODE_FLAG_TEMPORARY;
 
             break;
         }
