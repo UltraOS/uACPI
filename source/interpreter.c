@@ -1535,7 +1535,7 @@ static uacpi_status ensure_is_a_field_unit(uacpi_namespace_node *node,
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_FIELD_UNIT) {
         uacpi_error(
-            "Invalid argument: '%.4s' is not a field unit (%s)\n",
+            "invalid argument: '%.4s' is not a field unit (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
@@ -1553,7 +1553,7 @@ static uacpi_status ensure_is_an_op_region(uacpi_namespace_node *node,
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_OPERATION_REGION) {
         uacpi_error(
-            "Invalid argument: '%.4s' is not an operation region (%s)\n",
+            "invalid argument: '%.4s' is not an operation region (%s)\n",
             node->name.text, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
@@ -2461,7 +2461,7 @@ static uacpi_status ensure_valid_idx(uacpi_object *obj, uacpi_size idx,
         return UACPI_STATUS_OK;
 
     uacpi_error(
-        "Invalid index %zu, %s@%p has %zu elements\n",
+        "invalid index %zu, %s@%p has %zu elements\n",
         idx, uacpi_object_type_to_string(obj->type), obj, src_size
     );
     return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
@@ -2542,7 +2542,7 @@ static uacpi_status handle_index(struct execution_context *ctx)
     }
     default:
         uacpi_error(
-            "Invalid argument for Index: %s, "
+            "invalid argument for Index: %s, "
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
         );
@@ -2801,7 +2801,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     if (uacpi_unlikely(src->type != UACPI_OBJECT_STRING &&
                        src->type != UACPI_OBJECT_BUFFER)) {
         uacpi_error(
-            "Invalid argument for Mid: %s, expected String/Buffer\n",
+            "invalid argument for Mid: %s, expected String/Buffer\n",
             uacpi_object_type_to_string(src->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
@@ -3024,7 +3024,7 @@ static uacpi_status handle_sizeof(struct execution_context *ctx)
 
     default:
         uacpi_error(
-            "Invalid argument for Sizeof: %s, "
+            "invalid argument for Sizeof: %s, "
             "expected String/Buffer/Package\n",
             uacpi_object_type_to_string(src->type)
         );
@@ -3472,7 +3472,7 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
     );
     if (uacpi_unlikely(obj->type != UACPI_OBJECT_EVENT)) {
         uacpi_error(
-            "%s: Invalid argument '%s', expected an Event object\n",
+            "%s: invalid argument '%s', expected an Event object\n",
             op_ctx->op->name, uacpi_object_type_to_string(obj->type)
         );
         return UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE;
@@ -3821,7 +3821,7 @@ static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
     if (uacpi_unlikely((field->bit_index + field->bit_length) >
                        src_buf->size * 8)) {
         uacpi_error(
-            "Invalid buffer field: bits [%zu..%zu], buffer size is %zu bytes\n",
+            "invalid buffer field: bits [%zu..%zu], buffer size is %zu bytes\n",
             field->bit_index, field->bit_index + field->bit_length,
             src_buf->size
         );
