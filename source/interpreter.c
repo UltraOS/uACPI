@@ -3081,7 +3081,8 @@ static uacpi_status handle_stall_or_sleep(struct execution_context *ctx)
         uacpi_kernel_sleep(time);
     } else {
         // Spec says this must evaluate to a ByteData
-        time &= 0xFF;
+        if (time > 0xFF)
+            time = 0xFF;
         uacpi_kernel_stall(time);
     }
 
