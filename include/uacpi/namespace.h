@@ -28,7 +28,6 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
     uacpi_predefined_namespace
 );
 
-uacpi_object *uacpi_namespace_node_get_object(const uacpi_namespace_node *node);
 uacpi_object_name uacpi_namespace_node_name(const uacpi_namespace_node *node);
 
 uacpi_size uacpi_namespace_node_depth(const uacpi_namespace_node *node);
