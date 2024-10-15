@@ -11,7 +11,7 @@ extern "C" {
 /*
  * Checks whether the device at 'node' matches any of the PNP ids provided in
  * 'list' (terminated by a UACPI_NULL). This is done by first attempting to
- * match the value retruned from _HID and then the value(s) from _CID.
+ * match the value returned from _HID and then the value(s) from _CID.
  *
  * Note that the presence of the device (_STA) is not verified here.
  */
@@ -22,9 +22,9 @@ uacpi_bool uacpi_device_matches_pnp_id(
 
 /*
  * Find all the devices in the namespace starting at 'parent' matching the
- * specified 'hids' (terminated by a UACPI_NULL). Only devices reported as
- * present via _STA are checked. Any matching devices are then passed to
- * the 'cb'.
+ * specified 'hids' (terminated by a UACPI_NULL) against any value from _HID or
+ * _CID. Only devices reported as present via _STA are checked. Any matching
+ * devices are then passed to the 'cb'.
  */
 uacpi_status uacpi_find_devices_at(
     uacpi_namespace_node *parent,
