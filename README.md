@@ -30,7 +30,7 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 
 ## Why would I use this over ACPICA?
 
-Whilst ACPICA is an old and battle-tested project, it still has some fundumental issues that make it very far from perfect or ideal.
+Whilst ACPICA is an old and battle-tested project, it still has some fundamental issues that make it very far from perfect or ideal.
 
 ### TLDR:
 - Much better compatibility with the Windows NT object implicit-cast semantics than ACPICA
@@ -132,7 +132,7 @@ Method (FOO) {
 }
 ```
 
-There's even more examples, but this should be enough to demonstrate the fundumental differences in designs.
+There's even more examples, but this should be enough to demonstrate the fundamental differences in designs.
 
 ## Integrating into a kernel
 
@@ -214,7 +214,7 @@ Anything inside [uacpi/internal](include/uacpi/internal) is considered private/u
 
 ## Developing and contributing
 
-Most of development work is fully doable in userland using the test runner.
+Most development work is fully doable in userland using the test runner.
 
 ### Setting up an IDE:
 
