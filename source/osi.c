@@ -3,6 +3,7 @@
 #include <uacpi/internal/helpers.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/mutex.h>
 #include <uacpi/kernel_api.h>
 
 struct registered_interface {
@@ -172,20 +173,22 @@ uacpi_status uacpi_install_interface(
 )
 {
     struct registered_interface *interface;
-    uacpi_status ret = UACPI_STATUS_ALREADY_EXISTS;
+    uacpi_status ret;
     uacpi_char *name_copy;
     uacpi_size name_size;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     interface = find_interface_unlocked(name);
     if (interface != UACPI_NULL) {
-        if (interface->disabled) {
+        if (interface->disabled)
             interface->disabled = UACPI_FALSE;
-            ret = UACPI_STATUS_OK;
-        }
+
+        ret = UACPI_STATUS_ALREADY_EXISTS;
         goto out;
     }
 
@@ -212,25 +215,27 @@ uacpi_status uacpi_install_interface(
     interface->dynamic = 1;
     interface->next = registered_interfaces;
     registered_interfaces = interface;
-    ret = UACPI_STATUS_OK;
 
 out:
-    UACPI_MUTEX_RELEASE(interface_mutex);
+    uacpi_release_native_mutex(interface_mutex);
     return ret;
 }
 
 uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
 {
     struct registered_interface *cur, *prev;
-    uacpi_status ret = UACPI_STATUS_NOT_FOUND;
+    uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     cur = registered_interfaces;
     prev = cur;
 
+    ret = UACPI_STATUS_NOT_FOUND;
     while (cur) {
         if (uacpi_strcmp(cur->name, name) != 0) {
             prev = cur;
@@ -245,7 +250,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
                 prev->next = cur->next;
             }
 
-            UACPI_MUTEX_RELEASE(interface_mutex);
+            uacpi_release_native_mutex(interface_mutex);
             uacpi_free_dynamic_string(cur->name);
             uacpi_free(cur, sizeof(*cur));
             return UACPI_STATUS_OK;
@@ -265,7 +270,7 @@ uacpi_status uacpi_uninstall_interface(const uacpi_char *name)
         break;
     }
 
-    UACPI_MUTEX_RELEASE(interface_mutex);
+    uacpi_release_native_mutex(interface_mutex);
     return ret;
 }
 
@@ -274,21 +279,23 @@ static uacpi_status configure_host_interface(
 )
 {
     struct registered_interface *interface;
-    uacpi_status ret = UACPI_STATUS_NOT_FOUND;
+    uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     interface = find_host_interface_unlocked(type);
-    if (interface == UACPI_NULL)
+    if (interface == UACPI_NULL) {
+        ret = UACPI_STATUS_NOT_FOUND;
         goto out;
+    }
 
     interface->disabled = !enabled;
-    ret = UACPI_STATUS_OK;
-
 out:
-    UACPI_MUTEX_RELEASE(interface_mutex);
+    uacpi_release_native_mutex(interface_mutex);
     return ret;
 }
 
@@ -306,20 +313,22 @@ uacpi_status uacpi_set_interface_query_handler(
     uacpi_interface_handler handler
 )
 {
-    uacpi_status ret = UACPI_STATUS_ALREADY_EXISTS;
+    uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-    if (interface_handler != UACPI_NULL && handler != UACPI_NULL)
+    if (interface_handler != UACPI_NULL && handler != UACPI_NULL) {
+        ret = UACPI_STATUS_ALREADY_EXISTS;
         goto out;
+    }
 
     interface_handler = handler;
-    ret = UACPI_STATUS_OK;
-
 out:
-    UACPI_MUTEX_RELEASE(interface_mutex);
+    uacpi_release_native_mutex(interface_mutex);
     return ret;
 }
 
@@ -327,11 +336,14 @@ uacpi_status uacpi_bulk_configure_interfaces(
     uacpi_interface_action action, uacpi_interface_kind kind
 )
 {
+    uacpi_status ret;
     struct registered_interface *interface;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     interface = registered_interfaces;
     while (interface) {
@@ -341,16 +353,19 @@ uacpi_status uacpi_bulk_configure_interfaces(
         interface = interface->next;
     }
 
-    UACPI_MUTEX_RELEASE(interface_mutex);
-    return UACPI_STATUS_OK;
+    uacpi_release_native_mutex(interface_mutex);
+    return ret;
 }
 
 uacpi_status uacpi_handle_osi(const uacpi_char *string, uacpi_bool *out_value)
 {
+    uacpi_status ret;
     struct registered_interface *interface;
     uacpi_bool is_supported = UACPI_FALSE;
 
-    UACPI_MUTEX_ACQUIRE(interface_mutex);
+    ret = uacpi_acquire_native_mutex(interface_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     interface = find_interface_unlocked(string);
     if (interface == UACPI_NULL)
@@ -363,7 +378,7 @@ uacpi_status uacpi_handle_osi(const uacpi_char *string, uacpi_bool *out_value)
     if (interface_handler)
         is_supported = interface_handler(string, is_supported);
 out:
-    UACPI_MUTEX_RELEASE(interface_mutex);
+    uacpi_release_native_mutex(interface_mutex);
     *out_value = is_supported;
     return UACPI_STATUS_OK;
 }
