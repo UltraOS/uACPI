@@ -2,10 +2,7 @@
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/interpreter.h>
-
-#ifndef UACPI_STATIC_TABLE_ARRAY_LEN
-    #define UACPI_STATIC_TABLE_ARRAY_LEN 16
-#endif
+#include <uacpi/platform/config.h>
 
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
     table_array, struct uacpi_installed_table, UACPI_STATIC_TABLE_ARRAY_LEN

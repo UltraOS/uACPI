@@ -2,13 +2,6 @@
 
 #include <uacpi/types.h>
 
-#ifndef UACPI_DEFAULT_LOG_LEVEL
-    #define UACPI_DEFAULT_LOG_LEVEL UACPI_LOG_INFO
-#endif
-
-#define UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS 30
-#define UACPI_DEFAULT_MAX_CALL_STACK_DEPTH 256
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -193,6 +193,7 @@ own implementations to be platform-independent and to make porting easier). The
 internal implementation is just the bare minimum and not optimized in any way.
 - [types.h](include/uacpi/platform/types.h) - typedefs a bunch of uacpi-specific types using the `stdint.h` header. You don't have to override this
 unless you don't provide `stdint.h`.
+- [config.h](include/uacpi/platform/config.h) - various compile-time options and settings, preconfigured to reasonable defaults.
 
 ### 3. Implement kernel API
 
