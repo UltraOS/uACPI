@@ -44,4 +44,6 @@ uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements);
 uacpi_mutex *uacpi_create_mutex(void);
 void uacpi_mutex_unref(uacpi_mutex*);
 
+void uacpi_method_unref(uacpi_control_method*);
+
 void uacpi_address_space_handler_unref(uacpi_address_space_handler *handler);

@@ -4244,6 +4244,8 @@ static uacpi_status enter_method(
 {
     uacpi_status ret = UACPI_STATUS_OK;
 
+    uacpi_shareable_ref(method);
+
     if (!method->is_serialized)
         return ret;
 
@@ -4342,6 +4344,8 @@ static void call_frame_clear(struct call_frame *frame)
         uacpi_object_unref(frame->args[i]);
     for (i = 0; i < 8; ++i)
         uacpi_object_unref(frame->locals[i]);
+
+    uacpi_method_unref(frame->method);
 }
 
 static uacpi_u8 parse_op_generates_item[0x100] = {
@@ -5537,17 +5541,16 @@ static uacpi_status exec_op(struct execution_context *ctx)
 
 static void ctx_reload_post_ret(struct execution_context *ctx)
 {
-    call_frame_clear(ctx->cur_frame);
+    uacpi_control_method *method = ctx->cur_frame->method;
 
-    if (ctx->cur_frame->method->is_serialized) {
+    if (method->is_serialized) {
         held_mutexes_array_remove_and_release(
-            &ctx->held_mutexes,
-            ctx->cur_frame->method->mutex,
-            FORCE_RELEASE_YES
+            &ctx->held_mutexes, method->mutex, FORCE_RELEASE_YES
         );
         ctx->sync_level = ctx->cur_frame->prev_sync_level;
     }
 
+    call_frame_clear(ctx->cur_frame);
     call_frame_array_pop(&ctx->call_stack);
 
     ctx->cur_frame = call_frame_array_last(&ctx->call_stack);
