@@ -221,6 +221,9 @@ static std::unordered_map<void*, uacpi_size> allocations;
 
 void* uacpi_kernel_alloc(uacpi_size size)
 {
+    if (size == 0)
+        std::abort();
+
     auto *ret = malloc(size);
     if (ret == nullptr)
         return ret;
@@ -265,6 +268,9 @@ void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
 #else
 void* uacpi_kernel_alloc(uacpi_size size)
 {
+    if (size == 0)
+        std::abort();
+
     return malloc(size);
 }
 
