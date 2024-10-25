@@ -1212,6 +1212,7 @@ static uacpi_status handle_create_data_region(struct execution_context *ctx)
     op_region->space = UACPI_ADDRESS_SPACE_TABLE_DATA;
     op_region->offset = table.virt_addr;
     op_region->length = table.hdr->length;
+    op_region->table_idx = table.index;
 
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED, obj

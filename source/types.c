@@ -5,6 +5,7 @@
 #include <uacpi/internal/dynamic_array.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/namespace.h>
+#include <uacpi/internal/tables.h>
 #include <uacpi/kernel_api.h>
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type type)
@@ -548,6 +549,8 @@ static void free_op_region(uacpi_handle handle)
         );
     }
 
+    if (op_region->space == UACPI_ADDRESS_SPACE_TABLE_DATA)
+        uacpi_table_unref(&(struct uacpi_table) { .index = op_region->table_idx });
     uacpi_free(op_region, sizeof(*op_region));
 }
 
