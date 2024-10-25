@@ -24,6 +24,7 @@
 #define ACPI_SSDT_SIGNATURE "SSDT"
 #define ACPI_PSDT_SIGNATURE "PSDT"
 #define ACPI_ECDT_SIGNATURE "ECDT"
+#define ACPI_RHCT_SIGNATURE "RHCT"
 
 #define ACPI_AS_ID_SYS_MEM       0x00
 #define ACPI_AS_ID_SYS_IO        0x01
@@ -130,7 +131,11 @@ enum acpi_madt_entry_type {
     ACPI_MADT_ENTRY_TYPE_MSI_PIC = 0x15,
     ACPI_MADT_ENTRY_TYPE_BIO_PIC = 0x16,
     ACPI_MADT_ENTRY_TYPE_LPC_PIC = 0x17,
-    ACPI_MADT_ENTRY_TYPE_RESERVED = 0x18, // 0x18..0x7F
+    ACPI_MADT_ENTRY_TYPE_RINTC = 0x18,
+    ACPI_MADT_ENTRY_TYPE_IMSIC = 0x19,
+    ACPI_MADT_ENTRY_TYPE_APLIC = 0x1A,
+    ACPI_MADT_ENTRY_TYPE_PLIC = 0x1B,
+    ACPI_MADT_ENTRY_TYPE_RESERVED = 0x1C, // 0x1C..0x7F
     ACPI_MADT_ENTRY_TYPE_OEM = 0x80, // 0x80..0xFF
 };
 
@@ -417,6 +422,62 @@ UACPI_PACKED(struct acpi_madt_lpc_pic {
     uacpi_u16 cascade_vector;
 })
 UACPI_EXPECT_SIZEOF(struct acpi_madt_lpc_pic, 15);
+
+UACPI_PACKED(struct acpi_madt_rintc {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u8 rsvd;
+    uacpi_u32 flags;
+    uacpi_u64 hart_id;
+    uacpi_u32 uid;
+    uacpi_u32 ext_intc_id;
+    uacpi_u64 address;
+    uacpi_u32 size;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_rintc, 36);
+
+UACPI_PACKED(struct acpi_madt_imsic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u8 rsvd;
+    uacpi_u32 flags;
+    uacpi_u16 num_ids;
+    uacpi_u16 num_guest_ids;
+    uacpi_u8 guest_index_bits;
+    uacpi_u8 hart_index_bits;
+    uacpi_u8 group_index_bits;
+    uacpi_u8 group_index_shift;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_imsic, 16);
+
+UACPI_PACKED(struct acpi_madt_aplic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u8 id;
+    uacpi_u32 flags;
+    uacpi_u64 hardware_id;
+    uacpi_u16 idc_count;
+    uacpi_u16 sources_count;
+    uacpi_u32 gsi_base;
+    uacpi_u64 address;
+    uacpi_u32 size;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_aplic, 36);
+
+UACPI_PACKED(struct acpi_madt_plic {
+    struct acpi_entry_hdr hdr;
+    uacpi_u8 version;
+    uacpi_u8 id;
+    uacpi_u64 hardware_id;
+    uacpi_u16 sources_count;
+    uacpi_u16 max_priority;
+    uacpi_u32 flags;
+    uacpi_u32 size;
+    uacpi_u64 address;
+    uacpi_u32 gsi_base;
+
+})
+UACPI_EXPECT_SIZEOF(struct acpi_madt_plic, 36);
 
 enum acpi_srat_entry_type {
     ACPI_SRAT_ENTRY_TYPE_PROCESSOR_AFFINITY = 0,
@@ -941,6 +1002,70 @@ UACPI_PACKED(struct acpi_ecdt {
     uacpi_char ec_id[];
 })
 UACPI_EXPECT_SIZEOF(struct acpi_ecdt, 65);
+
+UACPI_PACKED(struct acpi_rhct_hdr {
+    uacpi_u16 type;
+    uacpi_u16 length;
+    uacpi_u16 revision;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct_hdr, 6);
+
+// acpi_rhct->flags
+#define ACPI_TIMER_CANNOT_WAKE_CPU (1 << 0)
+
+UACPI_PACKED(struct acpi_rhct {
+    struct acpi_sdt_hdr hdr;
+    uacpi_u32 flags;
+    uacpi_u64 timebase_frequency;
+    uacpi_u32 node_count;
+    uacpi_u32 nodes_offset;
+    struct acpi_rhct_hdr entries[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct, 56);
+
+enum acpi_rhct_entry_type {
+    ACPI_RHCT_ENTRY_TYPE_ISA_STRING = 0,
+    ACPI_RHCT_ENTRY_TYPE_CMO = 1,
+    ACPI_RHCT_ENTRY_TYPE_MMU = 2,
+    ACPI_RHCT_ENTRY_TYPE_HART_INFO = 65535,
+};
+
+UACPI_PACKED(struct acpi_rhct_isa_string {
+    struct acpi_rhct_hdr hdr;
+    uacpi_u16 length;
+    uacpi_u8 isa[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct_isa_string, 8);
+
+UACPI_PACKED(struct acpi_rhct_cmo {
+    struct acpi_rhct_hdr hdr;
+    uacpi_u8 rsvd;
+    uacpi_u8 cbom_size;
+    uacpi_u8 cbop_size;
+    uacpi_u8 cboz_size;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct_cmo, 10);
+
+enum acpi_rhct_mmu_type {
+    ACPI_RHCT_MMU_TYPE_SV39 = 0,
+    ACPI_RHCT_MMU_TYPE_SV48 = 1,
+    ACPI_RHCT_MMU_TYPE_SV57 = 2,
+};
+
+UACPI_PACKED(struct acpi_rhct_mmu {
+    struct acpi_rhct_hdr hdr;
+    uacpi_u8 rsvd;
+    uacpi_u8 type;
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct_mmu, 8);
+
+UACPI_PACKED(struct acpi_rhct_hart_info {
+    struct acpi_rhct_hdr hdr;
+    uacpi_u16 offset_count;
+    uacpi_u32 uid;
+    uacpi_u32 offsets[];
+})
+UACPI_EXPECT_SIZEOF(struct acpi_rhct_hart_info, 12);
 
 #define ACPI_LARGE_ITEM (1 << 7)
 
