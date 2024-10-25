@@ -123,6 +123,9 @@ uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements)
 {
     uacpi_size i;
 
+    if (num_elements == 0)
+        return UACPI_TRUE;
+
     pkg->objects = uacpi_kernel_calloc(num_elements, sizeof(uacpi_handle));
     if (uacpi_unlikely(pkg->objects == UACPI_NULL))
         return UACPI_FALSE;
