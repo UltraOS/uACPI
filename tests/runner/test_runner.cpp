@@ -419,6 +419,8 @@ static void run_test(
     st = uacpi_eval(UACPI_NULL, "\\MAIN", UACPI_NULL, &ret);
 
     ensure_ok_status(st);
+    if (ret == UACPI_NULL)
+        throw std::runtime_error("\\MAIN didn't return a value");
     validate_ret_against_expected(*ret, expected_type, expected_value);
 }
 
