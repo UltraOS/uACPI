@@ -623,6 +623,11 @@ static void free_method(uacpi_handle handle)
     uacpi_free(method, sizeof(*method));
 }
 
+void uacpi_method_unref(uacpi_control_method *method)
+{
+    uacpi_shareable_unref_and_delete_if_last(method, free_method);
+}
+
 static void free_object_storage(uacpi_object *obj)
 {
     switch (obj->type) {
@@ -639,8 +644,7 @@ static void free_object_storage(uacpi_object *obj)
                                                  free_buffer);
         break;
     case UACPI_OBJECT_METHOD:
-        uacpi_shareable_unref_and_delete_if_last(obj->method,
-                                                 free_method);
+        uacpi_method_unref(obj->method);
         break;
     case UACPI_OBJECT_PACKAGE:
         uacpi_shareable_unref_and_delete_if_last(obj->package,
