@@ -1,5 +1,6 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/platform/config.h>
 
 #ifndef uacpi_memcpy
 void *uacpi_memcpy(void *dest, const void *src, size_t count)
@@ -661,15 +662,6 @@ uacpi_u8 uacpi_popcount(uacpi_u64 value)
 }
 
 #ifndef UACPI_FORMATTED_LOGGING
-
-#ifndef UACPI_PLAIN_LOG_BUFFER_SIZE
-    #define UACPI_PLAIN_LOG_BUFFER_SIZE 128
-#endif
-
-UACPI_BUILD_BUG_ON_WITH_MSG(
-    UACPI_PLAIN_LOG_BUFFER_SIZE < 16,
-    "configured log buffer size is too small (expecting at least 16 bytes)"
-);
 
 void uacpi_log(uacpi_log_level lvl, const uacpi_char *str, ...)
 {
