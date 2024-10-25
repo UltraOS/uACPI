@@ -283,6 +283,9 @@ typedef struct uacpi_operation_region {
     uacpi_u64 offset;
     uacpi_u64 length;
 
+    // If space == TABLE_DATA
+    uacpi_u64 table_idx;
+
     // Used to link regions sharing the same handler
     struct uacpi_operation_region *next;
 } uacpi_operation_region;
