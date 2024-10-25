@@ -330,6 +330,7 @@ typedef struct uacpi_control_method {
     uacpi_u8 is_serialized : 1;
     uacpi_u8 named_objects_persist: 1;
     uacpi_u8 native_call : 1;
+    uacpi_u8 owns_code : 1;
 } uacpi_control_method;
 
 typedef enum uacpi_access_type {

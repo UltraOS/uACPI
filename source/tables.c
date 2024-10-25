@@ -1046,19 +1046,11 @@ uacpi_status uacpi_table_load_with_cause(
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    /*
-     * FIXME:
-     * The reference to the table is leaked intentionally as any created
-     * methods inside still reference the virtual mapping here.
-     *
-     * There are two solutions I can think of:
-     * 1. Allocate a heap buffer for method code and copy it there, then the
-     *    methods no longer need to execute tables after the first pass.
-     * 2. Make methods explicitly take references to the table they're a part
-     *    of. This would allows us to drop the leaked reference here after the
-     *    table load.
-     */
-    return uacpi_execute_table(req.out_tbl, cause);
+    ret = uacpi_execute_table(req.out_tbl, cause);
+
+    req.type = TABLE_CTL_PUT;
+    table_ctl(idx, &req);
+    return ret;
 }
 
 uacpi_status uacpi_table_load(uacpi_size idx)
