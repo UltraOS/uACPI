@@ -612,6 +612,8 @@ static void free_method(uacpi_handle handle)
         method->mutex, free_mutex
     );
 
+    if (!method->native_call && method->owns_code)
+       uacpi_free(method->code, method->size);
     uacpi_free(method, sizeof(*method));
 }
 

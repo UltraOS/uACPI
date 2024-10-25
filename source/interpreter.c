@@ -3380,7 +3380,7 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     struct package_length *pkg;
     struct uacpi_namespace_node *node;
     struct uacpi_object *dst;
-    uacpi_u32 method_begin_offset;
+    uacpi_u32 method_begin_offset, method_size;
 
     this_method = ctx->cur_frame->method;
     pkg = &item_array_at(&op_ctx->items, 0)->pkg;
@@ -3400,11 +3400,23 @@ static uacpi_status handle_create_method(struct execution_context *ctx)
     dst = item_array_at(&op_ctx->items, 4)->obj;
 
     method = dst->method;
-    init_method_flags(method, item_array_at(&op_ctx->items, 2)->immediate);
+    method_size = pkg->end - method_begin_offset;
 
-    method->code = ctx->cur_frame->method->code;
-    method->code += method_begin_offset;
-    method->size = pkg->end - method_begin_offset;
+    if (method_size) {
+        method->code = uacpi_kernel_alloc(method_size);
+        if (uacpi_unlikely(method->code == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        uacpi_memcpy(
+            method->code,
+            ctx->cur_frame->method->code + method_begin_offset,
+            method_size
+        );
+        method->size = method_size;
+        method->owns_code = 1;
+    }
+
+    init_method_flags(method, item_array_at(&op_ctx->items, 2)->immediate);
 
     node->object = uacpi_create_internal_reference(UACPI_REFERENCE_KIND_NAMED,
                                                    dst);
