@@ -151,14 +151,16 @@ uacpi_u8 uacpi_load_table_op_decode_ops[] = {
     // Storage for the scope pointer, this is left as 0 in case of errors
     UACPI_PARSE_OP_LOAD_ZERO_IMM,
     UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_METHOD,
+    // Index of the table we are going to be loaded to unref it later
+    UACPI_PARSE_OP_LOAD_ZERO_IMM,
     // Storage for the target pointer, this is left as 0 if none was requested
     UACPI_PARSE_OP_LOAD_ZERO_IMM,
 
     UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, 5,
-    UACPI_PARSE_OP_IF_NOT_NULL, 3, 5,
+    UACPI_PARSE_OP_IF_NOT_NULL, 4, 5,
         UACPI_PARSE_OP_STRING,
-        UACPI_PARSE_OP_IMM_DECREMENT, 3,
-        UACPI_PARSE_OP_JMP, 7,
+        UACPI_PARSE_OP_IMM_DECREMENT, 4,
+        UACPI_PARSE_OP_JMP, 8,
     UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,
 
     /*
@@ -182,8 +184,8 @@ uacpi_u8 uacpi_load_table_op_decode_ops[] = {
     UACPI_PARSE_OP_INVOKE_HANDLER,
 
     // If we were given a target to store to, do the store
-    UACPI_PARSE_OP_IF_NOT_NULL, 2, 3,
-        UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT, 2, 9,
+    UACPI_PARSE_OP_IF_NOT_NULL, 3, 3,
+        UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT, 3, 10,
 
     UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,
     UACPI_PARSE_OP_END,
