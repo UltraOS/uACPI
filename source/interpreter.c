@@ -1291,18 +1291,23 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
      * new AML GPE handlers that might've been loaded, as well as potentially
      * remove the target.
      */
-    if (item_array_size(items) == 11) {
+    if (item_array_size(items) == 12) {
+        uacpi_size idx;
+
+        idx = item_array_at(items, 2)->immediate;
+        uacpi_table_unref(&(struct uacpi_table) { .index = idx });
+
         /*
          * If this load failed, remove the target that was provided via
          * ParameterPathString so that it doesn't get stored to.
          */
-        if (uacpi_unlikely(item_array_at(items, 10)->obj->integer == 0)) {
+        if (uacpi_unlikely(item_array_at(items, 11)->obj->integer == 0)) {
             uacpi_object *target;
 
-            target = item_array_at(items, 2)->obj;
+            target = item_array_at(items, 3)->obj;
             if (target != UACPI_NULL) {
                 uacpi_object_unref(target);
-                item_array_at(items, 2)->obj = UACPI_NULL;
+                item_array_at(items, 3)->obj = UACPI_NULL;
             }
 
             return UACPI_STATUS_OK;
@@ -1314,15 +1319,15 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
 
     ret = build_table_id(
         "LoadTable", &table_id,
-        item_array_at(items, 4)->obj->buffer,
         item_array_at(items, 5)->obj->buffer,
-        item_array_at(items, 6)->obj->buffer
+        item_array_at(items, 6)->obj->buffer,
+        item_array_at(items, 7)->obj->buffer
     );
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    root_path = item_array_at(items, 7)->obj->buffer;
-    param_path = item_array_at(items, 8)->obj->buffer;
+    root_path = item_array_at(items, 8)->obj->buffer;
+    param_path = item_array_at(items, 9)->obj->buffer;
 
     if (root_path->size > 1) {
         root_node = uacpi_namespace_node_resolve_from_aml_namepath(
@@ -1348,7 +1353,7 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
             );
         }
 
-        param_item = item_array_at(items, 2);
+        param_item = item_array_at(items, 3);
         param_item->obj = param_node->object;
         uacpi_object_ref(param_item->obj);
         param_item->type = ITEM_OBJECT;
@@ -1361,6 +1366,7 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     }
     uacpi_table_mark_as_loaded(table.index);
 
+    item_array_at(items, 2)->immediate = table.index;
     method = item_array_at(items, 1)->obj->method;
     prepare_table_load(table.hdr, UACPI_TABLE_LOAD_CAUSE_LOAD_TABLE_OP, method);
 
