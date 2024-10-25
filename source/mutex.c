@@ -5,7 +5,7 @@
 #include <uacpi/internal/context.h>
 #include <uacpi/kernel_api.h>
 
-#if UACPI_REDUCED_HARDWARE == 0
+#ifndef UACPI_REDUCED_HARDWARE
 
 #define GLOBAL_LOCK_PENDING (1 << 0)
 
