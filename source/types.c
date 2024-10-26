@@ -151,11 +151,9 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
 
     uacpi_shareable_init(pkg);
 
-    if (initial_size) {
-        if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size))) {
-            uacpi_free(pkg, sizeof(*pkg));
-            return UACPI_FALSE;
-        }
+    if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size))) {
+        uacpi_free(pkg, sizeof(*pkg));
+        return UACPI_FALSE;
     }
 
     obj->package = pkg;
