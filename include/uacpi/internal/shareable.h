@@ -2,6 +2,10 @@
 
 #include <uacpi/types.h>
 
+struct uacpi_shareable {
+    uacpi_u32 reference_count;
+};
+
 void uacpi_shareable_init(uacpi_handle);
 
 uacpi_bool uacpi_bugged_shareable(uacpi_handle);

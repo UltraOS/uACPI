@@ -85,7 +85,7 @@ static uacpi_status region_run_reg(
 )
 {
     uacpi_status ret;
-    uacpi_args method_args;
+    uacpi_object_array method_args;
     uacpi_object *args[2];
 
     args[0] = uacpi_create_object(UACPI_OBJECT_INTEGER);

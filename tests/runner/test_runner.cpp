@@ -47,11 +47,12 @@ static void validate_ret_against_expected(
         throw std::runtime_error(err);
     };
 
+    auto type = uacpi_object_get_type(&obj);
 
-    if (obj.type != expected_type) {
+    if (type != expected_type) {
         std::string err;
         err += "returned type '";
-        err += uacpi_object_type_to_string((uacpi_object_type)obj.type);
+        err += uacpi_object_type_to_string(type);
         err += "' doesn't match expected '";
         err += uacpi_object_type_to_string(expected_type);
         err += "'";
@@ -59,17 +60,21 @@ static void validate_ret_against_expected(
         throw std::runtime_error(err);
     }
 
-    switch (obj.type) {
+    switch (type) {
     case UACPI_OBJECT_INTEGER: {
         auto expected_int = std::stoull(expected_val.data(), nullptr, 0);
-        auto& actual_int = obj.integer;
+        uacpi_u64 actual_int;
+
+        uacpi_object_get_integer(&obj, &actual_int);
 
         if (expected_int != actual_int)
             ret_is_wrong(expected_val, std::to_string(actual_int));
     } break;
     case UACPI_OBJECT_STRING: {
-        auto actual_str = std::string_view(obj.buffer->text,
-                                           obj.buffer->size - 1);
+        uacpi_data_view view;
+
+        uacpi_object_get_string_or_buffer(&obj, &view);
+        auto actual_str = std::string_view(view.text, view.length - 1);
 
         if (expected_val != actual_str)
             ret_is_wrong(expected_val, actual_str);
@@ -385,12 +390,16 @@ static void run_test(
     ensure_ok_status(st);
 
     if (is_test_mode) {
-        uacpi_object *runner_id;
+        uacpi_object *runner_id = UACPI_NULL;
         st = uacpi_eval_typed(UACPI_NULL, "\\_SI.TID", UACPI_NULL,
                               UACPI_OBJECT_STRING_BIT, &runner_id);
         ensure_ok_status(st);
 
-        if (strcmp(runner_id->buffer->text, "uACPI") != 0)
+        uacpi_data_view view;
+        st = uacpi_object_get_string_or_buffer(runner_id, &view);
+        ensure_ok_status(st);
+
+        if (strcmp(view.text, "uACPI") != 0)
             throw std::runtime_error("invalid test runner id");
         uacpi_object_unref(runner_id);
     }

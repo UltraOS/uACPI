@@ -1,6 +1,6 @@
 #pragma once
 
-#include <uacpi/types.h>
+#include <uacpi/internal/types.h>
 #include <uacpi/resources.h>
 
 enum uacpi_aml_resource {

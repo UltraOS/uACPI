@@ -796,7 +796,8 @@ static uacpi_status handle_package(struct execution_context *ctx)
     }
 
     // 2. Create every object in the package, start as uninitialized
-    if (uacpi_unlikely(!uacpi_package_fill(package, num_elements)))
+    if (uacpi_unlikely(!uacpi_package_fill(package, num_elements,
+                                           UACPI_PREALLOC_OBJECTS_YES)))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     // 3. Go through every defined object and copy it into the package
@@ -4921,7 +4922,7 @@ enum method_call_type {
 static uacpi_status prepare_method_call(
     struct execution_context *ctx, uacpi_namespace_node *node,
     uacpi_control_method *method, enum method_call_type type,
-    const uacpi_args *args
+    const uacpi_object_array *args
 )
 {
     uacpi_status ret;
@@ -5638,7 +5639,7 @@ static void execution_context_release(struct execution_context *ctx)
 
 uacpi_status uacpi_execute_control_method(
     uacpi_namespace_node *scope, uacpi_control_method *method,
-    const uacpi_args *args, uacpi_object **out_obj
+    const uacpi_object_array *args, uacpi_object **out_obj
 )
 {
     uacpi_status ret = UACPI_STATUS_OK;

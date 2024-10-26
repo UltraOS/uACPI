@@ -119,7 +119,10 @@ static uacpi_bool empty_buffer_or_string_alloc(uacpi_object *object)
     return buffer_alloc(object, 0);
 }
 
-uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements)
+uacpi_bool uacpi_package_fill(
+    uacpi_package *pkg, uacpi_size num_elements,
+    enum uacpi_prealloc_objects prealloc_objects
+)
 {
     uacpi_size i;
 
@@ -131,17 +134,23 @@ uacpi_bool uacpi_package_fill(uacpi_package *pkg, uacpi_size num_elements)
         return UACPI_FALSE;
 
     pkg->count = num_elements;
-    for (i = 0; i < num_elements; ++i) {
-        pkg->objects[i] = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
 
-        if (uacpi_unlikely(pkg->objects[i] == UACPI_NULL))
-            return UACPI_FALSE;
+    if (prealloc_objects == UACPI_PREALLOC_OBJECTS_YES) {
+        for (i = 0; i < num_elements; ++i) {
+            pkg->objects[i] = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+
+            if (uacpi_unlikely(pkg->objects[i] == UACPI_NULL))
+                return UACPI_FALSE;
+        }
     }
 
     return UACPI_TRUE;
 }
 
-static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
+static uacpi_bool package_alloc(
+    uacpi_object *obj, uacpi_size initial_size,
+    enum uacpi_prealloc_objects prealloc
+)
 {
     uacpi_package *pkg;
 
@@ -151,7 +160,7 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
 
     uacpi_shareable_init(pkg);
 
-    if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size))) {
+    if (uacpi_unlikely(!uacpi_package_fill(pkg, initial_size, prealloc))) {
         uacpi_free(pkg, sizeof(*pkg));
         return UACPI_FALSE;
     }
@@ -162,7 +171,7 @@ static uacpi_bool package_alloc(uacpi_object *obj, uacpi_size initial_size)
 
 static uacpi_bool empty_package_alloc(uacpi_object *object)
 {
-    return package_alloc(object, 0);
+    return package_alloc(object, 0, UACPI_PREALLOC_OBJECTS_NO);
 }
 
 uacpi_mutex *uacpi_create_mutex(void)
@@ -829,7 +838,8 @@ static uacpi_status deep_copy_package_no_recurse(
     uacpi_size i;
     uacpi_package *dst_package;
 
-    if (uacpi_unlikely(!package_alloc(dst, src->count)))
+    if (uacpi_unlikely(!package_alloc(dst, src->count,
+                                      UACPI_PREALLOC_OBJECTS_YES)))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
     dst->type = UACPI_OBJECT_PACKAGE;
@@ -962,6 +972,385 @@ void uacpi_object_detach_child(uacpi_object *parent)
     refs_to_remove = uacpi_shareable_refcount(parent);
     while (refs_to_remove--)
         uacpi_object_unref(child);
+}
+
+uacpi_object_type uacpi_object_get_type(uacpi_object *obj)
+{
+    return obj->type;
+}
+
+uacpi_object_type uacpi_object_get_type_bit(uacpi_object *obj)
+{
+    return (1u << obj->type);
+}
+
+uacpi_bool uacpi_object_is(uacpi_object *obj, uacpi_object_type type)
+{
+    return obj->type == type;
+}
+
+uacpi_bool uacpi_object_is_one_of(uacpi_object *obj, uacpi_u32 type_mask)
+{
+    return (uacpi_object_get_type_bit(obj) & type_mask) != 0;
+}
+
+#define TYPE_CHECK_USER_OBJ_RET(obj, type_bits, ret)                 \
+    do {                                                             \
+        if (uacpi_unlikely(obj == UACPI_NULL ||                      \
+                           !uacpi_object_is_one_of(obj, type_bits))) \
+            return ret;                                              \
+    } while (0)
+
+#define TYPE_CHECK_USER_OBJ(obj, type_bits)                               \
+    TYPE_CHECK_USER_OBJ_RET(obj, type_bits, UACPI_STATUS_INVALID_ARGUMENT)
+
+#define ENSURE_VALID_USER_OBJ_RET(obj, ret)     \
+    do {                                        \
+        if (uacpi_unlikely(obj == UACPI_NULL))  \
+            return ret;                         \
+    } while (0)
+
+#define ENSURE_VALID_USER_OBJ(obj)                               \
+    ENSURE_VALID_USER_OBJ_RET(obj, UACPI_STATUS_INVALID_ARGUMENT)
+
+uacpi_status uacpi_object_get_integer(uacpi_object *obj, uacpi_u64 *out)
+{
+    TYPE_CHECK_USER_OBJ(obj, UACPI_OBJECT_INTEGER_BIT);
+
+    *out = obj->integer;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_assign_integer(uacpi_object *obj, uacpi_u64 value)
+{
+    ENSURE_VALID_USER_OBJ(obj);
+
+    return uacpi_object_assign(obj, &(uacpi_object) {
+        .type = UACPI_OBJECT_INTEGER,
+        .integer = value,
+    }, UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
+}
+
+uacpi_status uacpi_object_do_get_string_or_buffer(
+    uacpi_object *obj, uacpi_data_view *out, uacpi_u32 mask
+)
+{
+    TYPE_CHECK_USER_OBJ(obj, mask);
+
+    out->bytes = obj->buffer->data;
+    out->length = obj->buffer->size;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_get_string_or_buffer(
+    uacpi_object *obj, uacpi_data_view *out
+)
+{
+    return uacpi_object_do_get_string_or_buffer(
+        obj, out, UACPI_OBJECT_STRING_BIT | UACPI_OBJECT_BUFFER_BIT
+    );
+}
+
+uacpi_status uacpi_object_get_string(uacpi_object *obj, uacpi_data_view *out)
+{
+    return uacpi_object_do_get_string_or_buffer(
+        obj, out, UACPI_OBJECT_STRING_BIT
+    );
+}
+
+uacpi_status uacpi_object_get_buffer(uacpi_object *obj, uacpi_data_view *out)
+{
+    return uacpi_object_do_get_string_or_buffer(
+        obj, out, UACPI_OBJECT_BUFFER_BIT
+    );
+}
+
+uacpi_bool uacpi_object_is_aml_namepath(uacpi_object *obj)
+{
+    TYPE_CHECK_USER_OBJ_RET(obj, UACPI_OBJECT_STRING_BIT, UACPI_FALSE);
+    return obj->flags == UACPI_STRING_KIND_PATH;
+}
+
+uacpi_status uacpi_object_resolve_as_aml_namepath(
+    uacpi_object *obj, uacpi_namespace_node *scope,
+    uacpi_namespace_node **out_node
+)
+{
+    uacpi_namespace_node *node;
+
+    if (!uacpi_object_is_aml_namepath(obj))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    node = uacpi_namespace_node_resolve_from_aml_namepath(
+        scope, obj->buffer->text
+    );
+    if (node == UACPI_NULL)
+        return UACPI_STATUS_NOT_FOUND;
+
+    *out_node = node;
+    return UACPI_STATUS_OK;
+}
+
+static uacpi_status uacpi_object_do_assign_buffer(
+    uacpi_object *obj, uacpi_data_view in, uacpi_object_type type
+)
+{
+    uacpi_status ret;
+    uacpi_object tmp_obj = {
+        .type = type,
+    };
+    uacpi_size dst_buf_size = in.length;
+
+    ENSURE_VALID_USER_OBJ(obj);
+
+    if (type == UACPI_OBJECT_STRING && (in.length == 0 ||
+        in.const_bytes[in.length - 1] != 0x00))
+        dst_buf_size++;
+
+    ret = buffer_alloc_and_store(
+        &tmp_obj, dst_buf_size, in.const_bytes, in.length
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_object_assign(
+        obj, &tmp_obj, UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY
+    );
+    uacpi_shareable_unref_and_delete_if_last(tmp_obj.buffer, free_buffer);
+
+    return ret;
+}
+
+uacpi_status uacpi_object_assign_string(uacpi_object *obj, uacpi_data_view in)
+{
+    return uacpi_object_do_assign_buffer(obj, in, UACPI_OBJECT_STRING);
+}
+
+uacpi_status uacpi_object_assign_buffer(uacpi_object *obj, uacpi_data_view in)
+{
+    return uacpi_object_do_assign_buffer(obj, in, UACPI_OBJECT_BUFFER);
+}
+
+uacpi_object *uacpi_object_create_uninitialized(void)
+{
+    return uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+}
+
+uacpi_status uacpi_object_create_integer_safe(
+    uacpi_u64 value, uacpi_overflow_behavior behavior, uacpi_object **out_obj
+)
+{
+    uacpi_status ret;
+    uacpi_u8 bitness;
+    uacpi_object *obj;
+
+    ret = uacpi_get_aml_bitness(&bitness);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    switch (behavior) {
+    case UACPI_OVERFLOW_TRUNCATE:
+    case UACPI_OVERFLOW_DISALLOW:
+        if (bitness == 32 && value > 0xFFFFFFFF) {
+            if (behavior == UACPI_OVERFLOW_DISALLOW)
+                return UACPI_STATUS_INVALID_ARGUMENT;
+
+            value &= 0xFFFFFFFF;
+        }
+        UACPI_FALLTHROUGH;
+    case UACPI_OVERFLOW_ALLOW:
+        obj = uacpi_object_create_integer(value);
+        if (uacpi_unlikely(obj == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+
+        *out_obj = obj;
+        return ret;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+}
+
+uacpi_object *uacpi_object_create_integer(uacpi_u64 value)
+{
+    uacpi_object *obj;
+
+    obj = uacpi_create_object(UACPI_OBJECT_INTEGER);
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return obj;
+
+    obj->integer = value;
+    return obj;
+}
+
+uacpi_object *uacpi_object_do_create_string_or_buffer(
+    uacpi_data_view view, uacpi_object_type type
+)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+
+    obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_NULL;
+
+    ret = uacpi_object_do_assign_buffer(obj, view, type);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_object_unref(obj);
+        return UACPI_NULL;
+    }
+
+    return obj;
+}
+
+uacpi_object *uacpi_object_create_string(uacpi_data_view view)
+{
+    return uacpi_object_do_create_string_or_buffer(view, UACPI_OBJECT_STRING);
+}
+
+uacpi_object *uacpi_object_create_buffer(uacpi_data_view view)
+{
+    return uacpi_object_do_create_string_or_buffer(view, UACPI_OBJECT_BUFFER);
+}
+
+uacpi_object *uacpi_object_create_cstring(const uacpi_char *str)
+{
+    return uacpi_object_create_string((uacpi_data_view) {
+        .const_text = str,
+        .length = uacpi_strlen(str) + 1,
+    });
+}
+
+uacpi_status uacpi_object_get_package(
+    uacpi_object *obj, uacpi_object_array *out
+)
+{
+    TYPE_CHECK_USER_OBJ(obj, UACPI_OBJECT_PACKAGE_BIT);
+
+    out->objects = obj->package->objects;
+    out->count = obj->package->count;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_object *uacpi_object_create_reference(uacpi_object *child)
+{
+    uacpi_object *obj;
+
+    ENSURE_VALID_USER_OBJ_RET(child, UACPI_NULL);
+
+    obj = uacpi_create_object(UACPI_OBJECT_REFERENCE);
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_NULL;
+
+    uacpi_object_attach_child(obj, child);
+    obj->flags = UACPI_REFERENCE_KIND_ARG;
+
+    return obj;
+}
+
+uacpi_status uacpi_object_assign_reference(
+    uacpi_object *obj, uacpi_object *child
+)
+{
+    uacpi_status ret;
+
+    ENSURE_VALID_USER_OBJ(obj);
+    ENSURE_VALID_USER_OBJ(child);
+
+    // First clear out the object
+    ret = uacpi_object_assign(
+        obj, &(uacpi_object) { .type = UACPI_OBJECT_UNINITIALIZED },
+        UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    obj->type = UACPI_OBJECT_REFERENCE;
+    uacpi_object_attach_child(obj, child);
+    obj->flags = UACPI_REFERENCE_KIND_ARG;
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_get_dereferenced(
+    uacpi_object *obj, uacpi_object **out
+)
+{
+    TYPE_CHECK_USER_OBJ(obj, UACPI_OBJECT_REFERENCE_BIT);
+
+    *out = obj->inner_object;
+    uacpi_shareable_ref(*out);
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_get_processor_info(
+    uacpi_object *obj, uacpi_processor_info *out
+)
+{
+    TYPE_CHECK_USER_OBJ(obj, UACPI_OBJECT_PROCESSOR_BIT);
+
+    out->id = obj->processor->id;
+    out->block_address = obj->processor->block_address;
+    out->block_length = obj->processor->block_length;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_get_power_resource_info(
+    uacpi_object *obj, uacpi_power_resource_info *out
+)
+{
+    TYPE_CHECK_USER_OBJ(obj, UACPI_OBJECT_POWER_RESOURCE_BIT);
+
+    out->system_level = obj->power_resource.system_level;
+    out->resource_order = obj->power_resource.resource_order;
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_object_assign_package(
+    uacpi_object *obj, uacpi_object_array in
+)
+{
+    uacpi_status ret;
+    uacpi_size i;
+    uacpi_object tmp_obj = {
+        .type = UACPI_OBJECT_PACKAGE,
+    };
+
+    ENSURE_VALID_USER_OBJ(obj);
+
+    if (uacpi_unlikely(!package_alloc(&tmp_obj, in.count,
+                                      UACPI_PREALLOC_OBJECTS_NO)))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    obj->type = UACPI_OBJECT_PACKAGE;
+
+    for (i = 0; i < in.count; ++i) {
+        tmp_obj.package->objects[i] = in.objects[i];
+        uacpi_object_ref(tmp_obj.package->objects[i]);
+    }
+
+    ret = uacpi_object_assign(obj, &tmp_obj, UACPI_ASSIGN_BEHAVIOR_SHALLOW_COPY);
+    uacpi_shareable_unref_and_delete_if_last(tmp_obj.package, free_package);
+
+    return ret;
+}
+
+uacpi_object *uacpi_object_create_package(uacpi_object_array in)
+{
+    uacpi_status ret;
+    uacpi_object *obj;
+
+    obj = uacpi_object_create_uninitialized();
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return obj;
+
+    ret = uacpi_object_assign_package(obj, in);
+    if (uacpi_unlikely_error(ret)) {
+        uacpi_object_unref(obj);
+        return UACPI_NULL;
+    }
+
+    return obj;
 }
 
 uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,

@@ -989,7 +989,7 @@ uacpi_status uacpi_set_interrupt_model(uacpi_interrupt_model model)
 {
     uacpi_status ret;
     uacpi_object *arg;
-    uacpi_args args;
+    uacpi_object_array args;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
 

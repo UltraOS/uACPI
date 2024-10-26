@@ -118,7 +118,7 @@ uacpi_init_level uacpi_get_current_init_level(void);
  * lookups, unless 'path' is already absolute.
  */
 uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
-                        const uacpi_args *args, uacpi_object **ret);
+                        const uacpi_object_array *args, uacpi_object **ret);
 
 /*
  * Same as uacpi_eval, but the return value type is validated against
@@ -126,7 +126,7 @@ uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
  */
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **ret
+    const uacpi_object_array *args, uacpi_u32 ret_mask, uacpi_object **ret
 );
 
 /*
@@ -134,7 +134,7 @@ uacpi_status uacpi_eval_typed(
  */
 uacpi_status uacpi_eval_integer(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_args *args, uacpi_u64 *out_value
+    const uacpi_object_array *args, uacpi_u64 *out_value
 );
 
 /*
