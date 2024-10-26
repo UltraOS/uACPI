@@ -1,6 +1,6 @@
 #pragma once
 
-#include <uacpi/types.h>
+#include <uacpi/internal/types.h>
 #include <uacpi/opregion.h>
 
 void uacpi_trace_region_error(

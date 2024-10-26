@@ -1,6 +1,6 @@
 #pragma once
 
-#include <uacpi/types.h>
+#include <uacpi/internal/types.h>
 
 uacpi_bool uacpi_this_thread_owns_aml_mutex(uacpi_mutex*);
 

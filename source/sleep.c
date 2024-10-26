@@ -268,7 +268,7 @@ static uacpi_status eval_sleep_helper(
 )
 {
     uacpi_object *arg;
-    uacpi_args args;
+    uacpi_object_array args;
     uacpi_status ret;
 
     arg = uacpi_create_object(UACPI_OBJECT_INTEGER);

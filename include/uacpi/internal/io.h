@@ -1,6 +1,6 @@
 #pragma once
 
-#include <uacpi/types.h>
+#include <uacpi/internal/types.h>
 #include <uacpi/acpi.h>
 #include <uacpi/io.h>
 

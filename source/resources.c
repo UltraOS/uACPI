@@ -2484,7 +2484,7 @@ uacpi_status uacpi_set_resources(
 {
     uacpi_status ret;
     uacpi_object *res_template;
-    uacpi_args args;
+    uacpi_object_array args;
 
     ret = uacpi_native_resources_to_aml(resources, &res_template);
     if (uacpi_unlikely_error(ret))

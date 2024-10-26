@@ -583,7 +583,7 @@ out:
 
 uacpi_status
 uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
-           const uacpi_args *args, uacpi_object **ret)
+           const uacpi_object_array *args, uacpi_object **ret)
 {
     struct uacpi_namespace_node *node;
     uacpi_object *obj;
@@ -659,7 +659,7 @@ static void trace_invalid_return_type(
 
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_args *args, uacpi_u32 ret_mask, uacpi_object **out_obj
+    const uacpi_object_array *args, uacpi_u32 ret_mask, uacpi_object **out_obj
 )
 {
     uacpi_status ret;
@@ -688,7 +688,7 @@ uacpi_status uacpi_eval_typed(
 
 uacpi_status uacpi_eval_integer(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_args *args, uacpi_u64 *out_value
+    const uacpi_object_array *args, uacpi_u64 *out_value
 )
 {
     uacpi_object *int_obj;
