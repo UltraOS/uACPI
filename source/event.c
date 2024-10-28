@@ -1554,7 +1554,7 @@ uacpi_status uacpi_enable_gpe_for_wake(
 }
 
 uacpi_status uacpi_disable_gpe_for_wake(
-        uacpi_namespace_node *gpe_device, uacpi_u16 idx
+    uacpi_namespace_node *gpe_device, uacpi_u16 idx
 )
 {
     return gpe_enable_disable_for_wake(gpe_device, idx, UACPI_FALSE);
@@ -1696,7 +1696,7 @@ out:
     return UACPI_STATUS_OK;
 }
 
-uacpi_status uacpi_gpe_install_block(
+uacpi_status uacpi_install_gpe_block(
     uacpi_namespace_node *gpe_device, uacpi_u64 address,
     uacpi_address_space address_space, uacpi_u16 num_registers, uacpi_u32 irq
 )
@@ -1706,13 +1706,15 @@ uacpi_status uacpi_gpe_install_block(
     obj = uacpi_namespace_node_get_object(gpe_device);
     if (obj == UACPI_NULL || obj->type != UACPI_OBJECT_DEVICE)
         return UACPI_STATUS_INVALID_ARGUMENT;
+    if (uacpi_unlikely(get_gpe(gpe_device, 0) != UACPI_NULL))
+        return UACPI_STATUS_ALREADY_EXISTS;
 
     return create_gpe_block(
         gpe_device, irq, 0, address, address_space, num_registers
     );
 }
 
-uacpi_status uacpi_gpe_uninstall_block(
+uacpi_status uacpi_uninstall_gpe_block(
     uacpi_namespace_node *gpe_device
 )
 {
