@@ -68,7 +68,7 @@ uacpi_status uacpi_fixed_event_info(
 
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
 uacpi_status uacpi_gpe_info(
-   uacpi_namespace_node *gpe_devicem, uacpi_u16 idx,
+   uacpi_namespace_node *gpe_device, uacpi_u16 idx,
    uacpi_event_info *out_info
 ))
 
@@ -129,7 +129,7 @@ uacpi_status uacpi_uninstall_gpe_handler(
  * NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
  */
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
-uacpi_status uacpi_gpe_setup_for_wake(
+uacpi_status uacpi_setup_gpe_for_wake(
     uacpi_namespace_node *gpe_device, uacpi_u16 idx,
     uacpi_namespace_node *wake_device
 ))
@@ -143,11 +143,11 @@ uacpi_status uacpi_gpe_setup_for_wake(
  * NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
  */
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
-uacpi_status uacpi_gpe_enable_for_wake(
+uacpi_status uacpi_enable_gpe_for_wake(
     uacpi_namespace_node *gpe_device, uacpi_u16 idx
 ))
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
-uacpi_status uacpi_gpe_disable_for_wake(
+uacpi_status uacpi_disable_gpe_for_wake(
     uacpi_namespace_node *gpe_device, uacpi_u16 idx
 ))
 
