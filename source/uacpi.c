@@ -705,3 +705,11 @@ uacpi_status uacpi_eval_integer(
 
     return UACPI_STATUS_OK;
 }
+
+uacpi_status uacpi_get_aml_bitness(uacpi_u8 *out_bitness)
+{
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
+
+    *out_bitness = g_uacpi_rt_ctx.is_rev1 ? 32 : 64;
+    return UACPI_STATUS_OK;
+}

@@ -138,6 +138,13 @@ uacpi_status uacpi_eval_integer(
 );
 
 /*
+ * Get the bitness of the currently loaded AML code according to the DSDT.
+ *
+ * Returns either 32 or 64.
+ */
+uacpi_status uacpi_get_aml_bitness(uacpi_u8 *out_bitness);
+
+/*
  * Helpers for entering & leaving ACPI mode. Note that ACPI mode is entered
  * automatically during the call to uacpi_initialize().
  */
