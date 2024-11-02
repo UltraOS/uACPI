@@ -6,6 +6,7 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/mutex.h>
 #include <uacpi/kernel_api.h>
 
 #define UACPI_REV_VALUE 2
@@ -30,6 +31,28 @@ predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_MAX + 1] = {
     [UACPI_PREDEFINED_NAMESPACE_OSI] = MAKE_PREDEFINED("_OSI"),
     [UACPI_PREDEFINED_NAMESPACE_REV] = MAKE_PREDEFINED("_REV"),
 };
+
+static struct uacpi_rw_lock namespace_lock;
+
+uacpi_status uacpi_namespace_read_lock(void)
+{
+    return uacpi_rw_lock_read(&namespace_lock);
+}
+
+uacpi_status uacpi_namespace_read_unlock(void)
+{
+    return uacpi_rw_unlock_read(&namespace_lock);
+}
+
+uacpi_status uacpi_namespace_write_lock(void)
+{
+    return uacpi_rw_lock_write(&namespace_lock);
+}
+
+uacpi_status uacpi_namespace_write_unlock(void)
+{
+    return uacpi_rw_unlock_write(&namespace_lock);
+}
 
 static uacpi_object *make_object_for_predefined(
     enum uacpi_predefined_namespace ns
@@ -122,6 +145,11 @@ uacpi_status uacpi_initialize_namespace(void)
     enum uacpi_predefined_namespace ns;
     uacpi_object *obj;
     uacpi_namespace_node *node;
+    uacpi_status ret;
+
+    ret = uacpi_rw_lock_init(&namespace_lock);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     for (ns = 0; ns <= UACPI_PREDEFINED_NAMESPACE_MAX; ns++) {
         node = &predefined_namespaces[ns];
@@ -213,6 +241,7 @@ void uacpi_deinitialize_namespace(void)
         obj->type = UACPI_OBJECT_DEVICE;
 
     free_namespace_node(uacpi_namespace_root());
+    uacpi_rw_lock_deinit(&namespace_lock);
 }
 
 uacpi_namespace_node *uacpi_namespace_root(void)
