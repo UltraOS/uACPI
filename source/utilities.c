@@ -1085,12 +1085,12 @@ uacpi_status uacpi_get_pci_routing_table(
         elem_obj = entry_pkg->objects[2];
         switch (elem_obj->type) {
         case UACPI_OBJECT_STRING:
-            entry->source = uacpi_namespace_node_resolve_from_aml_namepath(
-                parent, elem_obj->buffer->text
+            ret = uacpi_object_resolve_as_aml_namepath(
+                elem_obj, parent, &entry->source
             );
-            if (uacpi_unlikely(entry->source == UACPI_NULL)) {
-                uacpi_error("unable to lookup _PRT source: %s\n",
-                            elem_obj->buffer->text);
+            if (uacpi_unlikely_error(ret)) {
+                uacpi_error("unable to lookup _PRT source %s: %s\n",
+                            elem_obj->buffer->text, uacpi_status_to_string(ret));
                 goto out_bad_encoding;
             }
             break;
