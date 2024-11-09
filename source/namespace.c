@@ -662,6 +662,13 @@ uacpi_size uacpi_namespace_node_depth(const uacpi_namespace_node *node)
     return depth;
 }
 
+uacpi_namespace_node *uacpi_namespace_node_parent(
+    uacpi_namespace_node *node
+)
+{
+    return node->parent;
+}
+
 const uacpi_char *uacpi_namespace_node_generate_absolute_path(
     const uacpi_namespace_node *node
 )
