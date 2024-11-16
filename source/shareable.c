@@ -1,4 +1,5 @@
 #include <uacpi/internal/shareable.h>
+#include <uacpi/platform/atomic.h>
 
 #define BUGGED_REFCOUNT 0xFFFFFFFF
 
@@ -13,15 +14,15 @@ uacpi_bool uacpi_bugged_shareable(uacpi_handle handle)
     struct uacpi_shareable *shareable = handle;
 
     if (uacpi_unlikely(shareable->reference_count == 0))
-        shareable->reference_count = BUGGED_REFCOUNT;
+        uacpi_make_shareable_bugged(shareable);
 
-    return shareable->reference_count == BUGGED_REFCOUNT;
+    return uacpi_atomic_load32(&shareable->reference_count) == BUGGED_REFCOUNT;
 }
 
 void uacpi_make_shareable_bugged(uacpi_handle handle)
 {
     struct uacpi_shareable *shareable = handle;
-    shareable->reference_count = BUGGED_REFCOUNT;
+    uacpi_atomic_store32(&shareable->reference_count, BUGGED_REFCOUNT);
 }
 
 uacpi_u32 uacpi_shareable_ref(uacpi_handle handle)
@@ -31,7 +32,7 @@ uacpi_u32 uacpi_shareable_ref(uacpi_handle handle)
     if (uacpi_unlikely(uacpi_bugged_shareable(shareable)))
         return BUGGED_REFCOUNT;
 
-    return shareable->reference_count++;
+    return uacpi_atomic_inc32(&shareable->reference_count) - 1;
 }
 
 uacpi_u32 uacpi_shareable_unref(uacpi_handle handle)
@@ -41,7 +42,7 @@ uacpi_u32 uacpi_shareable_unref(uacpi_handle handle)
     if (uacpi_unlikely(uacpi_bugged_shareable(shareable)))
         return BUGGED_REFCOUNT;
 
-    return shareable->reference_count--;
+    return uacpi_atomic_dec32(&shareable->reference_count) + 1;
 }
 
 void uacpi_shareable_unref_and_delete_if_last(
@@ -61,5 +62,5 @@ void uacpi_shareable_unref_and_delete_if_last(
 uacpi_u32 uacpi_shareable_refcount(uacpi_handle handle)
 {
     struct uacpi_shareable *shareable = handle;
-    return shareable->reference_count;
+    return uacpi_atomic_load32(&shareable->reference_count);
 }
