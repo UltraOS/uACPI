@@ -711,14 +711,7 @@ static void make_chain_bugged(uacpi_object *obj)
 
 void uacpi_object_ref(uacpi_object *obj)
 {
-    uacpi_object *this_obj = obj;
-
     while (obj) {
-        if (uacpi_unlikely(uacpi_bugged_shareable(obj))) {
-            make_chain_bugged(this_obj);
-            return;
-        }
-
         uacpi_shareable_ref(obj);
 
         if (obj->type == UACPI_OBJECT_REFERENCE)
@@ -747,25 +740,15 @@ static void free_chain(uacpi_object *obj)
 void uacpi_object_unref(uacpi_object *obj)
 {
     uacpi_object *this_obj = obj;
-    uacpi_u32 parent_refcount;
 
     if (!obj)
         return;
 
-    parent_refcount = obj->shareable.reference_count;
-
     while (obj) {
-        if (uacpi_unlikely(uacpi_bugged_shareable(obj))) {
-            make_chain_bugged(this_obj);
+        if (uacpi_unlikely(uacpi_bugged_shareable(obj)))
             return;
-        }
 
-        if (uacpi_unlikely(uacpi_shareable_refcount(obj) < parent_refcount)) {
-            make_chain_bugged(this_obj);
-            return;
-        }
-
-        parent_refcount = uacpi_shareable_unref(obj);
+        uacpi_shareable_unref(obj);
 
         if (obj->type == UACPI_OBJECT_REFERENCE) {
             obj = obj->inner_object;
