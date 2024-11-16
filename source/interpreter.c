@@ -21,7 +21,6 @@
 enum item_type {
     ITEM_NONE = 0,
     ITEM_NAMESPACE_NODE,
-    ITEM_NAMESPACE_NODE_METHOD_LOCAL,
     ITEM_OBJECT,
     ITEM_EMPTY_OBJECT,
     ITEM_PACKAGE_LENGTH,
@@ -619,6 +618,10 @@ static uacpi_status resolve_name_string(
 out:
     cursor += namesegs * 4;
     frame->code_offset = cursor - frame->method->code;
+
+    if (uacpi_likely_success(ret) && behavior == RESOLVE_FAIL_IF_DOESNT_EXIST)
+        uacpi_shareable_ref(cur_node);
+
     *out_node = cur_node;
     return ret;
 }
@@ -1280,6 +1283,7 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
 {
     uacpi_status ret;
     struct item_array *items = &ctx->cur_op_ctx->items;
+    struct item *root_node_item;
     struct uacpi_table_identifiers table_id;
     uacpi_table table;
     uacpi_buffer *root_path, *param_path;
@@ -1340,7 +1344,9 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
         root_node = uacpi_namespace_root();
     }
 
-    item_array_at(items, 0)->node = root_node;
+    root_node_item->node = root_node;
+    root_node_item->type = ITEM_NAMESPACE_NODE;
+    uacpi_shareable_ref(root_node);
 
     if (param_path->size > 1) {
         struct item *param_item;
@@ -1644,7 +1650,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
         item = item_array_at(&op_ctx->items, i++);
 
         // An actual field object
-        if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL) {
+        if (item->type == ITEM_NAMESPACE_NODE) {
             uacpi_u32 length;
             uacpi_field_unit *field;
 
@@ -4310,7 +4316,8 @@ static uacpi_bool pop_item(struct op_context *op_ctx)
 
     if (item->type == ITEM_OBJECT)
         uacpi_object_unref(item->obj);
-    if (item->type == ITEM_NAMESPACE_NODE_METHOD_LOCAL)
+
+    if (item->type == ITEM_NAMESPACE_NODE)
         uacpi_namespace_node_unref(item->node);
 
     item_array_pop(&op_ctx->items);
@@ -4366,8 +4373,8 @@ static uacpi_u8 parse_op_generates_item[0x100] = {
     [UACPI_PARSE_OP_TARGET] = ITEM_EMPTY_OBJECT,
     [UACPI_PARSE_OP_PKGLEN] = ITEM_PACKAGE_LENGTH,
     [UACPI_PARSE_OP_TRACKED_PKGLEN] = ITEM_PACKAGE_LENGTH,
-    [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE_METHOD_LOCAL,
-    [UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE_METHOD_LOCAL,
+    [UACPI_PARSE_OP_CREATE_NAMESTRING] = ITEM_NAMESPACE_NODE,
+    [UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL] = ITEM_NAMESPACE_NODE,
     [UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL_IF_LOAD] = ITEM_NAMESPACE_NODE,
