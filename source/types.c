@@ -979,7 +979,7 @@ uacpi_object_type uacpi_object_get_type(uacpi_object *obj)
     return obj->type;
 }
 
-uacpi_object_type uacpi_object_get_type_bit(uacpi_object *obj)
+uacpi_object_type_bits uacpi_object_get_type_bit(uacpi_object *obj)
 {
     return (1u << obj->type);
 }
@@ -989,7 +989,9 @@ uacpi_bool uacpi_object_is(uacpi_object *obj, uacpi_object_type type)
     return obj->type == type;
 }
 
-uacpi_bool uacpi_object_is_one_of(uacpi_object *obj, uacpi_u32 type_mask)
+uacpi_bool uacpi_object_is_one_of(
+    uacpi_object *obj, uacpi_object_type_bits type_mask
+)
 {
     return (uacpi_object_get_type_bit(obj) & type_mask) != 0;
 }
