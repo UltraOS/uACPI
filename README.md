@@ -30,15 +30,45 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 
 ## Why would I use this over ACPICA?
 
-Whilst ACPICA is an old and battle-tested project, it still has some fundamental issues that make it very far from perfect or ideal.
+### 1. NT-compatible from the ground up
+                              
+Over the decades of development, ACPICA has accumulated a lot of workarounds for
+AML expecting NT-specific behaviors, and is still missing compatibility in a lot
+of critical aspects.
 
-### TLDR:
-- Much better compatibility with the Windows NT object implicit-cast semantics than ACPICA
-- AML reference semantics 100% compatible with the Windows AML interpreter, **including edge cases**.
-- A more sophisticated and safe object lifetime tracking without extra overhead (**AML that would crash the NT interpreter works just fine!**)
-- No recursion when doing dynamic table loads from AML (`Load`/`LoadTable`)
-- Unlike ACPICA, uACPI doesn't try to work around AML code designed for the Windows NT ACPI driver, instead, it embraces it
-- No design flaws preventing true multi-threaded uses without the global interpreter lock
+uACPI, on the other hand, is built to be natively NT-compatible without extra
+workarounds.
+
+Some specific highlights include:
+- Reference objects, especially multi-level reference chains
+- Implicit cast semantics
+- Object mutability
+- Named object resolution, especially for named objects inside packages
+                             
+### 2. Fundamental safety
+             
+uACPI is built to always assume the worst about the AML byte code it's executing,
+and as such, has a more sophisticated object lifetime tracking system, as well
+as carefully designed handling for various edge-cases, including race conditions.
+
+Some of the standard uACPI test cases crash both ACPICA, and the NT AML 
+interpreters.
+
+While a permanent fuzzing solution for uACPI is currently WIP, it has already
+been fuzzed quite extensively and all known issues have been fixed.
+
+### 3. No recursion
+
+Running at kernel level has a lot of very strict limitations, one of which is a
+tiny stack size, which can sometimes be only a few pages in length.
+
+Of course, both ACPICA and uACPI have non-recursive AML interpreters, but there
+are still edge cases that cause potentially unbounded recursion.
+
+One such example are the dynamic table load operators from AML
+(`Load`/`LoadTable`): these cause a linear growth in stack usage per call in
+ACPICA, whereas in uACPI these  are treated as special method calls,
+and as such, don't increase stack usage whatsoever.
 
 ### More detailed overview
 Expressions within package:
@@ -130,6 +160,20 @@ Method (FOO) {
     // Use-after-free in ACPICA, object lifetime prolonged in uACPI (node is still removed from the namespace)
     Return (RefOf(TEST))
 }
+```
+
+CopyObject into self:
+```asl
+Method (TEST) {
+    CopyObject(123, TEST)
+    Return (1)
+}
+
+// Segfault in ACPICA, prints 1 in uACPI  
+Debug = TEST()
+
+// Unreachable in ACPICA, prints 123 in uACPI
+Debug = TEST
 ```
 
 There's even more examples, but this should be enough to demonstrate the fundamental differences in designs.
