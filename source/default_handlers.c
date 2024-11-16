@@ -62,8 +62,13 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
      */
     device = node;
     while (device) {
-        obj = uacpi_namespace_node_get_object(device);
-        if (obj && obj->type == UACPI_OBJECT_DEVICE)
+        uacpi_object_type type;
+
+        ret = uacpi_namespace_node_type(device, &type);
+        if (uacpi_unlikely_error(ret))
+            return ret;
+
+        if (type == UACPI_OBJECT_DEVICE)
             break;
 
         device = device->parent;
@@ -164,14 +169,21 @@ struct memory_region_ctx {
 static uacpi_status memory_region_attach(uacpi_region_attach_data *data)
 {
     struct memory_region_ctx *ctx;
+    uacpi_object *region_obj;
     uacpi_operation_region *op_region;
-    uacpi_status ret = UACPI_STATUS_OK;
+    uacpi_status ret;
 
     ctx = uacpi_kernel_alloc(sizeof(*ctx));
     if (ctx == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    op_region = uacpi_namespace_node_get_object(data->region_node)->op_region;
+    ret = uacpi_namespace_node_acquire_object_typed(
+        data->region_node, UACPI_OBJECT_OPERATION_REGION_BIT, &region_obj
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    op_region = region_obj->op_region;
     ctx->size = op_region->length;
 
     // FIXME: this really shouldn't try to map everything at once
@@ -182,10 +194,12 @@ static uacpi_status memory_region_attach(uacpi_region_attach_data *data)
         ret = UACPI_STATUS_MAPPING_FAILED;
         uacpi_trace_region_error(data->region_node, "unable to map", ret);
         uacpi_free(ctx, sizeof(*ctx));
-        return ret;
+        goto out;
     }
 
     data->out_region_context = ctx;
+out:
+    uacpi_namespace_node_release_object(region_obj);
     return ret;
 }
 
@@ -206,6 +220,7 @@ struct io_region_ctx {
 static uacpi_status io_region_attach(uacpi_region_attach_data *data)
 {
     struct io_region_ctx *ctx;
+    uacpi_object *region_obj;
     uacpi_operation_region *op_region;
     uacpi_status ret;
 
@@ -213,7 +228,13 @@ static uacpi_status io_region_attach(uacpi_region_attach_data *data)
     if (ctx == UACPI_NULL)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    op_region = uacpi_namespace_node_get_object(data->region_node)->op_region;
+    ret = uacpi_namespace_node_acquire_object_typed(
+        data->region_node, UACPI_OBJECT_OPERATION_REGION_BIT, &region_obj
+    );
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    op_region = region_obj->op_region;
     ctx->base = op_region->offset;
 
     ret = uacpi_kernel_io_map(ctx->base, op_region->length, &ctx->handle);
@@ -222,10 +243,13 @@ static uacpi_status io_region_attach(uacpi_region_attach_data *data)
             data->region_node, "unable to map an IO", ret
         );
         uacpi_free(ctx, sizeof(*ctx));
-        return ret;
+        goto out;
     }
 
     data->out_region_context = ctx;
+
+out:
+    uacpi_object_unref(region_obj);
     return ret;
 }
 

@@ -1333,13 +1333,20 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
 
     root_path = item_array_at(items, 8)->obj->buffer;
     param_path = item_array_at(items, 9)->obj->buffer;
+    root_node_item = item_array_at(items, 0);
 
     if (root_path->size > 1) {
-        root_node = uacpi_namespace_node_resolve_from_aml_namepath(
-            ctx->cur_frame->cur_scope, root_path->text
+        ret = uacpi_namespace_node_resolve(
+            ctx->cur_frame->cur_scope, root_path->text, UACPI_SHOULD_LOCK_NO,
+            UACPI_MAY_SEARCH_ABOVE_PARENT_YES, UACPI_PERMANENT_ONLY_NO,
+            &root_node
         );
-        if (uacpi_unlikely(root_node == UACPI_NULL))
-            return table_id_error("LoadTable", "RootPathString", root_path);
+        if (uacpi_unlikely_error(ret)) {
+            table_id_error("LoadTable", "RootPathString", root_path);
+            if (ret == UACPI_STATUS_NOT_FOUND)
+                ret = UACPI_STATUS_AML_UNDEFINED_REFERENCE;
+            return ret;
+        }
     } else {
         root_node = uacpi_namespace_root();
     }
@@ -1351,13 +1358,16 @@ static uacpi_status handle_load_table(struct execution_context *ctx)
     if (param_path->size > 1) {
         struct item *param_item;
 
-        param_node = uacpi_namespace_node_resolve_from_aml_namepath(
-            root_node, param_path->text
+        ret = uacpi_namespace_node_resolve(
+            root_node, param_path->text, UACPI_SHOULD_LOCK_NO,
+            UACPI_MAY_SEARCH_ABOVE_PARENT_YES, UACPI_PERMANENT_ONLY_NO,
+            &param_node
         );
-        if (uacpi_unlikely(param_node == UACPI_NULL)) {
-            return table_id_error(
-                "LoadTable", "ParameterPathString", root_path
-            );
+        if (uacpi_unlikely_error(ret)) {
+            table_id_error("LoadTable", "ParameterPathString", root_path);
+            if (ret == UACPI_STATUS_NOT_FOUND)
+                ret = UACPI_STATUS_AML_UNDEFINED_REFERENCE;
+            return ret;
         }
 
         param_item = item_array_at(items, 3);
@@ -1518,7 +1528,16 @@ error_out:
 
 uacpi_status uacpi_execute_table(void *tbl, enum uacpi_table_load_cause cause)
 {
-    return do_load_table(uacpi_namespace_root(), tbl, cause);
+    uacpi_status ret;
+
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = do_load_table(uacpi_namespace_root(), tbl, cause);
+
+    uacpi_namespace_write_unlock();
+    return ret;
 }
 
 uacpi_u32 get_field_length(struct item *item)
@@ -3085,7 +3104,9 @@ static uacpi_status handle_stall_or_sleep(struct execution_context *ctx)
         if (time > 2000)
             time = 2000;
 
+        uacpi_namespace_write_unlock();
         uacpi_kernel_sleep(time);
+        uacpi_namespace_write_lock();
     } else {
         // Spec says this must evaluate to a ByteData
         if (time > 0xFF)
@@ -3501,7 +3522,9 @@ static uacpi_status handle_event_ctl(struct execution_context *ctx)
         if (timeout > 0xFFFF)
             timeout = 0xFFFF;
 
+        uacpi_namespace_write_unlock();
         ret = uacpi_kernel_wait_for_event(obj->event->handle, timeout);
+        uacpi_namespace_write_lock();
 
         /*
          * The return value here is inverted, we return 0 for success and Ones
@@ -3670,7 +3693,10 @@ static uacpi_status handle_firmware_request(struct execution_context *ctx)
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
+    uacpi_namespace_write_unlock();
     uacpi_kernel_handle_firmware_request(&req);
+    uacpi_namespace_write_lock();
+
     return UACPI_STATUS_OK;
 }
 

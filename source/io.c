@@ -4,6 +4,7 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/mutex.h>
+#include <uacpi/internal/namespace.h>
 
 uacpi_size uacpi_round_up_bits_to_bytes(uacpi_size bit_length)
 {
@@ -179,8 +180,10 @@ static uacpi_status dispatch_field_io(
 )
 {
     uacpi_status ret;
+    uacpi_object *obj;
     uacpi_operation_region *region;
     uacpi_address_space_handler *handler;
+    uacpi_address_space space;
     uacpi_u64 offset_end;
 
     uacpi_region_rw_data data = {
@@ -196,7 +199,13 @@ static uacpi_status dispatch_field_io(
         return ret;
     }
 
-    region = uacpi_namespace_node_get_object(region_node)->op_region;
+    obj = uacpi_namespace_node_get_object(region_node);
+    if (uacpi_unlikely(obj == UACPI_NULL ||
+                       obj->type != UACPI_OBJECT_OPERATION_REGION))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    region = obj->op_region;
+    space = region->space;
     handler = region->handler;
 
     offset_end = offset;
@@ -224,17 +233,21 @@ static uacpi_status dispatch_field_io(
 
     if (op == UACPI_REGION_OP_WRITE) {
         data.value = *in_out;
-        uacpi_trace_region_io(region_node, op, data.offset,
+        uacpi_trace_region_io(region_node, space, op, data.offset,
                               byte_width, data.value);
     }
+
+    uacpi_namespace_write_unlock();
 
     ret = handler->callback(op, &data);
     if (uacpi_unlikely_error(ret))
         return ret;
 
+    uacpi_namespace_write_lock();
+
     if (op == UACPI_REGION_OP_READ) {
         *in_out = data.value;
-        uacpi_trace_region_io(region_node, op, data.offset,
+        uacpi_trace_region_io(region_node, space, op, data.offset,
                               byte_width, data.value);
     }
 
@@ -248,19 +261,11 @@ static uacpi_status access_field_unit(
 {
     uacpi_status ret = UACPI_STATUS_OK;
     uacpi_namespace_node *region_node;
-    uacpi_mutex *gl = UACPI_NULL;
 
     if (field->lock_rule) {
-        uacpi_namespace_node *gl_node;
-        uacpi_object *obj;
-
-        gl_node = uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_GL);
-        obj = uacpi_namespace_node_get_object(gl_node);
-
-        if (uacpi_likely(obj != UACPI_NULL && obj->type == UACPI_OBJECT_MUTEX))
-            gl = obj->mutex;
-
-        ret = uacpi_acquire_aml_mutex(gl, 0xFFFF);
+        ret = uacpi_acquire_aml_mutex(
+            g_uacpi_rt_ctx.global_lock_mutex, 0xFFFF
+        );
         if (uacpi_unlikely_error(ret))
             return ret;
     }
@@ -309,8 +314,8 @@ static uacpi_status access_field_unit(
     );
 
 out:
-    if (gl != UACPI_NULL)
-        uacpi_release_aml_mutex(gl);
+    if (field->lock_rule)
+        uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
     return ret;
 }
 

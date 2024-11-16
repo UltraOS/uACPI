@@ -126,7 +126,7 @@ uacpi_bool uacpi_package_fill(
 {
     uacpi_size i;
 
-    if (num_elements == 0)
+    if (uacpi_unlikely(num_elements == 0))
         return UACPI_TRUE;
 
     pkg->objects = uacpi_kernel_calloc(num_elements, sizeof(uacpi_handle));
@@ -1061,19 +1061,18 @@ uacpi_status uacpi_object_resolve_as_aml_namepath(
     uacpi_namespace_node **out_node
 )
 {
+    uacpi_status ret;
     uacpi_namespace_node *node;
 
     if (!uacpi_object_is_aml_namepath(obj))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    node = uacpi_namespace_node_resolve_from_aml_namepath(
-        scope, obj->buffer->text
+    ret = uacpi_namespace_node_resolve_from_aml_namepath(
+        scope, obj->buffer->text, &node
     );
-    if (node == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
-
-    *out_node = node;
-    return UACPI_STATUS_OK;
+    if (uacpi_likely_success(ret))
+        *out_node = node;
+    return ret;
 }
 
 static uacpi_status uacpi_object_do_assign_buffer(

@@ -4,6 +4,7 @@
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/namespace.h>
 #include <uacpi/uacpi.h>
 
 #define LARGE_RESOURCE_BASE (ACPI_RESOURCE_END_TAG + 1)
