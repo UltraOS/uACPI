@@ -115,23 +115,26 @@ typedef enum uacpi_object_type {
 } uacpi_object_type;
 
 // Type bits for API requiring a bit mask, e.g. uacpi_eval_typed
-#define UACPI_OBJECT_INTEGER_BIT (1 << UACPI_OBJECT_INTEGER)
-#define UACPI_OBJECT_STRING_BIT (1 << UACPI_OBJECT_STRING)
-#define UACPI_OBJECT_BUFFER_BIT (1 << UACPI_OBJECT_BUFFER)
-#define UACPI_OBJECT_PACKAGE_BIT (1 << UACPI_OBJECT_PACKAGE)
-#define UACPI_OBJECT_FIELD_UNIT_BIT (1 << UACPI_OBJECT_FIELD_UNIT)
-#define UACPI_OBJECT_DEVICE_BIT (1 << UACPI_OBJECT_DEVICE)
-#define UACPI_OBJECT_EVENT_BIT (1 << UACPI_OBJECT_EVENT)
-#define UACPI_OBJECT_METHOD_BIT (1 << UACPI_OBJECT_METHOD)
-#define UACPI_OBJECT_MUTEX_BIT (1 << UACPI_OBJECT_MUTEX)
-#define UACPI_OBJECT_OPERATION_REGION_BIT (1 << UACPI_OBJECT_OPERATION_REGION)
-#define UACPI_OBJECT_POWER_RESOURCE_BIT (1 << UACPI_OBJECT_POWER_RESOURCE)
-#define UACPI_OBJECT_PROCESSOR_BIT (1 << UACPI_OBJECT_PROCESSOR)
-#define UACPI_OBJECT_THERMAL_ZONE_BIT (1 << UACPI_OBJECT_THERMAL_ZONE)
-#define UACPI_OBJECT_BUFFER_FIELD_BIT (1 << UACPI_OBJECT_BUFFER_FIELD)
-#define UACPI_OBJECT_DEBUG_BIT (1 << UACPI_OBJECT_DEBUG)
-#define UACPI_OBJECT_REFERENCE_BIT (1 << UACPI_OBJECT_REFERENCE)
-#define UACPI_OBJECT_BUFFER_INDEX_BIT (1 << UACPI_OBJECT_BUFFER_INDEX)
+typedef enum uacpi_object_type_bits {
+    UACPI_OBJECT_INTEGER_BIT = (1 << UACPI_OBJECT_INTEGER),
+    UACPI_OBJECT_STRING_BIT = (1 << UACPI_OBJECT_STRING),
+    UACPI_OBJECT_BUFFER_BIT = (1 << UACPI_OBJECT_BUFFER),
+    UACPI_OBJECT_PACKAGE_BIT = (1 << UACPI_OBJECT_PACKAGE),
+    UACPI_OBJECT_FIELD_UNIT_BIT = (1 << UACPI_OBJECT_FIELD_UNIT),
+    UACPI_OBJECT_DEVICE_BIT = (1 << UACPI_OBJECT_DEVICE),
+    UACPI_OBJECT_EVENT_BIT = (1 << UACPI_OBJECT_EVENT),
+    UACPI_OBJECT_METHOD_BIT = (1 << UACPI_OBJECT_METHOD),
+    UACPI_OBJECT_MUTEX_BIT = (1 << UACPI_OBJECT_MUTEX),
+    UACPI_OBJECT_OPERATION_REGION_BIT = (1 << UACPI_OBJECT_OPERATION_REGION),
+    UACPI_OBJECT_POWER_RESOURCE_BIT = (1 << UACPI_OBJECT_POWER_RESOURCE),
+    UACPI_OBJECT_PROCESSOR_BIT = (1 << UACPI_OBJECT_PROCESSOR),
+    UACPI_OBJECT_THERMAL_ZONE_BIT = (1 << UACPI_OBJECT_THERMAL_ZONE),
+    UACPI_OBJECT_BUFFER_FIELD_BIT = (1 << UACPI_OBJECT_BUFFER_FIELD),
+    UACPI_OBJECT_DEBUG_BIT = (1 << UACPI_OBJECT_DEBUG),
+    UACPI_OBJECT_REFERENCE_BIT = (1 << UACPI_OBJECT_REFERENCE),
+    UACPI_OBJECT_BUFFER_INDEX_BIT = (1 << UACPI_OBJECT_BUFFER_INDEX),
+    UACPI_OBJECT_ANY_BIT = 0xFFFFFFFF,
+} uacpi_object_type_bits;
 
 typedef struct uacpi_object uacpi_object;
 
@@ -139,7 +142,7 @@ void uacpi_object_ref(uacpi_object *obj);
 void uacpi_object_unref(uacpi_object *obj);
 
 uacpi_object_type uacpi_object_get_type(uacpi_object*);
-uacpi_object_type uacpi_object_get_type_bit(uacpi_object*);
+uacpi_object_type_bits uacpi_object_get_type_bit(uacpi_object*);
 
 /*
  * Returns UACPI_TRUE if the provided object's type matches this type.
@@ -150,7 +153,9 @@ uacpi_bool uacpi_object_is(uacpi_object*, uacpi_object_type);
  * Returns UACPI_TRUE if the provided object's type is one of the values
  * specified in the 'type_mask' of UACPI_OBJECT_*_BIT.
  */
-uacpi_bool uacpi_object_is_one_of(uacpi_object*, uacpi_u32 type_mask);
+uacpi_bool uacpi_object_is_one_of(
+    uacpi_object*, uacpi_object_type_bits type_mask
+);
 
 const uacpi_char *uacpi_object_type_to_string(uacpi_object_type);
 
