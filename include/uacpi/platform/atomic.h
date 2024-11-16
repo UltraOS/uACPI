@@ -50,6 +50,12 @@
 #define UACPI_MSVC_ATOMIC_LOAD(ptr, type, width) \
     _InterlockedOr##width((type volatile*)(ptr), 0)
 
+#define UACPI_MSVC_ATOMIC_INC(ptr, type, width) \
+    _InterlockedIncrement##width((type volatile*)(ptr))
+
+#define UACPI_MSVC_ATOMIC_DEC(ptr, type, width) \
+    _InterlockedDecrement##width((type volatile*)(ptr))
+
 UACPI_MAKE_MSVC_CMPXCHG(64, __int64, 64)
 UACPI_MAKE_MSVC_CMPXCHG(32, long,)
 UACPI_MAKE_MSVC_CMPXCHG(16, short, 16)
@@ -72,6 +78,14 @@ UACPI_MAKE_MSVC_CMPXCHG(16, short, 16)
 #define uacpi_atomic_store16(ptr, value) UACPI_MSVC_ATOMIC_STORE(ptr, value, short, 16)
 #define uacpi_atomic_store32(ptr, value) UACPI_MSVC_ATOMIC_STORE(ptr, value, long,)
 #define uacpi_atomic_store64(ptr, value) UACPI_MSVC_ATOMIC_STORE(ptr, value, __int64, 64)
+
+#define uacpi_atomic_inc16(ptr) UACPI_MSVC_ATOMIC_INC(ptr, short, 16)
+#define uacpi_atomic_inc32(ptr) UACPI_MSVC_ATOMIC_INC(ptr, long,)
+#define uacpi_atomic_inc64(ptr) UACPI_MSVC_ATOMIC_INC(ptr, __int64, 64)
+
+#define uacpi_atomic_dec16(ptr) UACPI_MSVC_ATOMIC_DEC(ptr, short, 16)
+#define uacpi_atomic_dec32(ptr) UACPI_MSVC_ATOMIC_DEC(ptr, long,)
+#define uacpi_atomic_dec64(ptr) UACPI_MSVC_ATOMIC_DEC(ptr, __int64, 64)
 #else
 
 #define UACPI_DO_CMPXCHG(ptr, expected, desired)           \
@@ -94,6 +108,14 @@ UACPI_MAKE_MSVC_CMPXCHG(16, short, 16)
 #define uacpi_atomic_store16(ptr, value) __atomic_store_n(ptr, value, __ATOMIC_RELEASE)
 #define uacpi_atomic_store32(ptr, value) __atomic_store_n(ptr, value, __ATOMIC_RELEASE)
 #define uacpi_atomic_store64(ptr, value) __atomic_store_n(ptr, value, __ATOMIC_RELEASE)
+
+#define uacpi_atomic_inc16(ptr) __atomic_add_fetch(ptr, 1, __ATOMIC_ACQ_REL)
+#define uacpi_atomic_inc32(ptr) __atomic_add_fetch(ptr, 1, __ATOMIC_ACQ_REL)
+#define uacpi_atomic_inc64(ptr) __atomic_add_fetch(ptr, 1, __ATOMIC_ACQ_REL)
+
+#define uacpi_atomic_dec16(ptr) __atomic_sub_fetch(ptr, 1, __ATOMIC_ACQ_REL)
+#define uacpi_atomic_dec32(ptr) __atomic_sub_fetch(ptr, 1, __ATOMIC_ACQ_REL)
+#define uacpi_atomic_dec64(ptr) __atomic_sub_fetch(ptr, 1, __ATOMIC_ACQ_REL)
 #endif
 
 #if UACPI_POINTER_SIZE == 4
