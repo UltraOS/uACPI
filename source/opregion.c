@@ -1,10 +1,12 @@
-#include <uacpi/internal/opregion.h>
 #include <uacpi/kernel_api.h>
+
+#include <uacpi/internal/opregion.h>
 #include <uacpi/internal/namespace.h>
-#include <uacpi/uacpi.h>
 #include <uacpi/internal/stdlib.h>
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/mutex.h>
+#include <uacpi/internal/interpreter.h>
 
 void uacpi_trace_region_error(
     uacpi_namespace_node *node, uacpi_char *message, uacpi_status ret
@@ -27,13 +29,12 @@ void uacpi_trace_region_error(
 #define UACPI_TRACE_REGION_IO
 
 void uacpi_trace_region_io(
-    uacpi_namespace_node *node, uacpi_region_op op,
+    uacpi_namespace_node *node, uacpi_address_space space, uacpi_region_op op,
     uacpi_u64 offset, uacpi_u8 byte_size, uacpi_u64 ret
 )
 {
 #ifdef UACPI_TRACE_REGION_IO
     const uacpi_char *path;
-    uacpi_operation_region *op_region;
     const uacpi_char *type_str;
 
     if (!uacpi_should_log(UACPI_LOG_TRACE))
@@ -50,13 +51,12 @@ void uacpi_trace_region_io(
         type_str = "<INVALID-OP>";
     }
 
-    op_region = uacpi_namespace_node_get_object(node)->op_region;
     path = uacpi_namespace_node_generate_absolute_path(node);
 
     uacpi_trace(
         "%s [%s] (%d bytes) %s[0x%016"UACPI_PRIX64"] = 0x%"UACPI_PRIX64"\n",
         type_str, path, byte_size,
-        uacpi_address_space_to_string(op_region->space),
+        uacpi_address_space_to_string(space),
         UACPI_FMT64(offset), UACPI_FMT64(ret)
     );
 
@@ -85,8 +85,22 @@ static uacpi_status region_run_reg(
 )
 {
     uacpi_status ret;
+    uacpi_namespace_node *reg_node;
     uacpi_object_array method_args;
-    uacpi_object *args[2];
+    uacpi_object *reg_obj, *args[2];
+
+    ret = uacpi_namespace_node_resolve(
+        node->parent, "_REG", UACPI_SHOULD_LOCK_NO,
+        UACPI_MAY_SEARCH_ABOVE_PARENT_NO, UACPI_PERMANENT_ONLY_NO, &reg_node
+    );
+    if (uacpi_unlikely_error(ret))
+        return UACPI_STATUS_OK;
+
+    reg_obj = uacpi_namespace_node_get_object_typed(
+        reg_node, UACPI_OBJECT_METHOD_BIT
+    );
+    if (uacpi_unlikely(reg_obj == UACPI_NULL))
+        return UACPI_STATUS_OK;
 
     args[0] = uacpi_create_object(UACPI_OBJECT_INTEGER);
     if (uacpi_unlikely(args[0] == UACPI_NULL))
@@ -103,8 +117,10 @@ static uacpi_status region_run_reg(
     method_args.objects = args;
     method_args.count = 2;
 
-    ret = uacpi_eval(node->parent, "_REG", &method_args, UACPI_NULL);
-    if (uacpi_unlikely_error(ret && ret != UACPI_STATUS_NOT_FOUND))
+    ret = uacpi_execute_control_method(
+        node->parent, reg_obj->method, &method_args, UACPI_NULL
+    );
+    if (uacpi_unlikely_error(ret))
         uacpi_trace_region_error(node, "error during _REG execution for", ret);
 
     uacpi_object_unref(args[0]);
@@ -118,25 +134,20 @@ uacpi_address_space_handlers *uacpi_node_get_address_space_handlers(
 {
     uacpi_object *object;
 
+    if (node == uacpi_namespace_root())
+        return g_uacpi_rt_ctx.root_object->address_space_handlers;
+
     object = uacpi_namespace_node_get_object(node);
     if (uacpi_unlikely(object == UACPI_NULL))
         return UACPI_NULL;
 
     switch (object->type) {
-    default:
-        /*
-         * Even though the '\' object doesn't have its type set to
-         * UACPI_OBJECT_DEVICE, it is one.
-         * See namespace.c:make_object_for_predefined for reasoning.
-         */
-        if (node != uacpi_namespace_root() ||
-            object->type != UACPI_OBJECT_UNINITIALIZED)
-            return UACPI_NULL;
-        UACPI_FALLTHROUGH;
     case UACPI_OBJECT_DEVICE:
     case UACPI_OBJECT_PROCESSOR:
     case UACPI_OBJECT_THERMAL_ZONE:
         return object->address_space_handlers;
+    default:
+        return UACPI_NULL;
     }
 }
 
@@ -180,6 +191,7 @@ static uacpi_operation_region *find_previous_region_link(
 
 uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
 {
+    uacpi_object *obj;
     uacpi_operation_region *region;
     uacpi_address_space_handler *handler;
     uacpi_status ret;
@@ -188,7 +200,14 @@ uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
     if (uacpi_namespace_node_is_dangling(node))
         return UACPI_STATUS_NAMESPACE_NODE_DANGLING;
 
-    region = uacpi_namespace_node_get_object(node)->op_region;
+    obj = uacpi_namespace_node_get_object_typed(
+        node, UACPI_OBJECT_OPERATION_REGION_BIT
+    );
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    region = obj->op_region;
+
     if (region->handler == UACPI_NULL)
         return UACPI_STATUS_NO_HANDLER;
     if (region->state_flags & UACPI_OP_REGION_STATE_ATTACHED)
@@ -198,19 +217,26 @@ uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
     attach_data.region_node = node;
     attach_data.handler_context = handler->user_context;
 
+    uacpi_object_ref(obj);
+    uacpi_namespace_write_unlock();
     ret = handler->callback(UACPI_REGION_OP_ATTACH, &attach_data);
+    uacpi_namespace_write_lock();
+
     if (uacpi_unlikely_error(ret)) {
         uacpi_trace_region_error(node, "failed to attach a handler to", ret);
+        uacpi_object_unref(obj);
         return ret;
     }
 
     region->state_flags |= UACPI_OP_REGION_STATE_ATTACHED;
     region->user_context = attach_data.out_region_context;
+    uacpi_object_unref(obj);
     return ret;
 }
 
-static void region_install_handler(uacpi_namespace_node *node,
-                                   uacpi_address_space_handler *handler)
+static void region_install_handler(
+    uacpi_namespace_node *node, uacpi_address_space_handler *handler
+)
 {
     uacpi_operation_region *region;
 
@@ -222,14 +248,29 @@ static void region_install_handler(uacpi_namespace_node *node,
     handler->regions = region;
 }
 
-void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
+enum unreg {
+    UNREG_NO = 0,
+    UNREG_YES,
+};
+
+static void region_uninstall_handler(
+    uacpi_namespace_node *node, enum unreg unreg
+)
 {
+    uacpi_status ret;
+    uacpi_object *obj;
     uacpi_address_space_handler *handler;
     uacpi_operation_region *region, *link;
 
-    region = uacpi_namespace_node_get_object(node)->op_region;
-    handler = region->handler;
+    obj = uacpi_namespace_node_get_object_typed(
+        node, UACPI_OBJECT_OPERATION_REGION_BIT
+    );
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return;
 
+    region = obj->op_region;
+
+    handler = region->handler;
     if (handler == UACPI_NULL)
         return;
 
@@ -247,14 +288,16 @@ void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
 
 out:
     if (region->state_flags & UACPI_OP_REGION_STATE_ATTACHED) {
-        uacpi_status ret;
         uacpi_region_detach_data detach_data = {
             .region_node = node,
             .region_context = region->user_context,
             .handler_context = handler->user_context,
         };
 
+        uacpi_namespace_write_unlock();
         ret = handler->callback(UACPI_REGION_OP_DETACH, &detach_data);
+        uacpi_namespace_write_lock();
+
         if (uacpi_unlikely_error(ret)) {
             uacpi_trace_region_error(
                 node, "error during handler detach for", ret
@@ -262,13 +305,20 @@ out:
         }
     }
 
-    if (region->state_flags & UACPI_OP_REGION_STATE_REG_EXECUTED)
+    if ((region->state_flags & UACPI_OP_REGION_STATE_REG_EXECUTED) &&
+        unreg == UNREG_YES) {
+        region->state_flags &= ~UACPI_OP_REGION_STATE_REG_EXECUTED;
         region_run_reg(node, ACPI_REG_DISCONNECT);
+    }
 
     uacpi_address_space_handler_unref(region->handler);
     region->handler = UACPI_NULL;
-    region->state_flags &= ~(UACPI_OP_REGION_STATE_ATTACHED |
-                             UACPI_OP_REGION_STATE_REG_EXECUTED);
+    region->state_flags &= ~UACPI_OP_REGION_STATE_ATTACHED;
+}
+
+void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
+{
+    region_uninstall_handler(node, UNREG_YES);
 }
 
 enum opregion_iter_action {
@@ -282,12 +332,14 @@ struct opregion_iter_ctx {
 };
 
 static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
-    uacpi_handle opaque, uacpi_namespace_node *node
+    uacpi_handle opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     struct opregion_iter_ctx *ctx = opaque;
     uacpi_address_space_handlers *handlers;
     uacpi_object *object;
+
+    UACPI_UNUSED(depth);
 
     object = uacpi_namespace_node_get_object(node);
     if (object->type == UACPI_OBJECT_OPERATION_REGION) {
@@ -298,7 +350,7 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
 
         if (ctx->action == OPREGION_ITER_ACTION_INSTALL) {
             if (region->handler)
-                uacpi_opregion_uninstall_handler(node);
+                region_uninstall_handler(node, UNREG_NO);
 
             region_install_handler(node, ctx->handler);
         } else {
@@ -310,7 +362,7 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
                 return UACPI_NS_ITERATION_DECISION_CONTINUE;
             }
 
-            uacpi_opregion_uninstall_handler(node);
+            region_uninstall_handler(node, UNREG_NO);
         }
 
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
@@ -350,26 +402,23 @@ struct reg_run_ctx {
 };
 
 enum uacpi_ns_iteration_decision do_run_reg(
-    void *opaque, uacpi_namespace_node *node
+    void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     struct reg_run_ctx *ctx = opaque;
-    uacpi_object *object;
     uacpi_operation_region *region;
     uacpi_status ret;
+    uacpi_bool was_regged;
 
-    object = uacpi_namespace_node_get_object(node);
-    if (object->type != UACPI_OBJECT_OPERATION_REGION)
+    UACPI_UNUSED(depth);
+
+    region = uacpi_namespace_node_get_object(node)->op_region;
+
+    if (region->space != ctx->space)
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
-    region = object->op_region;
-
-    if (region->space != ctx->space ||
-        (region->state_flags & UACPI_OP_REGION_STATE_REG_EXECUTED))
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
-
-    if (region->handler == UACPI_NULL &&
-        ctx->connection_code != ACPI_REG_DISCONNECT)
+    was_regged = region->state_flags & UACPI_OP_REGION_STATE_REG_EXECUTED;
+    if (was_regged == (ctx->connection_code == ACPI_REG_CONNECT))
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
     ret = region_run_reg(node, ctx->connection_code);
@@ -383,20 +432,23 @@ enum uacpi_ns_iteration_decision do_run_reg(
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
-    region->state_flags |= UACPI_OP_REGION_STATE_REG_EXECUTED;
+    if (ctx->connection_code == ACPI_REG_CONNECT)
+        region->state_flags |= UACPI_OP_REGION_STATE_REG_EXECUTED;
+    else
+        region->state_flags &= ~UACPI_OP_REGION_STATE_REG_EXECUTED;
     return UACPI_NS_ITERATION_DECISION_CONTINUE;
 }
 
-uacpi_status uacpi_reg_all_opregions(
-    uacpi_namespace_node *device_node,
-    enum uacpi_address_space space
+static uacpi_status reg_or_unreg_all_opregions(
+    uacpi_namespace_node *device_node, enum uacpi_address_space space,
+    uacpi_u8 connection_code
 )
 {
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *this_handler;
     struct reg_run_ctx ctx = {
         .space = space,
-        .connection_code = ACPI_REG_CONNECT,
+        .connection_code = connection_code,
     };
 
     if (!space_needs_reg(space))
@@ -410,16 +462,65 @@ uacpi_status uacpi_reg_all_opregions(
     if (uacpi_unlikely(this_handler == UACPI_NULL))
         return UACPI_STATUS_NO_HANDLER;
 
-    uacpi_namespace_for_each_node_depth_first(
-        device_node, do_run_reg, &ctx
+    uacpi_namespace_do_for_each_child(
+        device_node, do_run_reg, UACPI_NULL,
+        UACPI_OBJECT_OPERATION_REGION_BIT, UACPI_MAX_DEPTH_ANY,
+        UACPI_SHOULD_LOCK_NO, UACPI_PERMANENT_ONLY_YES, &ctx
     );
 
     uacpi_trace(
-        "activated all '%s' opregions controlled by '%.4s', "
-        "%zu _REG() calls (%zu errors)\n", uacpi_address_space_to_string(space),
+        "%sactivated all '%s' opregions controlled by '%.4s', "
+        "%zu _REG() calls (%zu errors)\n",
+        connection_code == ACPI_REG_CONNECT ? "" : "de",
+        uacpi_address_space_to_string(space),
         device_node->name.text, ctx.reg_executed, ctx.reg_errors
     );
     return UACPI_STATUS_OK;
+}
+
+static uacpi_address_space_handlers *extract_handlers(
+    uacpi_namespace_node *node
+)
+{
+    uacpi_object *handlers_obj;
+
+    if (node == uacpi_namespace_root())
+        return g_uacpi_rt_ctx.root_object->address_space_handlers;
+
+    handlers_obj = uacpi_namespace_node_get_object_typed(
+        node,
+        UACPI_OBJECT_DEVICE_BIT | UACPI_OBJECT_THERMAL_ZONE_BIT |
+        UACPI_OBJECT_PROCESSOR_BIT
+    );
+    if (uacpi_unlikely(handlers_obj == UACPI_NULL))
+        return UACPI_NULL;
+
+    return handlers_obj->address_space_handlers;
+}
+
+uacpi_status uacpi_reg_all_opregions(
+    uacpi_namespace_node *device_node,
+    enum uacpi_address_space space
+)
+{
+    uacpi_status ret;
+
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
+
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    if (uacpi_unlikely(extract_handlers(device_node) == UACPI_NULL)) {
+        ret = UACPI_STATUS_INVALID_ARGUMENT;
+        goto out;
+    }
+
+    ret = reg_or_unreg_all_opregions(device_node, space, ACPI_REG_CONNECT);
+
+out:
+    uacpi_namespace_write_unlock();
+    return ret;
 }
 
 uacpi_status uacpi_install_address_space_handler(
@@ -427,21 +528,32 @@ uacpi_status uacpi_install_address_space_handler(
     uacpi_region_handler handler, uacpi_handle handler_context
 )
 {
+    uacpi_status ret;
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *this_handler, *new_handler;
     struct opregion_iter_ctx iter_ctx;
 
-    handlers = uacpi_node_get_address_space_handlers(device_node);
-    if (uacpi_unlikely(handlers == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    handlers = extract_handlers(device_node);
+    if (uacpi_unlikely(handlers == UACPI_NULL)) {
+        ret = UACPI_STATUS_INVALID_ARGUMENT;
+        goto out;
+    }
 
     this_handler = find_handler(handlers, space);
-    if (this_handler != UACPI_NULL)
-        return UACPI_STATUS_ALREADY_EXISTS;
+    if (this_handler != UACPI_NULL) {
+        ret = UACPI_STATUS_ALREADY_EXISTS;
+        goto out;
+    }
 
     new_handler = uacpi_kernel_alloc(sizeof(*new_handler));
-    if (new_handler == UACPI_NULL)
-        return UACPI_STATUS_OUT_OF_MEMORY;
+    if (new_handler == UACPI_NULL) {
+        ret = UACPI_STATUS_OUT_OF_MEMORY;
+        goto out;
+    }
     uacpi_shareable_init(new_handler);
 
     new_handler->next = handlers->head;
@@ -454,12 +566,14 @@ uacpi_status uacpi_install_address_space_handler(
     iter_ctx.handler = new_handler;
     iter_ctx.action = OPREGION_ITER_ACTION_INSTALL;
 
-    uacpi_namespace_for_each_node_depth_first(
-        device_node, do_install_or_uninstall_handler, &iter_ctx
+    uacpi_namespace_do_for_each_child(
+        device_node, do_install_or_uninstall_handler, UACPI_NULL,
+        UACPI_OBJECT_ANY_BIT, UACPI_MAX_DEPTH_ANY, UACPI_SHOULD_LOCK_NO,
+        UACPI_PERMANENT_ONLY_YES, &iter_ctx
     );
 
     if (!space_needs_reg(space))
-        return UACPI_STATUS_OK;
+        goto out;
 
      /*
       * Installing an early address space handler, obviously not possible to
@@ -469,7 +583,7 @@ uacpi_status uacpi_install_address_space_handler(
       * the namespace.
       */
     if (g_uacpi_rt_ctx.init_level < UACPI_INIT_LEVEL_NAMESPACE_LOADED)
-        return UACPI_STATUS_OK;
+        goto out;
 
     /*
      * _REG methods for global address space handlers (installed to root)
@@ -479,10 +593,16 @@ uacpi_status uacpi_install_address_space_handler(
      */
     if (device_node == uacpi_namespace_root() &&
         g_uacpi_rt_ctx.init_level == UACPI_INIT_LEVEL_NAMESPACE_LOADED)
-        return UACPI_STATUS_OK;
+        goto out;
 
     // Init level is NAMESPACE_INITIALIZED, so we can safely run _REG now
-    return uacpi_reg_all_opregions(device_node, space);
+    ret = reg_or_unreg_all_opregions(
+        device_node, space, ACPI_REG_CONNECT
+    );
+
+out:
+    uacpi_namespace_write_unlock();
+    return ret;
 }
 
 uacpi_status uacpi_uninstall_address_space_handler(
@@ -490,23 +610,34 @@ uacpi_status uacpi_uninstall_address_space_handler(
     enum uacpi_address_space space
 )
 {
+    uacpi_status ret;
     uacpi_address_space_handlers *handlers;
-    uacpi_address_space_handler *handler, *prev_handler;
+    uacpi_address_space_handler *handler = UACPI_NULL, *prev_handler;
     struct opregion_iter_ctx iter_ctx;
 
-    handlers = uacpi_node_get_address_space_handlers(device_node);
-    if (uacpi_unlikely(handlers == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    handlers = extract_handlers(device_node);
+    if (uacpi_unlikely(handlers == UACPI_NULL)) {
+        ret = UACPI_STATUS_INVALID_ARGUMENT;
+        goto out;
+    }
 
     handler = find_handler(handlers, space);
-    if (uacpi_unlikely(handler == UACPI_NULL))
-        return UACPI_STATUS_NO_HANDLER;
+    if (uacpi_unlikely(handler == UACPI_NULL)) {
+        ret = UACPI_STATUS_NO_HANDLER;
+        goto out;
+    }
 
     iter_ctx.handler = handler;
     iter_ctx.action = OPREGION_ITER_ACTION_UNINSTALL;
 
-    uacpi_namespace_for_each_node_depth_first(
-        device_node, do_install_or_uninstall_handler, &iter_ctx
+    uacpi_namespace_do_for_each_child(
+        device_node, do_install_or_uninstall_handler, UACPI_NULL,
+        UACPI_OBJECT_ANY_BIT, UACPI_MAX_DEPTH_ANY, UACPI_SHOULD_LOCK_NO,
+        UACPI_PERMANENT_ONLY_YES, &iter_ctx
     );
 
     prev_handler = handlers->head;
@@ -527,9 +658,13 @@ uacpi_status uacpi_uninstall_address_space_handler(
         prev_handler = prev_handler->next;
     }
 
+    reg_or_unreg_all_opregions(device_node, space, ACPI_REG_DISCONNECT);
+
 out:
-    uacpi_address_space_handler_unref(handler);
-    return UACPI_STATUS_OK;
+    if (handler != UACPI_NULL)
+        uacpi_address_space_handler_unref(handler);
+    uacpi_namespace_write_unlock();
+    return ret;
 }
 
 uacpi_status uacpi_opregion_find_and_install_handler(

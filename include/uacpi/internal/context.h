@@ -54,7 +54,14 @@ struct uacpi_runtime_context {
     uacpi_u32 max_call_stack_depth;
 
     uacpi_u32 global_lock_seq_num;
-    uacpi_handle *global_lock_mutex;
+
+    /*
+     * These are stored here to protect against stuff like:
+     * - CopyObject(JUNK, \)
+     * - CopyObject(JUNK, \_GL)
+     */
+    uacpi_mutex *global_lock_mutex;
+    uacpi_object *root_object;
 
 #ifndef UACPI_REDUCED_HARDWARE
     uacpi_handle *global_lock_event;

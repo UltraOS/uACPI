@@ -1,10 +1,11 @@
 #include <uacpi/types.h>
 #include <uacpi/status.h>
+#include <uacpi/uacpi.h>
 
 #include <uacpi/internal/context.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/log.h>
-#include <uacpi/uacpi.h>
+#include <uacpi/internal/namespace.h>
 
 void uacpi_eisa_id_to_string(uacpi_u32 id, uacpi_char *out_string)
 {
@@ -928,19 +929,12 @@ struct device_find_ctx {
 };
 
 enum uacpi_ns_iteration_decision find_one_device(
-    void *opaque, uacpi_namespace_node *node
+    void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     struct device_find_ctx *ctx = opaque;
     uacpi_status ret;
     uacpi_u32 flags;
-    uacpi_object *obj;
-
-    obj = uacpi_namespace_node_get_object(node);
-    if (uacpi_unlikely(obj == UACPI_NULL))
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
-    if (obj->type != UACPI_OBJECT_DEVICE)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
 
     if (!uacpi_device_matches_pnp_id(node, ctx->target_hids))
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
@@ -953,7 +947,7 @@ enum uacpi_ns_iteration_decision find_one_device(
         !(flags & ACPI_STA_RESULT_DEVICE_FUNCTIONING))
         return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
 
-    return ctx->cb(ctx->user, node);
+    return ctx->cb(ctx->user, node, depth);
 }
 
 
@@ -970,8 +964,10 @@ uacpi_status uacpi_find_devices_at(
         .cb = cb,
     };
 
-    uacpi_namespace_for_each_node_depth_first(parent, find_one_device, &ctx);
-    return UACPI_STATUS_OK;
+    return uacpi_namespace_for_each_child(
+        parent, find_one_device, UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+        UACPI_MAX_DEPTH_ANY, &ctx
+    );
 }
 
 uacpi_status uacpi_find_devices(

@@ -2,41 +2,41 @@
 #include <uacpi/internal/shareable.h>
 #include <uacpi/internal/namespace.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/mutex.h>
+#include <uacpi/internal/utilities.h>
 #include <uacpi/kernel_api.h>
 
-uacpi_handlers *uacpi_node_get_handlers(
-    uacpi_namespace_node *node
-)
+static uacpi_handle notify_mutex;
+
+uacpi_status uacpi_initialize_notify(void)
 {
-    uacpi_object *obj;
+    notify_mutex = uacpi_kernel_create_mutex();
+    if (uacpi_unlikely(notify_mutex == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
 
-    obj = uacpi_namespace_node_get_object(node);
-    if (uacpi_unlikely(obj == UACPI_NULL))
-        return UACPI_NULL;
+    return UACPI_STATUS_OK;
+}
 
-    switch (obj->type) {
-    default:
-        /*
-         * Even though the '\' object doesn't have its type set to
-         * UACPI_OBJECT_DEVICE, it is one.
-         * See namespace.c:make_object_for_predefined for reasoning.
-         */
-        if (node != uacpi_namespace_root() ||
-            obj->type != UACPI_OBJECT_UNINITIALIZED)
-            return UACPI_NULL;
-        UACPI_FALLTHROUGH;
-    case UACPI_OBJECT_DEVICE:
-    case UACPI_OBJECT_THERMAL_ZONE:
-    case UACPI_OBJECT_PROCESSOR:
-        return obj->handlers;
-    }
+void uacpi_deinitialize_notify(void)
+{
+    if (notify_mutex != UACPI_NULL)
+        uacpi_kernel_free_mutex(notify_mutex);
+
+    notify_mutex = UACPI_NULL;
 }
 
 struct notification_ctx {
     uacpi_namespace_node *node;
     uacpi_u64 value;
-    uacpi_device_notify_handler *node_handlers, *root_handlers;
+    uacpi_object *node_object;
 };
+
+static void free_notification_ctx(struct notification_ctx *ctx)
+{
+    uacpi_namespace_node_release_object(ctx->node_object);
+    uacpi_namespace_node_unref(ctx->node);
+    uacpi_free(ctx, sizeof(*ctx));
+}
 
 static void do_notify(uacpi_handle opaque)
 {
@@ -44,17 +44,16 @@ static void do_notify(uacpi_handle opaque)
     uacpi_device_notify_handler *handler;
     uacpi_bool did_notify_root = UACPI_FALSE;
 
-    handler = ctx->node_handlers;
+    handler = ctx->node_object->handlers->notify_head;
 
     for (;;) {
         if (handler == UACPI_NULL) {
             if (did_notify_root) {
-                uacpi_namespace_node_unref(ctx->node);
-                uacpi_free(ctx, sizeof(*ctx));
+                free_notification_ctx(ctx);
                 return;
             }
 
-            handler = ctx->root_handlers;
+            handler = g_uacpi_rt_ctx.root_object->handlers->notify_head;
             did_notify_root = UACPI_TRUE;
             continue;
         }
@@ -68,40 +67,49 @@ uacpi_status uacpi_notify_all(uacpi_namespace_node *node, uacpi_u64 value)
 {
     uacpi_status ret;
     struct notification_ctx *ctx;
-    uacpi_handlers *node_handlers, *root_handlers;
+    uacpi_object *node_object;
 
-    node_handlers = uacpi_node_get_handlers(node);
-    if (uacpi_unlikely(node_handlers == UACPI_NULL))
+    node_object = uacpi_namespace_node_get_object_typed(
+        node, UACPI_OBJECT_DEVICE_BIT | UACPI_OBJECT_THERMAL_ZONE_BIT |
+              UACPI_OBJECT_PROCESSOR_BIT
+    );
+    if (uacpi_unlikely(node_object == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    root_handlers = uacpi_node_get_handlers(uacpi_namespace_root());
+    ret = uacpi_acquire_native_mutex(notify_mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
-    if (node_handlers->notify_head == UACPI_NULL &&
-        root_handlers->notify_head == UACPI_NULL)
-        return UACPI_STATUS_NO_HANDLER;
+    if (node_object->handlers->notify_head == UACPI_NULL &&
+        g_uacpi_rt_ctx.root_object->handlers->notify_head == UACPI_NULL) {
+        ret = UACPI_STATUS_NO_HANDLER;
+        goto out;
+    }
 
     ctx = uacpi_kernel_alloc(sizeof(*ctx));
-    if (uacpi_unlikely(ctx == UACPI_NULL))
-        return UACPI_STATUS_OUT_OF_MEMORY;
+    if (uacpi_unlikely(ctx == UACPI_NULL)) {
+        ret = UACPI_STATUS_OUT_OF_MEMORY;
+        goto out;
+    }
 
     ctx->node = node;
     // In case this node goes out of scope
     uacpi_shareable_ref(node);
 
     ctx->value = value;
-    ctx->node_handlers = node_handlers->notify_head;
-    ctx->root_handlers = root_handlers->notify_head;
+    ctx->node_object = uacpi_namespace_node_get_object(node);
+    uacpi_object_ref(ctx->node_object);
 
     ret = uacpi_kernel_schedule_work(UACPI_WORK_NOTIFICATION, do_notify, ctx);
     if (uacpi_unlikely_error(ret)) {
         uacpi_warn("unable to schedule notification work: %s\n",
                    uacpi_status_to_string(ret));
-        uacpi_namespace_node_unref(node);
-        uacpi_free(ctx, sizeof(*ctx));
-        return ret;
+        free_notification_ctx(ctx);
     }
 
-    return UACPI_STATUS_OK;
+out:
+    uacpi_release_native_mutex(notify_mutex);
+    return ret;
 }
 
 static uacpi_device_notify_handler *handler_container(
@@ -125,14 +133,36 @@ uacpi_status uacpi_install_notify_handler(
     uacpi_handle handler_context
 )
 {
+    uacpi_status ret;
+    uacpi_object *obj;
     uacpi_handlers *handlers;
     uacpi_device_notify_handler *new_handler;
 
-    handlers = uacpi_node_get_handlers(node);
-    if (uacpi_unlikely(handlers == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    if (handler_container(handlers, handler) != UACPI_NULL)
-        return UACPI_STATUS_ALREADY_EXISTS;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
+
+    if (node == uacpi_namespace_root()) {
+        obj = g_uacpi_rt_ctx.root_object;
+    } else {
+        ret = uacpi_namespace_node_acquire_object_typed(
+            node, UACPI_OBJECT_DEVICE_BIT | UACPI_OBJECT_THERMAL_ZONE_BIT |
+                  UACPI_OBJECT_PROCESSOR_BIT, &obj
+        );
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    ret = uacpi_acquire_native_mutex(notify_mutex);
+    if (uacpi_unlikely_error(ret))
+        goto out_no_mutex;
+
+    uacpi_kernel_wait_for_work_completion();
+
+    handlers = obj->handlers;
+
+    if (handler_container(handlers, handler) != UACPI_NULL) {
+        ret = UACPI_STATUS_ALREADY_EXISTS;
+        goto out;
+    }
 
     new_handler = uacpi_kernel_calloc(1, sizeof(*new_handler));
     if (uacpi_unlikely(new_handler == UACPI_NULL))
@@ -143,23 +173,51 @@ uacpi_status uacpi_install_notify_handler(
     new_handler->next = handlers->notify_head;
 
     handlers->notify_head = new_handler;
-    return UACPI_STATUS_OK;
+
+out:
+    uacpi_release_native_mutex(notify_mutex);
+out_no_mutex:
+    if (node != uacpi_namespace_root())
+        uacpi_object_unref(obj);
+
+    return ret;
 }
 
 uacpi_status uacpi_uninstall_notify_handler(
     uacpi_namespace_node *node, uacpi_notify_handler handler
 )
 {
+    uacpi_status ret;
+    uacpi_object *obj;
     uacpi_handlers *handlers;
     uacpi_device_notify_handler *containing, *prev_handler;
 
-    handlers = uacpi_node_get_handlers(node);
-    if (uacpi_unlikely(handlers == UACPI_NULL))
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
+
+    if (node == uacpi_namespace_root()) {
+        obj = g_uacpi_rt_ctx.root_object;
+    } else {
+        ret = uacpi_namespace_node_acquire_object_typed(
+            node, UACPI_OBJECT_DEVICE_BIT | UACPI_OBJECT_THERMAL_ZONE_BIT |
+                  UACPI_OBJECT_PROCESSOR_BIT, &obj
+        );
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    ret = uacpi_acquire_native_mutex(notify_mutex);
+    if (uacpi_unlikely_error(ret))
+        goto out_no_mutex;
+
+    uacpi_kernel_wait_for_work_completion();
+
+    handlers = obj->handlers;
 
     containing = handler_container(handlers, handler);
-    if (containing == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
+    if (containing == UACPI_NULL) {
+        ret = UACPI_STATUS_NOT_FOUND;
+        goto out;
+    }
 
     prev_handler = handlers->notify_head;
 
@@ -180,6 +238,13 @@ uacpi_status uacpi_uninstall_notify_handler(
     }
 
 out:
-    uacpi_free(containing, sizeof(*containing));
-    return UACPI_STATUS_OK;
+    uacpi_release_native_mutex(notify_mutex);
+out_no_mutex:
+    if (node != uacpi_namespace_root())
+        uacpi_object_unref(obj);
+
+    if (uacpi_likely_success(ret))
+        uacpi_free(containing, sizeof(*containing));
+
+    return ret;
 }

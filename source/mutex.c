@@ -4,6 +4,7 @@
 #include <uacpi/internal/registers.h>
 #include <uacpi/internal/context.h>
 #include <uacpi/kernel_api.h>
+#include <uacpi/internal/namespace.h>
 
 #ifndef UACPI_REDUCED_HARDWARE
 
@@ -153,14 +154,14 @@ uacpi_status uacpi_acquire_global_lock(uacpi_u16 timeout, uacpi_u32 *out_seq)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     ret = uacpi_acquire_native_mutex_with_timeout(
-        g_uacpi_rt_ctx.global_lock_mutex, timeout
+        g_uacpi_rt_ctx.global_lock_mutex->handle, timeout
     );
     if (ret != UACPI_STATUS_OK)
         return ret;
 
     ret = uacpi_acquire_global_lock_from_firmware();
     if (uacpi_unlikely_error(ret)) {
-        uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+        uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex->handle);
         return ret;
     }
 
@@ -182,7 +183,7 @@ uacpi_status uacpi_release_global_lock(uacpi_u32 seq)
 
     g_uacpi_rt_ctx.global_lock_acquired = UACPI_FALSE;
     uacpi_release_global_lock_to_firmware();
-    uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+    uacpi_release_native_mutex(g_uacpi_rt_ctx.global_lock_mutex->handle);
 
     return UACPI_STATUS_OK;
 }
@@ -214,20 +215,24 @@ uacpi_status uacpi_acquire_aml_mutex(uacpi_mutex *mutex, uacpi_u16 timeout)
         return ret;
     }
 
+    uacpi_namespace_write_unlock();
     ret = uacpi_acquire_native_mutex_with_timeout(mutex->handle, timeout);
     if (ret != UACPI_STATUS_OK)
-        return ret;
+        goto out;
 
-    if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex) {
+    if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex->handle) {
         ret = uacpi_acquire_global_lock_from_firmware();
         if (uacpi_unlikely_error(ret)) {
             uacpi_release_native_mutex(mutex->handle);
-            return ret;
+            goto out;
         }
     }
 
     UACPI_ATOMIC_STORE_THREAD_ID(&mutex->owner, this_id);
     mutex->depth = 1;
+
+out:
+    uacpi_namespace_write_lock();
     return ret;
 }
 
@@ -236,7 +241,7 @@ uacpi_status uacpi_release_aml_mutex(uacpi_mutex *mutex)
     if (mutex->depth-- > 1)
         return UACPI_STATUS_OK;
 
-    if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex)
+    if (mutex->handle == g_uacpi_rt_ctx.global_lock_mutex->handle)
         uacpi_release_global_lock_to_firmware();
 
     UACPI_ATOMIC_STORE_THREAD_ID(&mutex->owner, UACPI_THREAD_ID_NONE);

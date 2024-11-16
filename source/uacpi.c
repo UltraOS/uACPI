@@ -11,6 +11,7 @@
 #include <uacpi/internal/opregion.h>
 #include <uacpi/internal/registers.h>
 #include <uacpi/internal/event.h>
+#include <uacpi/internal/notify.h>
 #include <uacpi/internal/osi.h>
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
@@ -20,6 +21,7 @@ void uacpi_state_reset(void)
     uacpi_deinitialize_namespace();
     uacpi_deinitialize_interfaces();
     uacpi_deinitialize_events();
+    uacpi_deinitialize_notify();
     uacpi_deinitialize_tables();
 
 #ifndef UACPI_REDUCED_HARDWARE
@@ -294,6 +296,10 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 
+    ret = uacpi_initialize_notify();
+    if (uacpi_unlikely_error(ret))
+        goto out_fatal_error;
+
     uacpi_install_default_address_space_handlers();
 
     if (!uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE)) {
@@ -450,38 +456,34 @@ static uacpi_status sta_eval(
 }
 
 static enum uacpi_ns_iteration_decision do_sta_ini(
-    void *opaque, uacpi_namespace_node *node
+    void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     struct ns_init_context *ctx = opaque;
     uacpi_status ret;
+    uacpi_object_type type = UACPI_OBJECT_UNINITIALIZED;
     uacpi_u32 sta_ret;
-    uacpi_bool is_sb;
-    uacpi_object *obj;
+
+    UACPI_UNUSED(depth);
 
     // We don't care about aliases
     if (node->flags & UACPI_NAMESPACE_NODE_FLAG_ALIAS)
         return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
 
-    is_sb = node == uacpi_namespace_get_predefined(
-        UACPI_PREDEFINED_NAMESPACE_SB
-    );
-
-    obj = uacpi_namespace_node_get_object(node);
-    if (node != uacpi_namespace_root() && !is_sb) {
-        switch (obj->type) {
-        case UACPI_OBJECT_DEVICE:
-            ctx->devices++;
-            break;
-        case UACPI_OBJECT_THERMAL_ZONE:
-            ctx->thermal_zones++;
-            break;
-        case UACPI_OBJECT_PROCESSOR:
-            ctx->processors++;
-            break;
-        default:
-            return UACPI_NS_ITERATION_DECISION_CONTINUE;
-        }
+    ret = uacpi_namespace_node_type(node, &type);
+    switch (type) {
+    case UACPI_OBJECT_DEVICE:
+        ctx->devices++;
+        break;
+    case UACPI_OBJECT_THERMAL_ZONE:
+        ctx->thermal_zones++;
+        break;
+    case UACPI_OBJECT_PROCESSOR:
+        ctx->processors++;
+        break;
+    default:
+        if (node != uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_TZ))
+            return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     ret = sta_eval(ctx, node, &sta_ret);
@@ -504,8 +506,7 @@ static enum uacpi_ns_iteration_decision do_sta_ini(
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
     }
 
-    if (node != uacpi_namespace_root() && !is_sb)
-        ini_eval(ctx, node);
+    ini_eval(ctx, node);
 
     return UACPI_NS_ITERATION_DECISION_CONTINUE;
 }
@@ -557,7 +558,10 @@ uacpi_status uacpi_namespace_initialize(void)
     }
 
     // Step 4 - Run all other _STA and _INI methods
-    uacpi_namespace_for_each_node_depth_first(root, do_sta_ini, &ctx);
+    uacpi_namespace_for_each_child(
+        root, do_sta_ini, UACPI_NULL,
+        UACPI_OBJECT_ANY_BIT, UACPI_MAX_DEPTH_ANY, &ctx
+    );
 
     uacpi_info(
         "namespace initialization done: "
@@ -581,35 +585,70 @@ out:
     return ret;
 }
 
-uacpi_status
-uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
-           const uacpi_object_array *args, uacpi_object **ret)
+uacpi_status uacpi_eval(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **out_obj
+)
 {
     struct uacpi_namespace_node *node;
+    uacpi_control_method *method;
     uacpi_object *obj;
+    uacpi_status ret = UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (parent == UACPI_NULL && path == UACPI_NULL)
-        return UACPI_STATUS_INVALID_ARGUMENT;
+    if (uacpi_unlikely(parent == UACPI_NULL && path == UACPI_NULL))
+        return ret;
+
+    ret = uacpi_namespace_read_lock();
+    if (uacpi_unlikely_error(ret))
+        return ret;
 
     if (path != UACPI_NULL) {
-        node = uacpi_namespace_node_find(parent, path);
-        if (node == UACPI_NULL)
-            return UACPI_STATUS_NOT_FOUND;
+        ret = uacpi_namespace_node_resolve(
+            parent, path, UACPI_SHOULD_LOCK_NO,
+            UACPI_MAY_SEARCH_ABOVE_PARENT_NO, UACPI_PERMANENT_ONLY_YES,
+            &node
+        );
+        if (uacpi_unlikely_error(ret))
+            goto out_read_unlock;
     } else {
         node = parent;
     }
 
     obj = uacpi_namespace_node_get_object(node);
     if (obj->type != UACPI_OBJECT_METHOD) {
-        if (uacpi_likely(ret != UACPI_NULL)) {
-            *ret = obj;
-            uacpi_object_ref(obj);
+        if (uacpi_likely(out_obj == UACPI_NULL))
+            goto out_read_unlock;
+
+        *out_obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+        if (uacpi_unlikely(*out_obj == UACPI_NULL)) {
+            ret = UACPI_STATUS_OUT_OF_MEMORY;
+            goto out_read_unlock;
         }
 
-        return UACPI_STATUS_OK;
+        ret = uacpi_object_assign(
+            *out_obj, obj, UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
+        );
+
+    out_read_unlock:
+        uacpi_namespace_read_unlock();
+        return ret;
     }
 
-    return uacpi_execute_control_method(node, obj->method, args, ret);
+    method = obj->method;
+    uacpi_shareable_ref(method);
+    uacpi_namespace_read_unlock();
+
+    // Upgrade to a write-lock since we're about to run a method
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        goto out_no_write_lock;
+
+    ret = uacpi_execute_control_method(node, method, args, out_obj);
+    uacpi_namespace_write_unlock();
+
+out_no_write_lock:
+    uacpi_method_unref(method);
+    return ret;
 }
 
 #define TRACE_BAD_RET(path_fmt, type, ...)                                 \

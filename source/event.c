@@ -375,20 +375,26 @@ static void async_run_gpe_handler(uacpi_handle opaque)
     uacpi_status ret;
     struct gp_event *event = opaque;
 
+    ret = uacpi_namespace_write_lock();
+    if (uacpi_unlikely_error(ret))
+        goto out;
+
     switch (event->handler_type) {
     case GPE_HANDLER_TYPE_AML_HANDLER: {
         uacpi_object *method_obj;
 
-        method_obj = uacpi_namespace_node_get_object(event->aml_handler);
-        if (uacpi_unlikely(method_obj == UACPI_NULL ||
-                           method_obj->type != UACPI_OBJECT_METHOD)) {
-            uacpi_error("GPE(%02X) has invalid or deleted AML handler\n",
-                        event->idx);
+        method_obj = uacpi_namespace_node_get_object_typed(
+            event->aml_handler, UACPI_OBJECT_METHOD_BIT
+        );
+        if (uacpi_unlikely(method_obj == UACPI_NULL)) {
+            uacpi_error("GPE(%02X) AML handler gone\n", event->idx);
             break;
         }
 
-        uacpi_trace("executing GPE(%02X) handler %.4s\n",
-                    event->idx, event->aml_handler->name.text);
+        uacpi_trace(
+            "executing GPE(%02X) handler %.4s\n",
+            event->idx, uacpi_namespace_node_name(event->aml_handler).text
+        );
 
         ret = uacpi_execute_control_method(
             event->aml_handler, method_obj->method, UACPI_NULL, UACPI_NULL
@@ -399,8 +405,8 @@ static void async_run_gpe_handler(uacpi_handle opaque)
                 event->idx, event->aml_handler->name.text,
                 uacpi_status_to_string(ret)
             );
-            break;
         }
+        uacpi_object_unref(method_obj);
         break;
     }
 
@@ -423,6 +429,10 @@ static void async_run_gpe_handler(uacpi_handle opaque)
     default:
         break;
     }
+
+out:
+    if (uacpi_likely_success(ret))
+        uacpi_namespace_write_unlock();
 
     /*
      * We schedule the work as NOTIFICATION to make sure all other notifications
@@ -749,19 +759,16 @@ struct gpe_match_ctx {
 };
 
 static uacpi_ns_iteration_decision do_match_gpe_methods(
-    uacpi_handle opaque, uacpi_namespace_node *node
+    uacpi_handle opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     uacpi_status ret;
     struct gpe_match_ctx *ctx = opaque;
     struct gp_event *event;
-    uacpi_object *object;
     uacpi_u8 triggering;
     uacpi_u64 idx;
 
-    object = uacpi_namespace_node_get_object(node);
-    if (object->type != UACPI_OBJECT_METHOD)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    UACPI_UNUSED(depth);
 
     if (node->name.text[0] != '_')
         return UACPI_NS_ITERATION_DECISION_CONTINUE;
@@ -842,9 +849,10 @@ uacpi_status uacpi_events_match_post_dynamic_table_load(void)
         match_ctx.block = irq_ctx->gpe_head;
 
         while (match_ctx.block) {
-            uacpi_namespace_for_each_node_depth_first(
-                match_ctx.block->device_node, do_match_gpe_methods,
-                &match_ctx
+            uacpi_namespace_do_for_each_child(
+                match_ctx.block->device_node, do_match_gpe_methods, UACPI_NULL,
+                UACPI_OBJECT_METHOD_BIT, UACPI_MAX_DEPTH_ANY,
+                UACPI_SHOULD_LOCK_NO, UACPI_PERMANENT_ONLY_YES, &match_ctx
             );
             match_ctx.block = match_ctx.block->next;
         }
@@ -938,8 +946,10 @@ static uacpi_status create_gpe_block(
     block->irq_ctx->gpe_head = block;
     match_ctx.block = block;
 
-    uacpi_namespace_for_each_node_depth_first(
-        device_node, do_match_gpe_methods, &match_ctx
+    uacpi_namespace_do_for_each_child(
+        device_node, do_match_gpe_methods, UACPI_NULL,
+        UACPI_OBJECT_METHOD_BIT, UACPI_MAX_DEPTH_ANY,
+        UACPI_SHOULD_LOCK_YES, UACPI_PERMANENT_ONLY_YES, &match_ctx
     );
 
     uacpi_trace("initialized GPE block %.4s[%d->%d], %d AML handlers (IRQ %d)\n",

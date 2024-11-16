@@ -86,10 +86,8 @@ static void validate_ret_against_expected(
 
 static void enumerate_namespace()
 {
-    auto dump_one_node = [](void*, uacpi_namespace_node *node) {
+    auto dump_one_node = [](void*, uacpi_namespace_node *node, uacpi_u32 depth) {
         uacpi_namespace_node_info *info;
-
-        auto depth = uacpi_namespace_node_depth(node);
 
         auto nested_printf = [depth](const char *fmt, ...) {
             va_list va;
@@ -189,8 +187,8 @@ static void enumerate_namespace()
 
     auto *root = uacpi_namespace_root();
 
-    dump_one_node(nullptr, root);
-    uacpi_namespace_for_each_node_depth_first(root, dump_one_node, nullptr);
+    dump_one_node(nullptr, root, 0);
+    uacpi_namespace_for_each_child_simple(root, dump_one_node, nullptr);
 }
 
 /*
