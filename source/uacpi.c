@@ -421,7 +421,6 @@ struct ns_init_context {
     uacpi_size sta_errors;
     uacpi_size devices;
     uacpi_size thermal_zones;
-    uacpi_size processors;
 };
 
 static void ini_eval(struct ns_init_context *ctx, uacpi_namespace_node *node)
@@ -473,13 +472,11 @@ static uacpi_iteration_decision do_sta_ini(
     ret = uacpi_namespace_node_type(node, &type);
     switch (type) {
     case UACPI_OBJECT_DEVICE:
+    case UACPI_OBJECT_PROCESSOR:
         ctx->devices++;
         break;
     case UACPI_OBJECT_THERMAL_ZONE:
         ctx->thermal_zones++;
-        break;
-    case UACPI_OBJECT_PROCESSOR:
-        ctx->processors++;
         break;
     default:
         if (node != uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_TZ))
@@ -565,8 +562,8 @@ uacpi_status uacpi_namespace_initialize(void)
 
     uacpi_info(
         "namespace initialization done: "
-        "%zu devices, %zu thermal zones, %zu processors\n",
-        ctx.devices, ctx.thermal_zones, ctx.processors
+        "%zu devices, %zu thermal zones\n",
+        ctx.devices, ctx.thermal_zones
     );
 
     uacpi_trace(
