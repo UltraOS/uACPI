@@ -117,8 +117,24 @@ uacpi_init_level uacpi_get_current_init_level(void);
  * A value of NULL for 'parent' implies uacpi_namespace_root() relative
  * lookups, unless 'path' is already absolute.
  */
-uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
-                        const uacpi_object_array *args, uacpi_object **ret);
+uacpi_status uacpi_eval(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+);
+uacpi_status uacpi_eval_simple(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+);
+
+/*
+ * Same as uacpi_eval() but without a return value.
+ */
+uacpi_status uacpi_execute(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args
+);
+uacpi_status uacpi_execute_simple(
+    uacpi_namespace_node *parent, const uacpi_char *path
+);
 
 /*
  * Same as uacpi_eval, but the return value type is validated against
@@ -129,6 +145,9 @@ uacpi_status uacpi_eval_typed(
     const uacpi_object_array *args, uacpi_object_type_bits ret_mask,
     uacpi_object **ret
 );
+uacpi_status uacpi_eval_simple_typed(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_object_type_bits ret_mask, uacpi_object **ret
 );
 
 /*
@@ -137,6 +156,62 @@ uacpi_status uacpi_eval_typed(
 uacpi_status uacpi_eval_integer(
     uacpi_namespace_node *parent, const uacpi_char *path,
     const uacpi_object_array *args, uacpi_u64 *out_value
+);
+uacpi_status uacpi_eval_simple_integer(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_u64 *out_value
+);
+
+/*
+ * A shorthand for uacpi_eval_typed with
+ *     UACPI_OBJECT_BUFFER_BIT | UACPI_OBJECT_STRING_BIT
+ *
+ * Use uacpi_object_get_string_or_buffer to retrieve the resulting buffer data.
+ */
+uacpi_status uacpi_eval_buffer_or_string(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+);
+uacpi_status uacpi_eval_simple_buffer_or_string(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+);
+
+/*
+ * A shorthand for uacpi_eval_typed with UACPI_OBJECT_STRING_BIT.
+ *
+ * Use uacpi_object_get_string to retrieve the resulting buffer data.
+ */
+uacpi_status uacpi_eval_string(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+);
+uacpi_status uacpi_eval_simple_string(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+);
+
+/*
+ * A shorthand for uacpi_eval_typed with UACPI_OBJECT_BUFFER_BIT.
+ *
+ * Use uacpi_object_get_buffer to retrieve the resulting buffer data.
+ */
+uacpi_status uacpi_eval_buffer(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+);
+uacpi_status uacpi_eval_simple_buffer(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+);
+
+/*
+ * A shorthand for uacpi_eval_typed with UACPI_OBJECT_PACKAGE_BIT.
+ *
+ * Use uacpi_object_get_package to retrieve the resulting object array.
+ */
+uacpi_status uacpi_eval_package(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+);
+uacpi_status uacpi_eval_simple_package(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
 );
 
 /*
