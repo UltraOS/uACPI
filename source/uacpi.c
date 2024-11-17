@@ -663,7 +663,7 @@ out_no_write_lock:
 
 static void trace_invalid_return_type(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    uacpi_u32 expected_mask, uacpi_object_type actual_type
+    uacpi_object_type_bits expected_mask, uacpi_object_type actual_type
 )
 {
     const uacpi_char *abs_path;
@@ -695,7 +695,8 @@ static void trace_invalid_return_type(
 
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_object_array *args, uacpi_u32 ret_mask, uacpi_object **out_obj
+    const uacpi_object_array *args, uacpi_object_type_bits ret_mask,
+    uacpi_object **out_obj
 )
 {
     uacpi_status ret;

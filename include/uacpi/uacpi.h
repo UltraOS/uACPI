@@ -126,7 +126,9 @@ uacpi_status uacpi_eval(uacpi_namespace_node *parent, const uacpi_char *path,
  */
 uacpi_status uacpi_eval_typed(
     uacpi_namespace_node *parent, const uacpi_char *path,
-    const uacpi_object_array *args, uacpi_u32 ret_mask, uacpi_object **ret
+    const uacpi_object_array *args, uacpi_object_type_bits ret_mask,
+    uacpi_object **ret
+);
 );
 
 /*
