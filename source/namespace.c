@@ -307,6 +307,11 @@ uacpi_status uacpi_namespace_node_install(
     return UACPI_STATUS_OK;
 }
 
+uacpi_bool uacpi_namespace_node_is_alias(uacpi_namespace_node *node)
+{
+    return node->flags & UACPI_NAMESPACE_NODE_FLAG_ALIAS;
+}
+
 uacpi_bool uacpi_namespace_node_is_dangling(uacpi_namespace_node *node)
 {
     return node->flags & UACPI_NAMESPACE_NODE_FLAG_DANGLING;

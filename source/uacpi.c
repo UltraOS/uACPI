@@ -467,7 +467,7 @@ static uacpi_iteration_decision do_sta_ini(
     UACPI_UNUSED(depth);
 
     // We don't care about aliases
-    if (node->flags & UACPI_NAMESPACE_NODE_FLAG_ALIAS)
+    if (uacpi_namespace_node_is_alias(node))
         return UACPI_ITERATION_DECISION_NEXT_PEER;
 
     ret = uacpi_namespace_node_type(node, &type);
