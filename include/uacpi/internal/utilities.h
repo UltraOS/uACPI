@@ -41,3 +41,5 @@ uacpi_status uacpi_string_to_integer(
 uacpi_bool uacpi_is_valid_nameseg(uacpi_u8 *nameseg);
 
 void uacpi_free_dynamic_string(const uacpi_char *str);
+
+#define UACPI_NANOSECONDS_PER_SEC (1000ull * 1000ull * 1000ull)

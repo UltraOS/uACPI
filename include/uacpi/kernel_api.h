@@ -145,10 +145,10 @@ void uacpi_kernel_vlog(uacpi_log_level, const uacpi_char*, uacpi_va_list);
 #endif
 
 /*
- * Returns the number of 100 nanosecond ticks elapsed since boot,
+ * Returns the number of nanosecond ticks elapsed since boot,
  * strictly monotonic.
  */
-uacpi_u64 uacpi_kernel_get_ticks(void);
+uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void);
 
 /*
  * Spin for N microseconds.

@@ -326,8 +326,10 @@ void uacpi_kernel_log(enum uacpi_log_level lvl, const char* text)
 }
 #endif
 
+[[maybe_unused]]
+constexpr auto nanoseconds_per_second = 1000ull * 1000ull * 1000ull;
 
-uacpi_u64 uacpi_kernel_get_ticks(void)
+uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void)
 {
 #ifdef _WIN32
     static LARGE_INTEGER frequency;
@@ -345,13 +347,11 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
         std::abort();
     }
 
-    // Convert to 100 nanoseconds
-    counter.QuadPart *= 10000000;
+    counter.QuadPart *= nanoseconds_per_second;
     return counter.QuadPart / frequency.QuadPart;
 #elif defined(__APPLE__)
     static struct mach_timebase_info tb;
     static bool initialized;
-    uacpi_u64 nanoseconds;
 
     if (!initialized) {
         if (mach_timebase_info(&tb) != KERN_SUCCESS) {
@@ -361,8 +361,7 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
         initialized = true;
     }
 
-    nanoseconds = (mach_absolute_time() * tb.numer) / tb.denom;
-    return nanoseconds / 100;
+    return (mach_absolute_time() * tb.numer) / tb.denom;
 #else
     struct timespec ts;
 
@@ -371,7 +370,7 @@ uacpi_u64 uacpi_kernel_get_ticks(void)
         std::abort();
     }
 
-    return (ts.tv_nsec + ts.tv_sec * 1000000000ull) / 100;
+    return ts.tv_nsec + ts.tv_sec * nanoseconds_per_second;
 #endif
 }
 
