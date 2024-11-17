@@ -645,13 +645,8 @@ typedef struct uacpi_resources {
 } uacpi_resources;
 void uacpi_free_resources(uacpi_resources*);
 
-typedef enum uacpi_resource_iteration_decision {
-    UACPI_RESOURCE_ITERATION_ABORT,
-    UACPI_RESOURCE_ITERATION_CONTINUE,
-} uacpi_resource_iteration_decision;
-
-typedef uacpi_resource_iteration_decision
-    (*uacpi_resource_iteration_callback)(void *user, uacpi_resource *resource);
+typedef uacpi_iteration_decision (*uacpi_resource_iteration_callback)
+    (void *user, uacpi_resource *resource);
 
 uacpi_status uacpi_get_current_resources(
     uacpi_namespace_node *device, uacpi_resources **out_resources

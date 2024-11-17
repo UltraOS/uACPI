@@ -758,7 +758,7 @@ struct gpe_match_ctx {
     uacpi_bool post_dynamic_table_load;
 };
 
-static uacpi_ns_iteration_decision do_match_gpe_methods(
+static uacpi_iteration_decision do_match_gpe_methods(
     uacpi_handle opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
@@ -771,7 +771,7 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
     UACPI_UNUSED(depth);
 
     if (node->name.text[0] != '_')
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     switch (node->name.text[1]) {
     case 'L':
@@ -781,18 +781,18 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
         triggering = UACPI_GPE_TRIGGERING_EDGE;
         break;
     default:
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     ret = uacpi_string_to_integer(&node->name.text[2], 2, UACPI_BASE_HEX, &idx);
     if (uacpi_unlikely_error(ret)) {
         uacpi_trace("invalid GPE method name %.4s, ignored\n", node->name.text);
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     event = gpe_from_block(ctx->block, idx);
     if (event == UACPI_NULL)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     switch (event->handler_type) {
     /*
@@ -816,7 +816,7 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
                 (uacpi_u32)idx, event->aml_handler->name.text, node->name.text
             );
         }
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     case GPE_HANDLER_TYPE_NATIVE_HANDLER:
     case GPE_HANDLER_TYPE_NATIVE_HANDLER_RAW:
@@ -826,7 +826,7 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
         );
         UACPI_FALLTHROUGH;
     default:
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     uacpi_trace("assigned GPE(%02X) -> %.4s\n",
@@ -834,7 +834,7 @@ static uacpi_ns_iteration_decision do_match_gpe_methods(
     event->triggering = triggering;
     ctx->matched_count++;
 
-    return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_events_match_post_dynamic_table_load(void)
@@ -962,19 +962,14 @@ error_out:
     return ret;
 }
 
-enum gpe_block_iteration_decision {
-    GPE_BLOCK_ITERATION_DECISION_BREAK,
-    GPE_BLOCK_ITERATION_DECISION_CONTINUE,
-};
-
-typedef enum gpe_block_iteration_decision
-    (*gpe_block_iteration_callback)(struct gpe_block*, uacpi_handle);
+typedef uacpi_iteration_decision (*gpe_block_iteration_callback)
+    (struct gpe_block*, uacpi_handle);
 
 static void for_each_gpe_block(
     gpe_block_iteration_callback cb, uacpi_handle handle
 )
 {
-    enum gpe_block_iteration_decision decision;
+    uacpi_iteration_decision decision;
     struct gpe_interrupt_ctx *irq_ctx = gpe_interrupt_head;
     struct gpe_block *block;
 
@@ -983,7 +978,7 @@ static void for_each_gpe_block(
 
         while (block) {
             decision = cb(block, handle);
-            if (decision == GPE_BLOCK_ITERATION_DECISION_BREAK)
+            if (decision == UACPI_ITERATION_DECISION_BREAK)
                 return;
 
             block = block->next;
@@ -1000,21 +995,21 @@ struct gpe_search_ctx {
     struct gp_event *out_event;
 };
 
-static enum gpe_block_iteration_decision do_find_gpe(
+static uacpi_iteration_decision do_find_gpe(
     struct gpe_block *block, uacpi_handle opaque
 )
 {
     struct gpe_search_ctx *ctx = opaque;
 
     if (block->device_node != ctx->gpe_device)
-        return GPE_BLOCK_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     ctx->out_block = block;
     ctx->out_event = gpe_from_block(block, ctx->idx);
     if (ctx->out_event == UACPI_NULL)
-        return GPE_BLOCK_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
-    return GPE_BLOCK_ITERATION_DECISION_BREAK;
+    return UACPI_ITERATION_DECISION_BREAK;
 }
 
 static struct gp_event *get_gpe(
@@ -1180,7 +1175,7 @@ static uacpi_bool gpe_needs_polling(struct gp_event *event)
     return event->num_users && event->triggering == UACPI_GPE_TRIGGERING_EDGE;
 }
 
-static enum gpe_block_iteration_decision do_initialize_gpe_block(
+static uacpi_iteration_decision do_initialize_gpe_block(
     struct gpe_block *block, uacpi_handle opaque
 )
 {
@@ -1216,7 +1211,7 @@ static enum gpe_block_iteration_decision do_initialize_gpe_block(
             block->base_idx, block->base_idx + block->num_events
         );
     }
-    return GPE_BLOCK_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_finalize_gpe_initialization(void)
@@ -1582,7 +1577,7 @@ struct do_for_all_gpes_ctx {
     uacpi_status ret;
 };
 
-static enum gpe_block_iteration_decision do_for_all_gpes(
+static uacpi_iteration_decision do_for_all_gpes(
     struct gpe_block *block, uacpi_handle opaque
 )
 {
@@ -1607,7 +1602,7 @@ static enum gpe_block_iteration_decision do_for_all_gpes(
         case GPE_BLOCK_ACTION_CLEAR_ALL:
             ctx->ret = uacpi_gas_write(&reg->status, 0xFF);
             if (uacpi_unlikely_error(ctx->ret))
-                return GPE_BLOCK_ITERATION_DECISION_BREAK;
+                return UACPI_ITERATION_DECISION_BREAK;
             continue;
         default:
             continue;
@@ -1616,10 +1611,10 @@ static enum gpe_block_iteration_decision do_for_all_gpes(
         reg->current_mask = value;
         ctx->ret = uacpi_gas_write(&reg->enable, value);
         if (uacpi_unlikely_error(ctx->ret))
-            return GPE_BLOCK_ITERATION_DECISION_BREAK;
+            return UACPI_ITERATION_DECISION_BREAK;
     }
 
-    return GPE_BLOCK_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_disable_all_gpes(void)

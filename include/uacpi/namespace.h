@@ -88,21 +88,7 @@ uacpi_status uacpi_namespace_node_resolve_from_aml_namepath(
     uacpi_namespace_node **out_node
 );
 
-typedef enum uacpi_ns_iteration_decision {
-    // Continue to the next child of this node
-    UACPI_NS_ITERATION_DECISION_CONTINUE,
-
-    /*
-     * Don't go any deeper, instead continue to the next peer of the
-     * parent node currently being iterated.
-     */
-    UACPI_NS_ITERATION_DECISION_NEXT_PEER,
-
-    // Abort iteration
-    UACPI_NS_ITERATION_DECISION_BREAK,
-} uacpi_ns_iteration_decision;
-
-typedef uacpi_ns_iteration_decision (*uacpi_iteration_callback) (
+typedef uacpi_iteration_decision (*uacpi_iteration_callback) (
     void *user, uacpi_namespace_node *node, uacpi_u32 node_depth
 );
 

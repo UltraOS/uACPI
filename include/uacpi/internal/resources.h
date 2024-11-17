@@ -301,8 +301,7 @@ struct uacpi_resource_spec {
     const struct uacpi_resource_convert_instruction *to_aml;
 };
 
-typedef uacpi_resource_iteration_decision
-(*uacpi_aml_resource_iteration_callback) (
+typedef uacpi_iteration_decision (*uacpi_aml_resource_iteration_callback)(
     void*, uacpi_u8 *data, uacpi_u16 resource_size,
     const struct uacpi_resource_spec*
 );

@@ -331,7 +331,7 @@ struct opregion_iter_ctx {
     uacpi_address_space_handler *handler;
 };
 
-static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
+static uacpi_iteration_decision do_install_or_uninstall_handler(
     uacpi_handle opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
@@ -346,7 +346,7 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
         uacpi_operation_region *region = object->op_region;
 
         if (region->space != ctx->handler->space)
-            return UACPI_NS_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
 
         if (ctx->action == OPREGION_ITER_ACTION_INSTALL) {
             if (region->handler)
@@ -359,24 +359,24 @@ static enum uacpi_ns_iteration_decision do_install_or_uninstall_handler(
                     node, "handler mismatch for",
                     UACPI_STATUS_INTERNAL_ERROR
                 );
-                return UACPI_NS_ITERATION_DECISION_CONTINUE;
+                return UACPI_ITERATION_DECISION_CONTINUE;
             }
 
             region_uninstall_handler(node, UNREG_NO);
         }
 
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     handlers = uacpi_node_get_address_space_handlers(node);
     if (handlers == UACPI_NULL)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     // Device already has a handler for this space installed
     if (find_handler(handlers, ctx->handler->space) != UACPI_NULL)
-        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+        return UACPI_ITERATION_DECISION_NEXT_PEER;
 
-    return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 void uacpi_opregion_reg(uacpi_namespace_node *node)
@@ -401,7 +401,7 @@ struct reg_run_ctx {
     uacpi_size reg_errors;
 };
 
-enum uacpi_ns_iteration_decision do_run_reg(
+uacpi_iteration_decision do_run_reg(
     void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
@@ -415,28 +415,28 @@ enum uacpi_ns_iteration_decision do_run_reg(
     region = uacpi_namespace_node_get_object(node)->op_region;
 
     if (region->space != ctx->space)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     was_regged = region->state_flags & UACPI_OP_REGION_STATE_REG_EXECUTED;
     if (was_regged == (ctx->connection_code == ACPI_REG_CONNECT))
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     ret = region_run_reg(node, ctx->connection_code);
     if (ret == UACPI_STATUS_NOT_FOUND)
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     ctx->reg_executed++;
 
     if (uacpi_unlikely_error(ret)) {
         ctx->reg_errors++;
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     if (ctx->connection_code == ACPI_REG_CONNECT)
         region->state_flags |= UACPI_OP_REGION_STATE_REG_EXECUTED;
     else
         region->state_flags &= ~UACPI_OP_REGION_STATE_REG_EXECUTED;
-    return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 static uacpi_status reg_or_unreg_all_opregions(

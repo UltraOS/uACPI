@@ -48,11 +48,7 @@ uacpi_status uacpi_table_load_with_cause(
     uacpi_size idx, enum uacpi_table_load_cause cause
 );
 
-enum uacpi_table_iteration_decision {
-    UACPI_TABLE_ITERATION_DECISION_CONTINUE,
-    UACPI_TABLE_ITERATION_DECISION_BREAK,
-};
-typedef enum uacpi_table_iteration_decision (*uacpi_table_iteration_callback)
+typedef uacpi_iteration_decision (*uacpi_table_iteration_callback)
     (void *user, struct uacpi_installed_table *tbl, uacpi_size idx);
 
 uacpi_status uacpi_for_each_table(

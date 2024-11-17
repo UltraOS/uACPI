@@ -1417,7 +1417,7 @@ uacpi_status uacpi_for_each_aml_resource(
 )
 {
     uacpi_status ret;
-    uacpi_resource_iteration_decision decision;
+    uacpi_iteration_decision decision;
     uacpi_u8 *data;
     uacpi_size bytes_left;
     uacpi_u16 resource_size;
@@ -1467,9 +1467,9 @@ uacpi_status uacpi_for_each_aml_resource(
 
         decision = cb(user, data, resource_size, spec);
         switch (decision) {
-        case UACPI_RESOURCE_ITERATION_ABORT:
+        case UACPI_ITERATION_DECISION_BREAK:
             return UACPI_STATUS_OK;
-        case UACPI_RESOURCE_ITERATION_CONTINUE: {
+        case UACPI_ITERATION_DECISION_CONTINUE: {
             uacpi_size total_size = resource_size;
 
             total_size += aml_resource_kind_to_header_size[spec->resource_kind];
@@ -1488,7 +1488,7 @@ uacpi_status uacpi_for_each_aml_resource(
     return UACPI_STATUS_NO_RESOURCE_END_TAG;
 }
 
-static uacpi_resource_iteration_decision find_end(
+static uacpi_iteration_decision find_end(
     void *opaque, uacpi_u8 *data, uacpi_u16 resource_size,
     const struct uacpi_resource_spec *spec
 )
@@ -1497,10 +1497,10 @@ static uacpi_resource_iteration_decision find_end(
     UACPI_UNUSED(resource_size);
 
     if (spec->type != UACPI_AML_RESOURCE_END_TAG)
-        return UACPI_RESOURCE_ITERATION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     *out_ptr = data;
-    return UACPI_RESOURCE_ITERATION_ABORT;
+    return UACPI_ITERATION_DECISION_BREAK;
 }
 
 static uacpi_size native_size_for_aml_resource(
@@ -1552,7 +1552,7 @@ struct resource_conversion_ctx {
 // Opcodes that are the same for both AML->native and native->AML
 #define CONVERSION_OPCODES_COMMON(native_buf)                                \
     case UACPI_RESOURCE_CONVERT_OPCODE_END:                                  \
-        return UACPI_RESOURCE_ITERATION_CONTINUE;                            \
+        return UACPI_ITERATION_DECISION_CONTINUE;                            \
                                                                              \
     case UACPI_RESOURCE_CONVERT_OPCODE_FIELD_8:                              \
     case UACPI_RESOURCE_CONVERT_OPCODE_FIELD_16:                             \
@@ -1614,7 +1614,7 @@ struct resource_conversion_ctx {
             uacpi_error("tried to execute unreachable conversion opcode\n"); \
         }                                                                    \
         ctx->st = UACPI_STATUS_INTERNAL_ERROR;                               \
-        return UACPI_RESOURCE_ITERATION_ABORT;
+        return UACPI_ITERATION_DECISION_BREAK;
 
 #define PTR_AT(ptr, offset) (void*)((uacpi_u8*)(ptr) + (offset))
 
@@ -1629,7 +1629,7 @@ struct resource_conversion_ctx {
         uacpi_error(prefix what " is OOB: %zu > %u\n",                       \
                     (uacpi_size)offset, (uacpi_u32)aml_size + header_size);  \
         ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                         \
-        return UACPI_RESOURCE_ITERATION_ABORT;                               \
+        return UACPI_ITERATION_DECISION_BREAK;                               \
     }
 
 #define CHECK_AML_OFFSET_BASE(offset, what)                             \
@@ -1638,7 +1638,7 @@ struct resource_conversion_ctx {
             "invalid " what " offset: %zu, expected at least %u\n",     \
             (uacpi_size)offset, base_aml_size_with_header);             \
         ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;                    \
-        return UACPI_RESOURCE_ITERATION_ABORT;                          \
+        return UACPI_ITERATION_DECISION_BREAK;                          \
     }
 
 #define CHECK_AML_OFFSET(offset, what)     \
@@ -1653,7 +1653,7 @@ static uacpi_resource_type aml_serial_to_native_type(
            UACPI_RESOURCE_TYPE_SERIAL_I2C_CONNECTION;
 }
 
-static uacpi_resource_iteration_decision do_aml_resource_to_native(
+static uacpi_iteration_decision do_aml_resource_to_native(
     void *opaque, uacpi_u8 *data, uacpi_u16 aml_size,
     const struct uacpi_resource_spec *spec
 )
@@ -1679,7 +1679,7 @@ static uacpi_resource_iteration_decision do_aml_resource_to_native(
     base_aml_size_with_header += header_size;
 
     if (insns == UACPI_NULL)
-        return UACPI_RESOURCE_ITERATION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     for (;;) {
         insn = &insns[pc++];
@@ -1786,7 +1786,7 @@ static uacpi_resource_iteration_decision do_aml_resource_to_native(
             if (src_string[length - 1] != '\0') {
                 uacpi_error("non-null-terminated resource source string\n");
                 ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;
-                return UACPI_RESOURCE_ITERATION_ABORT;
+                return UACPI_ITERATION_DECISION_BREAK;
             }
 
             dst_string = PTR_AT(resource_end, accumulator);
@@ -1892,7 +1892,7 @@ static uacpi_resource_iteration_decision do_aml_resource_to_native(
                     "expected at least %d\n", type_length, extra_size
                 );
                 ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;
-                return UACPI_RESOURCE_ITERATION_ABORT;
+                return UACPI_ITERATION_DECISION_BREAK;
             }
 
             /*
@@ -1936,7 +1936,7 @@ static uacpi_status aml_resources_to_native(
     return ctx.st;
 }
 
-static uacpi_resource_iteration_decision accumulate_native_buffer_size(
+static uacpi_iteration_decision accumulate_native_buffer_size(
     void *opaque, uacpi_u8 *data, uacpi_u16 resource_size,
     const struct uacpi_resource_spec *spec
 )
@@ -1949,11 +1949,11 @@ static uacpi_resource_iteration_decision accumulate_native_buffer_size(
         uacpi_error("invalid native size for aml resource: %zu\n",
                     size_for_this);
         ctx->st = UACPI_STATUS_AML_INVALID_RESOURCE;
-        return UACPI_RESOURCE_ITERATION_ABORT;
+        return UACPI_ITERATION_DECISION_BREAK;
     }
 
     ctx->size += size_for_this;
-    return UACPI_RESOURCE_ITERATION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 static uacpi_status eval_resource_helper(
@@ -2057,7 +2057,7 @@ uacpi_status uacpi_for_each_resource(
 {
     uacpi_size bytes_left = resources->length;
     uacpi_resource *current = resources->entries;
-    uacpi_resource_iteration_decision decision;
+    uacpi_iteration_decision decision;
 
     while (bytes_left) {
         // At least the head bytes
@@ -2080,7 +2080,7 @@ uacpi_status uacpi_for_each_resource(
 
         decision = cb(user, current);
 
-        if (decision == UACPI_RESOURCE_ITERATION_ABORT ||
+        if (decision == UACPI_ITERATION_DECISION_BREAK ||
             current->type == UACPI_RESOURCE_TYPE_END_TAG)
             return UACPI_STATUS_OK;
 
@@ -2125,7 +2125,7 @@ static uacpi_size aml_size_for_native_resource(
            aml_size_with_header(spec);
 }
 
-static uacpi_resource_iteration_decision do_native_resource_to_aml(
+static uacpi_iteration_decision do_native_resource_to_aml(
     void *opaque, uacpi_resource *resource
 )
 {
@@ -2160,7 +2160,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
     }
 
     if (insns == UACPI_NULL)
-        return UACPI_RESOURCE_ITERATION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     for (;;) {
         insn = &insns[pc++];
@@ -2235,7 +2235,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
                     length
                 );
                 ctx->st = UACPI_STATUS_INVALID_ARGUMENT;
-                return UACPI_RESOURCE_ITERATION_ABORT;
+                return UACPI_ITERATION_DECISION_BREAK;
             }
 
             uacpi_memcpy(dst_string, src_string, length);
@@ -2284,7 +2284,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
                         vendor_data_length
                     );
                     ctx->st = UACPI_STATUS_INVALID_ARGUMENT;
-                    return UACPI_RESOURCE_ITERATION_ABORT;
+                    return UACPI_ITERATION_DECISION_BREAK;
                 }
 
                 /*
@@ -2340,7 +2340,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
 
             ctx->st = validate_aml_serial_type(serial_type);
             if (uacpi_unlikely_error(ctx->st))
-                return UACPI_RESOURCE_ITERATION_ABORT;
+                return UACPI_ITERATION_DECISION_BREAK;
 
             if (uacpi_unlikely(resource->type !=
                                aml_serial_to_native_type(serial_type))) {
@@ -2349,7 +2349,7 @@ static uacpi_resource_iteration_decision do_native_resource_to_aml(
                     resource->type, aml_serial_to_native_type(serial_type)
                 );
                 ctx->st = UACPI_STATUS_INVALID_ARGUMENT;
-                return UACPI_RESOURCE_ITERATION_ABORT;
+                return UACPI_ITERATION_DECISION_BREAK;
             }
 
             // Rebase the end pointer & size now that we know the serial type
@@ -2404,7 +2404,7 @@ static uacpi_status native_resources_to_aml(
     return ctx.st;
 }
 
-static uacpi_resource_iteration_decision accumulate_aml_buffer_size(
+static uacpi_iteration_decision accumulate_aml_buffer_size(
     void *opaque, uacpi_resource *resource
 )
 {
@@ -2420,11 +2420,11 @@ static uacpi_resource_iteration_decision accumulate_aml_buffer_size(
         uacpi_error("invalid aml size for native resource: %zu\n",
                     size_for_this);
         ctx->st = UACPI_STATUS_INVALID_ARGUMENT;
-        return UACPI_RESOURCE_ITERATION_ABORT;
+        return UACPI_ITERATION_DECISION_BREAK;
     }
 
     ctx->size += size_for_this;
-    return UACPI_RESOURCE_ITERATION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_native_resources_to_aml(

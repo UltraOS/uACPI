@@ -182,7 +182,7 @@ static void enumerate_namespace()
         }
 
         uacpi_free_namespace_node_info(info);
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     };
 
     auto *root = uacpi_namespace_root();

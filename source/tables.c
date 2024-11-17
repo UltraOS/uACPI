@@ -150,7 +150,7 @@ uacpi_status uacpi_setup_early_table_access(
     return ret;
 }
 
-static enum uacpi_table_iteration_decision warn_if_early_referenced(
+static uacpi_iteration_decision warn_if_early_referenced(
     void *user, struct uacpi_installed_table *tbl, uacpi_size idx
 )
 {
@@ -163,7 +163,7 @@ static enum uacpi_table_iteration_decision warn_if_early_referenced(
         );
     }
 
-    return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_initialize_tables(void)
@@ -752,7 +752,7 @@ uacpi_status uacpi_for_each_table(
     uacpi_status ret;
     uacpi_size idx;
     struct uacpi_installed_table *tbl;
-    enum uacpi_table_iteration_decision dec;
+    uacpi_iteration_decision dec;
 
     if (!early_table_access)
         UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED);
@@ -768,7 +768,7 @@ uacpi_status uacpi_for_each_table(
             continue;
 
         dec = cb(user, tbl, idx);
-        if (dec == UACPI_TABLE_ITERATION_DECISION_BREAK)
+        if (dec == UACPI_ITERATION_DECISION_BREAK)
             break;
     }
 
@@ -792,7 +792,7 @@ struct table_search_ctx {
     uacpi_status status;
 };
 
-static enum uacpi_table_iteration_decision do_search_tables(
+static uacpi_iteration_decision do_search_tables(
     void *user, struct uacpi_installed_table *tbl, uacpi_size idx
 )
 {
@@ -805,27 +805,27 @@ static enum uacpi_table_iteration_decision do_search_tables(
         const uacpi_table_identifiers *id = ctx->id;
 
         if (!uacpi_signatures_match(&id->signature, tbl->hdr.signature))
-            return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
         if (id->oemid[0] != '\0' &&
             uacpi_memcmp(id->oemid, tbl->hdr.oemid, sizeof(id->oemid)) != 0)
-            return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
 
         if (id->oem_table_id[0] != '\0' &&
             uacpi_memcmp(id->oem_table_id, tbl->hdr.oem_table_id,
                          sizeof(id->oem_table_id)) != 0)
-            return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
 
         break;
     }
 
     case SEARCH_TYPE_MATCH:
         if (!ctx->match_cb(tbl))
-            return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+            return UACPI_ITERATION_DECISION_CONTINUE;
         break;
 
     default:
         ctx->status = UACPI_STATUS_INVALID_ARGUMENT;
-        return UACPI_TABLE_ITERATION_DECISION_BREAK;
+        return UACPI_ITERATION_DECISION_BREAK;
     }
 
     ret = table_ref_unlocked(tbl);
@@ -834,7 +834,7 @@ static enum uacpi_table_iteration_decision do_search_tables(
         out_table->ptr = tbl->ptr;
         out_table->index = idx;
         ctx->status = ret;
-        return UACPI_TABLE_ITERATION_DECISION_BREAK;
+        return UACPI_ITERATION_DECISION_BREAK;
     }
 
     /*
@@ -842,10 +842,10 @@ static enum uacpi_table_iteration_decision do_search_tables(
      * existed and go on with the search.
      */
     if (ret == UACPI_STATUS_BAD_CHECKSUM)
-        return UACPI_TABLE_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     ctx->status = ret;
-    return UACPI_TABLE_ITERATION_DECISION_BREAK;
+    return UACPI_ITERATION_DECISION_BREAK;
 }
 
 uacpi_status uacpi_table_match(

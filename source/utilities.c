@@ -928,7 +928,7 @@ struct device_find_ctx {
     uacpi_iteration_callback cb;
 };
 
-enum uacpi_ns_iteration_decision find_one_device(
+uacpi_iteration_decision find_one_device(
     void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
@@ -937,15 +937,15 @@ enum uacpi_ns_iteration_decision find_one_device(
     uacpi_u32 flags;
 
     if (!uacpi_device_matches_pnp_id(node, ctx->target_hids))
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     ret = uacpi_eval_sta(node, &flags);
     if (uacpi_unlikely_error(ret))
-        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+        return UACPI_ITERATION_DECISION_NEXT_PEER;
 
     if (!(flags & ACPI_STA_RESULT_DEVICE_PRESENT) &&
         !(flags & ACPI_STA_RESULT_DEVICE_FUNCTIONING))
-        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+        return UACPI_ITERATION_DECISION_NEXT_PEER;
 
     return ctx->cb(ctx->user, node, depth);
 }
