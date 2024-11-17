@@ -648,6 +648,28 @@ out_no_write_lock:
     return ret;
 }
 
+uacpi_status uacpi_eval_simple(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+)
+{
+    return uacpi_eval(parent, path, UACPI_NULL, ret);
+}
+
+uacpi_status uacpi_execute(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args
+)
+{
+    return uacpi_eval(parent, path, args, UACPI_NULL);
+}
+
+uacpi_status uacpi_execute_simple(
+    uacpi_namespace_node *parent, const uacpi_char *path
+)
+{
+    return uacpi_eval(parent, path, UACPI_NULL, UACPI_NULL);
+}
+
 #define TRACE_BAD_RET(path_fmt, type, ...)                                 \
     uacpi_warn(                                                            \
         "unexpected '%s' object returned by method "path_fmt               \
@@ -723,6 +745,14 @@ uacpi_status uacpi_eval_typed(
     return UACPI_STATUS_OK;
 }
 
+uacpi_status uacpi_eval_simple_typed(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    uacpi_object_type_bits ret_mask, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(parent, path, UACPI_NULL, ret_mask, ret);
+}
+
 uacpi_status uacpi_eval_integer(
     uacpi_namespace_node *parent, const uacpi_char *path,
     const uacpi_object_array *args, uacpi_u64 *out_value
@@ -741,6 +771,93 @@ uacpi_status uacpi_eval_integer(
     uacpi_object_unref(int_obj);
 
     return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_eval_simple_integer(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_u64 *out_value
+)
+{
+    return uacpi_eval_integer(parent, path, UACPI_NULL, out_value);
+}
+
+uacpi_status uacpi_eval_buffer_or_string(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, args,
+        UACPI_OBJECT_BUFFER_BIT | UACPI_OBJECT_STRING_BIT,
+        ret
+    );
+}
+
+uacpi_status uacpi_eval_simple_buffer_or_string(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, UACPI_NULL,
+        UACPI_OBJECT_BUFFER_BIT | UACPI_OBJECT_STRING_BIT,
+        ret
+    );
+}
+
+uacpi_status uacpi_eval_string(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, args, UACPI_OBJECT_STRING_BIT, ret
+    );
+}
+
+uacpi_status uacpi_eval_simple_string(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, UACPI_NULL, UACPI_OBJECT_STRING_BIT, ret
+    );
+}
+
+uacpi_status uacpi_eval_buffer(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, args, UACPI_OBJECT_BUFFER_BIT, ret
+    );
+}
+
+uacpi_status uacpi_eval_simple_buffer(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, UACPI_NULL, UACPI_OBJECT_BUFFER_BIT, ret
+    );
+}
+
+uacpi_status uacpi_eval_package(
+    uacpi_namespace_node *parent, const uacpi_char *path,
+    const uacpi_object_array *args, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, args, UACPI_OBJECT_PACKAGE_BIT, ret
+    );
+}
+
+uacpi_status uacpi_eval_simple_package(
+    uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
+)
+{
+    return uacpi_eval_typed(
+        parent, path, UACPI_NULL, UACPI_OBJECT_PACKAGE_BIT, ret
+    );
 }
 
 uacpi_status uacpi_get_aml_bitness(uacpi_u8 *out_bitness)
