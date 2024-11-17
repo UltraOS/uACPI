@@ -842,13 +842,13 @@ uacpi_status uacpi_namespace_do_for_each_child(
     while (depth) {
         uacpi_namespace_node_is_one_of_unlocked(node, type_mask, &matches);
         if (!matches) {
-            decision = UACPI_NS_ITERATION_DECISION_CONTINUE;
+            decision = UACPI_ITERATION_DECISION_CONTINUE;
             goto do_next;
         }
 
         if (permanent_only == UACPI_PERMANENT_ONLY_YES &&
             uacpi_namespace_node_is_temporary(node)) {
-            decision = UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+            decision = UACPI_ITERATION_DECISION_NEXT_PEER;
             goto do_next;
         }
 
@@ -861,7 +861,7 @@ uacpi_status uacpi_namespace_do_for_each_child(
             }
 
             decision = cb(user, node, depth);
-            if (decision == UACPI_NS_ITERATION_DECISION_BREAK)
+            if (decision == UACPI_ITERATION_DECISION_BREAK)
                 goto out;
 
             if (should_lock == UACPI_SHOULD_LOCK_YES) {
@@ -885,14 +885,14 @@ uacpi_status uacpi_namespace_do_for_each_child(
         }
 
         switch (decision) {
-        case UACPI_NS_ITERATION_DECISION_CONTINUE:
+        case UACPI_ITERATION_DECISION_CONTINUE:
             if ((depth != max_depth) && (node->child != UACPI_NULL)) {
                 node = node->child;
                 depth++;
                 continue;
             }
             UACPI_FALLTHROUGH;
-        case UACPI_NS_ITERATION_DECISION_NEXT_PEER:
+        case UACPI_ITERATION_DECISION_NEXT_PEER:
             walking_up = UACPI_TRUE;
             continue;
         default:

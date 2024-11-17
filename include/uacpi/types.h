@@ -445,6 +445,14 @@ typedef uacpi_u32 uacpi_interrupt_ret;
 
 typedef uacpi_interrupt_ret (*uacpi_interrupt_handler)(uacpi_handle);
 
+typedef enum uacpi_iteration_decision {
+    UACPI_ITERATION_DECISION_CONTINUE = 0,
+    UACPI_ITERATION_DECISION_BREAK,
+
+    // Only applicable for uacpi_namespace_for_each_child
+    UACPI_ITERATION_DECISION_NEXT_PEER,
+} uacpi_iteration_decision;
+
 #ifdef __cplusplus
 }
 #endif

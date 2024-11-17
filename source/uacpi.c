@@ -455,7 +455,7 @@ static uacpi_status sta_eval(
     return ret;
 }
 
-static enum uacpi_ns_iteration_decision do_sta_ini(
+static uacpi_iteration_decision do_sta_ini(
     void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
@@ -468,7 +468,7 @@ static enum uacpi_ns_iteration_decision do_sta_ini(
 
     // We don't care about aliases
     if (node->flags & UACPI_NAMESPACE_NODE_FLAG_ALIAS)
-        return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+        return UACPI_ITERATION_DECISION_NEXT_PEER;
 
     ret = uacpi_namespace_node_type(node, &type);
     switch (type) {
@@ -488,11 +488,11 @@ static enum uacpi_ns_iteration_decision do_sta_ini(
 
     ret = sta_eval(ctx, node, &sta_ret);
     if (uacpi_unlikely_error(ret))
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
 
     if (!(sta_ret & ACPI_STA_RESULT_DEVICE_PRESENT)) {
         if (!(sta_ret & ACPI_STA_RESULT_DEVICE_FUNCTIONING))
-            return UACPI_NS_ITERATION_DECISION_NEXT_PEER;
+            return UACPI_ITERATION_DECISION_NEXT_PEER;
 
         /*
          * ACPI 6.5 specification:
@@ -503,12 +503,12 @@ static enum uacpi_ns_iteration_decision do_sta_ini(
          * should continue enumeration below a device whose _STA returns this
          * bit combination.
          */
-        return UACPI_NS_ITERATION_DECISION_CONTINUE;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     ini_eval(ctx, node);
 
-    return UACPI_NS_ITERATION_DECISION_CONTINUE;
+    return UACPI_ITERATION_DECISION_CONTINUE;
 }
 
 uacpi_status uacpi_namespace_initialize(void)
