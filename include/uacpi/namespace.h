@@ -28,6 +28,11 @@ uacpi_namespace_node *uacpi_namespace_get_predefined(
     uacpi_predefined_namespace
 );
 
+/*
+ * Returns UACPI_TRUE if the provided 'node' is an alias.
+ */
+uacpi_bool uacpi_namespace_node_is_alias(uacpi_namespace_node *node);
+
 uacpi_object_name uacpi_namespace_node_name(const uacpi_namespace_node *node);
 
 /*
