@@ -1942,8 +1942,6 @@ static void update_scope(struct call_frame *frame)
     frame->cur_scope = block->node;
 }
 
-#define TICKS_PER_SECOND (1000ull * 1000ull * 10ull)
-
 static uacpi_status begin_block_execution(struct execution_context *ctx)
 {
     struct call_frame *cur_frame = ctx->cur_frame;
@@ -1970,7 +1968,7 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
         if (pkg->begin == cur_frame->prev_while_code_offset) {
             uacpi_u64 cur_ticks;
 
-            cur_ticks = uacpi_kernel_get_ticks();
+            cur_ticks = uacpi_kernel_get_nanoseconds_since_boot();
 
             if (uacpi_unlikely(cur_ticks > block->expiration_point)) {
                 uacpi_error("loop time out after running for %u seconds\n",
@@ -1985,9 +1983,9 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
              * Calculate the expiration point for this loop.
              * If a loop is executed past this point, it will get aborted.
              */
-            block->expiration_point = uacpi_kernel_get_ticks();
+            block->expiration_point = uacpi_kernel_get_nanoseconds_since_boot();
             block->expiration_point +=
-                g_uacpi_rt_ctx.loop_timeout_seconds * TICKS_PER_SECOND;
+                g_uacpi_rt_ctx.loop_timeout_seconds * UACPI_NANOSECONDS_PER_SEC;
         }
         break;
     case UACPI_AML_OP_ScopeOp:
@@ -3084,7 +3082,7 @@ static uacpi_status handle_timer(struct execution_context *ctx)
     uacpi_object *dst;
 
     dst = item_array_at(&op_ctx->items, 0)->obj;
-    dst->integer = uacpi_kernel_get_ticks();
+    dst->integer = uacpi_kernel_get_nanoseconds_since_boot() / 100;
 
     return UACPI_STATUS_OK;
 }
