@@ -12,16 +12,20 @@ void uacpi_trace_region_error(
     uacpi_namespace_node *node, uacpi_char *message, uacpi_status ret
 )
 {
-    const uacpi_char *path;
-    uacpi_operation_region *op_region;
+    const uacpi_char *path, *space_string = "<unknown>";
+    uacpi_object *obj;
 
     path = uacpi_namespace_node_generate_absolute_path(node);
-    op_region = uacpi_namespace_node_get_object(node)->op_region;
+
+    obj = uacpi_namespace_node_get_object_typed(
+        node, UACPI_OBJECT_OPERATION_REGION_BIT
+    );
+    if (uacpi_likely(obj != UACPI_NULL))
+        space_string = uacpi_address_space_to_string(obj->op_region->space);
 
     uacpi_error(
         "%s (%s) operation region %s: %s\n",
-        message, uacpi_address_space_to_string(op_region->space),
-        path, uacpi_status_to_string(ret)
+        message, space_string, path, uacpi_status_to_string(ret)
     );
     uacpi_free_dynamic_string(path);
 }
