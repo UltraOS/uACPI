@@ -381,6 +381,8 @@ static void run_test(
 {
     acpi_rsdp rsdp {};
 
+    memcpy(&rsdp.signature, ACPI_RSDP_SIGNATURE, sizeof(ACPI_RSDP_SIGNATURE) - 1);
+
     auto xsdt_bytes = sizeof(full_xsdt);
     xsdt_bytes += ssdt_paths.size() * sizeof(acpi_sdt_hdr*);
 
