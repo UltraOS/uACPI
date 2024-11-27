@@ -36,12 +36,20 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rdsp_address)
     return UACPI_STATUS_OK;
 }
 
+static uint8_t *io_space;
+
 #ifdef UACPI_KERNEL_INITIALIZATION
-uacpi_status uacpi_kernel_initialize(uacpi_init_level)
+uacpi_status uacpi_kernel_initialize(uacpi_init_level lvl)
 {
+    if (lvl == UACPI_INIT_LEVEL_EARLY)
+        io_space = new uint8_t[UINT16_MAX + 1];
     return UACPI_STATUS_OK;
 }
-void uacpi_kernel_deinitialize(void) { }
+
+void uacpi_kernel_deinitialize(void)
+{
+    delete[] io_space;
+}
 #endif
 
 uacpi_status uacpi_kernel_raw_memory_read(
@@ -60,50 +68,46 @@ uacpi_status uacpi_kernel_raw_memory_write(
 }
 
 uacpi_status uacpi_kernel_raw_io_read(
-    uacpi_io_addr, uacpi_u8, uacpi_u64 *ret
+    uacpi_io_addr addr, uacpi_u8 width, uacpi_u64 *ret
 )
 {
-    *ret = 0xFFFFFFFFFFFFFFFF;
+    if (io_space && addr <= UINT16_MAX) {
+        *ret = 0;
+        memcpy(ret, &io_space[addr], width);
+    } else {
+        *ret = 0xFFFFFFFFFFFFFFFF;
+    }
+
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_raw_io_write(
-    uacpi_io_addr, uacpi_u8, uacpi_u64
+    uacpi_io_addr addr, uacpi_u8 width, uacpi_u64 value
 )
 {
+    if (io_space && addr <= UINT16_MAX)
+        memcpy(&io_space[addr], &value, width);
+
     return UACPI_STATUS_OK;
 }
 
-uacpi_status uacpi_kernel_io_map(uacpi_io_addr, uacpi_size,
+uacpi_status uacpi_kernel_io_map(uacpi_io_addr addr, uacpi_size,
                                  uacpi_handle *out_handle)
 {
-    *out_handle = nullptr;
+    *out_handle = (uacpi_handle)addr;
     return UACPI_STATUS_OK;
 }
 
 void uacpi_kernel_io_unmap(uacpi_handle) {}
 
 uacpi_status uacpi_kernel_io_read(
-    uacpi_handle, uacpi_size,
+    uacpi_handle handle, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 *value
 )
 {
-    switch (byte_width)
-    {
-    case 1:
-        *value = 0xFF;
-        break;
-    case 2:
-        *value = 0xFFFF;
-        break;
-    case 4:
-        *value = 0xFFFFFFFF;
-        break;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
-
-    return UACPI_STATUS_OK;
+    return uacpi_kernel_raw_io_read(
+        (uacpi_io_addr)handle + offset, byte_width, value
+    );
 }
 
 uacpi_status uacpi_kernel_pci_read(
@@ -115,18 +119,13 @@ uacpi_status uacpi_kernel_pci_read(
 }
 
 uacpi_status uacpi_kernel_io_write(
-    uacpi_handle, uacpi_size,
-    uacpi_u8 byte_width, uacpi_u64
+    uacpi_handle handle, uacpi_size offset,
+    uacpi_u8 byte_width, uacpi_u64 value
 )
 {
-    switch (byte_width) {
-    case 1:
-    case 2:
-    case 4:
-        return UACPI_STATUS_OK;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
+    return uacpi_kernel_raw_io_write(
+        (uacpi_io_addr)handle + offset, byte_width, value
+    );
 }
 
 uacpi_status uacpi_kernel_pci_write(
