@@ -2170,8 +2170,39 @@ uacpi_object *reference_unwind(uacpi_object *obj)
     return UACPI_NULL;
 }
 
+static uacpi_iteration_decision opregion_try_detach_from_parent(
+    void *user, uacpi_namespace_node *node, uacpi_u32 node_depth
+)
+{
+    uacpi_object *target_object = user;
+    UACPI_UNUSED(node_depth);
+
+    if (node->object == target_object) {
+        uacpi_opregion_uninstall_handler(node);
+        return UACPI_ITERATION_DECISION_BREAK;
+    }
+
+    return UACPI_ITERATION_DECISION_CONTINUE;
+}
+
 static void object_replace_child(uacpi_object *parent, uacpi_object *new_child)
 {
+    if (parent->flags == UACPI_REFERENCE_KIND_NAMED &&
+        uacpi_object_is(parent->inner_object, UACPI_OBJECT_OPERATION_REGION)) {
+
+        /*
+         * We're doing a CopyObject or similar to a namespace node that is an
+         * operation region. Try to find the parent node and manually detach
+         * the handler.
+         */
+        opregion_try_detach_from_parent(parent, uacpi_namespace_root(), 0);
+        uacpi_namespace_do_for_each_child(
+            uacpi_namespace_root(), opregion_try_detach_from_parent, UACPI_NULL,
+            UACPI_OBJECT_OPERATION_REGION_BIT, UACPI_MAX_DEPTH_ANY,
+            UACPI_SHOULD_LOCK_NO, UACPI_PERMANENT_ONLY_NO, parent
+        );
+    }
+
     uacpi_object_detach_child(parent);
     uacpi_object_attach_child(parent, new_child);
 }
