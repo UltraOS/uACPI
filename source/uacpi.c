@@ -339,10 +339,16 @@ static uacpi_bool match_ssdt_or_psdt(struct uacpi_installed_table *tbl)
            uacpi_signatures_match(tbl->hdr.signature, ACPI_PSDT_SIGNATURE);
 }
 
+static uacpi_u64 elapsed_ms(uacpi_u64 begin_ns, uacpi_u64 end_ns)
+{
+    return (end_ns - begin_ns) / (1000ull * 1000ull);
+}
+
 uacpi_status uacpi_namespace_load(void)
 {
     struct uacpi_table tbl;
     uacpi_status ret;
+    uacpi_u64 begin_ts, end_ts;
     struct table_load_stats st = { 0 };
     uacpi_size cur_index;
 
@@ -353,6 +359,8 @@ uacpi_status uacpi_namespace_load(void)
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
 #endif
+
+    begin_ts = uacpi_kernel_get_nanoseconds_since_boot();
 
     ret = uacpi_table_find_by_signature(ACPI_DSDT_SIGNATURE, &tbl);
     if (uacpi_unlikely_error(ret)) {
@@ -386,16 +394,28 @@ uacpi_status uacpi_namespace_load(void)
         uacpi_table_unref(&tbl);
     }
 
+    end_ts = uacpi_kernel_get_nanoseconds_since_boot();
+
     if (uacpi_unlikely(st.failure_counter != 0)) {
         uacpi_info(
-            "loaded & executed %u AML blob%s (%u error%s)\n", st.load_counter,
-            st.load_counter > 1 ? "s" : "", st.failure_counter,
+            "loaded %u AML blob%s in %"UACPI_PRIu64"ms (%u error%s)\n",
+            st.load_counter, st.load_counter > 1 ? "s" : "",
+            UACPI_FMT64(elapsed_ms(begin_ts, end_ts)), st.failure_counter,
             st.failure_counter > 1 ? "s" : ""
         );
     } else {
+        uacpi_u64 ops = g_uacpi_rt_ctx.opcodes_executed;
+        uacpi_u64 ops_per_sec = ops * UACPI_NANOSECONDS_PER_SEC;
+
+        if (uacpi_likely(end_ts > begin_ts))
+            ops_per_sec /= end_ts - begin_ts;
+
         uacpi_info(
-            "successfully loaded & executed %u AML blob%s\n", st.load_counter,
-            st.load_counter > 1 ? "s" : ""
+            "successfully loaded %u AML blob%s, %"UACPI_PRIu64" ops in "
+            "%"UACPI_PRIu64"ms (avg %"UACPI_PRIu64"/s)\n",
+            st.load_counter, st.load_counter > 1 ? "s" : "",
+            UACPI_FMT64(ops), UACPI_FMT64(elapsed_ms(begin_ts, end_ts)),
+            UACPI_FMT64(ops_per_sec)
         );
     }
 
@@ -512,6 +532,7 @@ uacpi_status uacpi_namespace_initialize(void)
 {
     struct ns_init_context ctx = { 0 };
     uacpi_namespace_node *root;
+    uacpi_u64 begin_ts, end_ts;
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
     uacpi_status ret = UACPI_STATUS_OK;
@@ -531,6 +552,8 @@ uacpi_status uacpi_namespace_initialize(void)
      */
 
     root = uacpi_namespace_root();
+
+    begin_ts = uacpi_kernel_get_nanoseconds_since_boot();
 
     // Step 1 - Execute \_INI
     ini_eval(&ctx, root);
@@ -560,9 +583,12 @@ uacpi_status uacpi_namespace_initialize(void)
         UACPI_OBJECT_ANY_BIT, UACPI_MAX_DEPTH_ANY, &ctx
     );
 
+    end_ts = uacpi_kernel_get_nanoseconds_since_boot();
+
     uacpi_info(
-        "namespace initialization done: "
+        "namespace initialization done in %"UACPI_PRIu64"ms: "
         "%zu devices, %zu thermal zones\n",
+        UACPI_FMT64(elapsed_ms(begin_ts, end_ts)),
         ctx.devices, ctx.thermal_zones
     );
 
