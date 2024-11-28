@@ -663,6 +663,8 @@ static uacpi_status get_op(struct execution_context *ctx)
         op |= AML_READ(code, frame->code_offset++);
     }
 
+    g_uacpi_rt_ctx.opcodes_executed++;
+
     ctx->cur_op = uacpi_get_op_spec(op);
     if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
         uacpi_error(

@@ -50,6 +50,8 @@ struct uacpi_runtime_context {
     uacpi_bool has_global_lock;
     uacpi_handle sci_handle;
 #endif
+    uacpi_u64 opcodes_executed;
+
     uacpi_u32 loop_timeout_seconds;
     uacpi_u32 max_call_stack_depth;
 
