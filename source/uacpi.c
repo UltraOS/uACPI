@@ -638,19 +638,31 @@ uacpi_status uacpi_eval(
     }
 
     obj = uacpi_namespace_node_get_object(node);
+    if (uacpi_unlikely(obj == UACPI_NULL)) {
+        ret = UACPI_STATUS_INVALID_ARGUMENT;
+        goto out_read_unlock;
+    }
+
     if (obj->type != UACPI_OBJECT_METHOD) {
-        if (uacpi_likely(out_obj == UACPI_NULL))
+        uacpi_object *new_obj;
+
+        if (uacpi_unlikely(out_obj == UACPI_NULL))
             goto out_read_unlock;
 
-        *out_obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
-        if (uacpi_unlikely(*out_obj == UACPI_NULL)) {
+        new_obj = uacpi_create_object(UACPI_OBJECT_UNINITIALIZED);
+        if (uacpi_unlikely(new_obj == UACPI_NULL)) {
             ret = UACPI_STATUS_OUT_OF_MEMORY;
             goto out_read_unlock;
         }
 
         ret = uacpi_object_assign(
-            *out_obj, obj, UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
+            new_obj, obj, UACPI_ASSIGN_BEHAVIOR_DEEP_COPY
         );
+        if (uacpi_unlikely_error(ret)) {
+            uacpi_object_unref(new_obj);
+            goto out_read_unlock;
+        }
+        *out_obj = new_obj;
 
     out_read_unlock:
         uacpi_namespace_read_unlock();
