@@ -874,6 +874,8 @@ uacpi_status uacpi_namespace_do_for_each_child(
                 if (uacpi_unlikely_error(ret))
                     return ret;
             }
+        } else {
+            decision = UACPI_ITERATION_DECISION_CONTINUE;
         }
 
     do_next:
