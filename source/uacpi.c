@@ -421,8 +421,8 @@ uacpi_status uacpi_namespace_load(void)
 
     ret = uacpi_initialize_events();
     if (uacpi_unlikely_error(ret)) {
-        uacpi_warn("event initialization failed: %s\n",
-                   uacpi_status_to_string(ret));
+        uacpi_error("event initialization failed: %s\n",
+                    uacpi_status_to_string(ret));
         goto out_fatal_error;
     }
 
