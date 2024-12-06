@@ -382,11 +382,15 @@ static void run_test(
     acpi_rsdp rsdp {};
 
     memcpy(&rsdp.signature, ACPI_RSDP_SIGNATURE, sizeof(ACPI_RSDP_SIGNATURE) - 1);
+    set_oem(rsdp.oemid);
 
     auto xsdt_bytes = sizeof(full_xsdt);
     xsdt_bytes += ssdt_paths.size() * sizeof(acpi_sdt_hdr*);
 
     auto *xsdt = new (std::calloc(xsdt_bytes, 1)) full_xsdt();
+    set_oem(xsdt->hdr.oemid);
+    set_oem_table_id(xsdt->hdr.oem_table_id);
+
     auto xsdt_delete = ScopeGuard(
         [&xsdt, &ssdt_paths] {
             uacpi_state_reset();
