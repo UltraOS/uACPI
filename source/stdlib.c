@@ -117,6 +117,7 @@ struct fmt_spec {
     uacpi_u8 uppercase      : 1;
     uacpi_u8 left_justify   : 1;
     uacpi_u8 alternate_form : 1;
+    uacpi_u8 has_precision  : 1;
     uacpi_char pad_char;
     uacpi_char prepend_char;
     uacpi_u64 min_width;
@@ -395,7 +396,6 @@ uacpi_i32 uacpi_vsnprintf(
         struct fmt_spec fm = {
             .pad_char = ' ',
             .base = 10,
-            .precision = 0xFFFFFFFFFFFFFFFF,
         };
         next_conversion = find_next_conversion(fmt, &next_offset);
 
@@ -442,6 +442,8 @@ uacpi_i32 uacpi_vsnprintf(
         }
 
         if (consume(&fmt, ".")) {
+            fm.has_precision = UACPI_TRUE;
+
             if (consume(&fmt, "*")) {
                 fm.precision = uacpi_va_arg(vlist, int);
             } else {
@@ -462,9 +464,10 @@ uacpi_i32 uacpi_vsnprintf(
             const uacpi_char *string = uacpi_va_arg(vlist, uacpi_char*);
             uacpi_size i;
 
-            for (i = 0; i < fm.precision && string[i]; ++i)
+            for (i = 0; (!fm.has_precision || i < fm.precision) && string[i]; ++i)
                 write_one(&fb_state, string[i]);
-
+            while (fm.has_precision && (i++ < fm.precision))
+                write_one(&fb_state, fm.pad_char);
             continue;
         }
 
