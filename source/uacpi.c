@@ -324,9 +324,8 @@ static void trace_table_load_failure(
 {
     uacpi_log_lvl(
         lvl,
-        "failed to load '%.4s' (OEM ID '%.6s' OEM Table ID '%.8s'): %s\n",
-        tbl->signature, tbl->oemid, tbl->oem_table_id,
-        uacpi_status_to_string(ret)
+        "failed to load "UACPI_PRI_TBL_HDR": %s\n",
+        UACPI_FMT_TBL_HDR(tbl), uacpi_status_to_string(ret)
     );
 }
 
