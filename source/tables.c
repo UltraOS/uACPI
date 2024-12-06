@@ -30,6 +30,40 @@ UACPI_PACKED(struct uacpi_rxsdt {
     uacpi_u8 ptr_bytes[];
 })
 
+static void dump_table_header(
+    uacpi_phys_addr phys_addr, void *hdr
+)
+{
+    struct acpi_sdt_hdr *sdt = hdr;
+
+    if (uacpi_signatures_match(hdr, ACPI_FACS_SIGNATURE)) {
+        struct acpi_facs *facs = hdr;
+
+        uacpi_info(
+            "FACS 0x%016"UACPI_PRIX64" %08X\n", UACPI_FMT64(phys_addr),
+            facs->length
+        );
+        return;
+    }
+
+    if (!uacpi_memcmp(hdr, ACPI_RSDP_SIGNATURE, sizeof(ACPI_RSDP_SIGNATURE) - 1)) {
+        struct acpi_rsdp *rsdp = hdr;
+
+        uacpi_info(
+            "RSDP 0x%016"UACPI_PRIX64" %08X v%02X (%.6s)\n",
+            UACPI_FMT64(phys_addr), rsdp->length, rsdp->revision,
+            rsdp->oemid
+        );
+        return;
+    }
+
+    uacpi_info(
+        "%.4s 0x%016"UACPI_PRIX64" %08X v%02X (%.6s %.8s)\n",
+        sdt->signature, UACPI_FMT64(phys_addr), sdt->length, sdt->revision,
+        sdt->oemid, sdt->oem_table_id
+    );
+}
+
 static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
                                           uacpi_size entry_size)
 {
@@ -41,6 +75,8 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
     rxsdt = uacpi_kernel_map(rxsdt_addr, map_len);
     if (rxsdt == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
+
+    dump_table_header(rxsdt_addr, rxsdt);
 
     ret = uacpi_check_table_signature(rxsdt,
         entry_size == 8 ? ACPI_XSDT_SIGNATURE : ACPI_RSDT_SIGNATURE);
@@ -105,6 +141,8 @@ static uacpi_status initialize_from_rsdp(void)
     rsdp = uacpi_kernel_map(rsdp_phys, sizeof(struct acpi_rsdp));
     if (rsdp == UACPI_NULL)
         return UACPI_STATUS_MAPPING_FAILED;
+
+    dump_table_header(rsdp_phys, rsdp);
 
     if (rsdp->revision > 1 && rsdp->xsdt_addr &&
         !uacpi_check_flag(UACPI_FLAG_BAD_XSDT))
@@ -521,6 +559,8 @@ static uacpi_status verify_and_install_table(
     ret = table_alloc(&table, &idx);
     if (uacpi_unlikely_error(ret))
         return ret;
+
+    dump_table_header(phys_addr, hdr);
 
     uacpi_memcpy(&table->hdr, hdr, sizeof(*hdr));
     table->phys_addr = phys_addr;
