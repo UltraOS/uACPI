@@ -29,6 +29,9 @@ UACPI_PACKED(struct full_xsdt {
     struct acpi_sdt_hdr* ssdts[];
 })
 
+void set_oem(char (&oemid)[6]);
+void set_oem_table_id(char(&oemid_table_id)[8]);
+
 void build_xsdt(full_xsdt& xsdt, acpi_rsdp& rsdp, std::string_view dsdt_path,
                 const std::vector<std::string>& ssdt_paths);
 

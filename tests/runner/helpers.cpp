@@ -19,6 +19,16 @@ static uacpi_u8 gen_checksum(void *table, uacpi_size size)
     return 256 - csum;
 }
 
+void set_oem(char(&oemid)[6])
+{
+    memcpy(oemid, "uOEMID", sizeof(oemid));
+}
+
+void set_oem_table_id(char(&oemid_table_id)[8])
+{
+    memcpy(oemid_table_id, "uTESTTBL", sizeof(oemid_table_id));
+}
+
 void build_xsdt(
     full_xsdt& xsdt, acpi_rsdp& rsdp, std::string_view dsdt_path,
     const std::vector<std::string> &ssdt_paths
@@ -70,6 +80,9 @@ void build_xsdt(
     tables_delete.disarm();
 
     auto& fadt = *new acpi_fadt {};
+    set_oem(fadt.hdr.oemid);
+    set_oem_table_id(fadt.hdr.oem_table_id);
+
     fadt.hdr.length = sizeof(fadt);
     fadt.hdr.revision = 6;
 
