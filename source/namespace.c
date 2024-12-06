@@ -484,6 +484,7 @@ uacpi_status uacpi_namespace_node_resolve(
 )
 {
     uacpi_namespace_node *cur_node = parent;
+    uacpi_status ret = UACPI_STATUS_OK;
     const uacpi_char *cursor = path;
     uacpi_size bytes_left;
     uacpi_char prev_char = 0;
@@ -495,8 +496,6 @@ uacpi_status uacpi_namespace_node_resolve(
     bytes_left = uacpi_strlen(path);
 
     if (should_lock == UACPI_SHOULD_LOCK_YES) {
-        uacpi_status ret;
-
         ret = uacpi_namespace_read_lock();
         if (uacpi_unlikely_error(ret))
             return ret;
@@ -510,8 +509,10 @@ uacpi_status uacpi_namespace_node_resolve(
         case '\\':
             single_nameseg = UACPI_FALSE;
 
-            if (prev_char == '^')
-                goto out_invalid_path;
+            if (prev_char == '^') {
+                ret = UACPI_STATUS_INVALID_ARGUMENT;
+                goto out;
+            }
 
             cur_node = uacpi_namespace_root();
             break;
@@ -519,8 +520,10 @@ uacpi_status uacpi_namespace_node_resolve(
             single_nameseg = UACPI_FALSE;
 
             // Tried to go behind root
-            if (uacpi_unlikely(cur_node == uacpi_namespace_root()))
-                goto out_invalid_path;
+            if (uacpi_unlikely(cur_node == uacpi_namespace_root())) {
+                ret = UACPI_STATUS_INVALID_ARGUMENT;
+                goto out;
+            }
 
             cur_node = cur_node->parent;
             break;
@@ -577,26 +580,31 @@ uacpi_status uacpi_namespace_node_resolve(
     }
 
 out:
-    if (should_lock == UACPI_SHOULD_LOCK_YES)
-        uacpi_namespace_read_unlock();
+    if (uacpi_unlikely(ret == UACPI_STATUS_INVALID_ARGUMENT)) {
+        uacpi_warn("invalid path '%s'\n", path);
+        goto out_read_unlock;
+    }
 
-    if (cur_node == UACPI_NULL)
-        return UACPI_STATUS_NOT_FOUND;
+    if (cur_node == UACPI_NULL) {
+        ret = UACPI_STATUS_NOT_FOUND;
+        goto out_read_unlock;
+    }
 
     if (uacpi_namespace_node_is_temporary(cur_node) &&
         permanent_only == UACPI_PERMANENT_ONLY_YES) {
         uacpi_warn("denying access to temporary namespace node '%.4s'\n",
                    cur_node->name.text);
-        return UACPI_STATUS_DENIED;
+        ret = UACPI_STATUS_DENIED;
+        goto out_read_unlock;
     }
 
     if (out_node != UACPI_NULL)
         *out_node = cur_node;
-    return UACPI_STATUS_OK;
 
-out_invalid_path:
-    uacpi_warn("invalid path '%s'\n", path);
-    return UACPI_STATUS_INVALID_ARGUMENT;
+out_read_unlock:
+    if (should_lock == UACPI_SHOULD_LOCK_YES)
+        uacpi_namespace_read_unlock();
+    return ret;
 }
 
 uacpi_status uacpi_namespace_node_find(
