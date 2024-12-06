@@ -37,11 +37,9 @@ static void dump_table_header(
     struct acpi_sdt_hdr *sdt = hdr;
 
     if (uacpi_signatures_match(hdr, ACPI_FACS_SIGNATURE)) {
-        struct acpi_facs *facs = hdr;
-
         uacpi_info(
             "FACS 0x%016"UACPI_PRIX64" %08X\n", UACPI_FMT64(phys_addr),
-            facs->length
+            sdt->length
         );
         return;
     }
