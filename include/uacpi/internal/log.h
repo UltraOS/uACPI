@@ -18,3 +18,5 @@ void uacpi_log(uacpi_log_level, const uacpi_char*, ...);
 #define uacpi_info(...)  uacpi_log_lvl(UACPI_LOG_INFO, __VA_ARGS__)
 #define uacpi_warn(...)  uacpi_log_lvl(UACPI_LOG_WARN, __VA_ARGS__)
 #define uacpi_error(...) uacpi_log_lvl(UACPI_LOG_ERROR, __VA_ARGS__)
+
+void uacpi_logger_initialize(void);

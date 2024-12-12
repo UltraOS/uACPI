@@ -175,6 +175,8 @@ uacpi_status uacpi_setup_early_table_access(
     if (uacpi_unlikely(buffer_size < sizeof(struct uacpi_installed_table)))
         return UACPI_STATUS_INVALID_ARGUMENT;
 
+    uacpi_logger_initialize();
+
     tables.dynamic_storage = temporary_buffer;
     tables.dynamic_capacity = buffer_size / sizeof(struct uacpi_installed_table);
     early_table_access = UACPI_TRUE;

@@ -46,6 +46,14 @@ void uacpi_context_set_log_level(uacpi_log_level lvl)
     g_uacpi_rt_ctx.log_level = lvl;
 }
 
+void uacpi_logger_initialize(void)
+{
+    if (g_uacpi_rt_ctx.log_level != 0)
+        return;
+
+    uacpi_context_set_log_level(UACPI_DEFAULT_LOG_LEVEL);
+}
+
 void uacpi_context_set_loop_timeout(uacpi_u32 seconds)
 {
     if (seconds == 0)
@@ -277,8 +285,8 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
     g_uacpi_rt_ctx.s0_sleep_typ_b = UACPI_SLEEP_TYP_INVALID;
     g_uacpi_rt_ctx.flags = flags;
 
-    if (g_uacpi_rt_ctx.log_level == 0)
-        uacpi_context_set_log_level(UACPI_DEFAULT_LOG_LEVEL);
+    uacpi_logger_initialize();
+
     if (g_uacpi_rt_ctx.loop_timeout_seconds == 0)
         uacpi_context_set_loop_timeout(UACPI_DEFAULT_LOOP_TIMEOUT_SECONDS);
     if (g_uacpi_rt_ctx.max_call_stack_depth == 0)
