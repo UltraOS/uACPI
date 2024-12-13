@@ -387,7 +387,7 @@ uacpi_status uacpi_namespace_load(void)
         ret = uacpi_table_match(cur_index, match_ssdt_or_psdt, &tbl);
         if (ret != UACPI_STATUS_OK) {
             if (uacpi_unlikely(ret != UACPI_STATUS_NOT_FOUND))
-                return ret;
+                goto out_fatal_error;
 
             break;
         }
