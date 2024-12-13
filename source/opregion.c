@@ -122,7 +122,7 @@ static uacpi_status region_run_reg(
     method_args.count = 2;
 
     ret = uacpi_execute_control_method(
-        node->parent, reg_obj->method, &method_args, UACPI_NULL
+        reg_node, reg_obj->method, &method_args, UACPI_NULL
     );
     if (uacpi_unlikely_error(ret))
         uacpi_trace_region_error(node, "error during _REG execution for", ret);
