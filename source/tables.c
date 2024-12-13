@@ -563,6 +563,7 @@ static uacpi_status verify_and_install_table(
     dump_table_header(phys_addr, hdr);
 
     uacpi_memcpy(&table->hdr, hdr, sizeof(*hdr));
+    table->reference_count = 0;
     table->phys_addr = phys_addr;
     table->ptr = virt_addr;
     table->flags = flags;
@@ -571,7 +572,7 @@ static uacpi_status verify_and_install_table(
     if (out_table == UACPI_NULL)
         return UACPI_STATUS_OK;
 
-    table->reference_count = 1;
+    table->reference_count++;
     out_table->ptr = virt_addr;
     out_table->index = idx;
     return UACPI_STATUS_OK;
