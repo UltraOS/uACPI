@@ -174,86 +174,6 @@ void uacpi_write_buffer_field(
     do_write_misaligned_buffer_field(field, src, size);
 }
 
-static uacpi_status dispatch_field_io(
-    uacpi_namespace_node *region_node, uacpi_u32 offset, uacpi_u8 byte_width,
-    uacpi_region_op op, uacpi_u64 *in_out
-)
-{
-    uacpi_status ret;
-    uacpi_object *obj;
-    uacpi_operation_region *region;
-    uacpi_address_space_handler *handler;
-    uacpi_address_space space;
-    uacpi_u64 offset_end;
-
-    uacpi_region_rw_data data = {
-        .byte_width = byte_width,
-        .offset = offset,
-    };
-
-    ret = uacpi_opregion_attach(region_node);
-    if (uacpi_unlikely_error(ret)) {
-        uacpi_trace_region_error(
-            region_node, "unable to attach", ret
-        );
-        return ret;
-    }
-
-    obj = uacpi_namespace_node_get_object(region_node);
-    if (uacpi_unlikely(obj == UACPI_NULL ||
-                       obj->type != UACPI_OBJECT_OPERATION_REGION))
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
-    region = obj->op_region;
-    space = region->space;
-    handler = region->handler;
-
-    offset_end = offset;
-    offset_end += byte_width;
-    data.offset += region->offset;
-
-    if (uacpi_unlikely(region->length < offset_end ||
-                       data.offset < offset)) {
-        const uacpi_char *path;
-
-        path = uacpi_namespace_node_generate_absolute_path(region_node);
-        uacpi_error(
-            "out-of-bounds access to opregion %s[0x%"UACPI_PRIX64"->"
-            "0x%"UACPI_PRIX64"] at 0x%"UACPI_PRIX64" (idx=%u, width=%d)\n",
-            path, UACPI_FMT64(region->offset),
-            UACPI_FMT64(region->offset + region->length),
-            UACPI_FMT64(data.offset), offset, byte_width
-        );
-        uacpi_free_dynamic_string(path);
-        return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
-    }
-
-    data.handler_context = handler->user_context;
-    data.region_context = region->user_context;
-
-    if (op == UACPI_REGION_OP_WRITE) {
-        data.value = *in_out;
-        uacpi_trace_region_io(region_node, space, op, data.offset,
-                              byte_width, data.value);
-    }
-
-    uacpi_namespace_write_unlock();
-
-    ret = handler->callback(op, &data);
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
-    uacpi_namespace_write_lock();
-
-    if (op == UACPI_REGION_OP_READ) {
-        *in_out = data.value;
-        uacpi_trace_region_io(region_node, space, op, data.offset,
-                              byte_width, data.value);
-    }
-
-    return UACPI_STATUS_OK;
-}
-
 static uacpi_status access_field_unit(
     uacpi_field_unit *field, uacpi_u32 offset, uacpi_region_op op,
     uacpi_u64 *in_out
@@ -309,7 +229,7 @@ static uacpi_status access_field_unit(
     if (uacpi_unlikely_error(ret))
         goto out;
 
-    ret = dispatch_field_io(
+    ret = uacpi_dispatch_opregion_io(
         region_node, offset, field->access_width_bytes, op, in_out
     );
 
