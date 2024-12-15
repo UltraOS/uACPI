@@ -250,6 +250,67 @@ uacpi_status uacpi_release_aml_mutex(uacpi_mutex *mutex)
     return UACPI_STATUS_OK;
 }
 
+uacpi_status uacpi_recursive_lock_init(struct uacpi_recursive_lock *lock)
+{
+    lock->mutex = uacpi_kernel_create_mutex();
+    if (uacpi_unlikely(lock->mutex == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    lock->owner = UACPI_THREAD_ID_NONE;
+    lock->depth = 0;
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_recursive_lock_deinit(struct uacpi_recursive_lock *lock)
+{
+    if (uacpi_unlikely(lock->depth)) {
+        uacpi_warn(
+            "de-initializing active recursive lock %p with depth=%zu\n",
+            lock, lock->depth
+        );
+        lock->depth = 0;
+    }
+
+    lock->owner = UACPI_THREAD_ID_NONE;
+
+    if (lock->mutex != UACPI_NULL) {
+        uacpi_kernel_free_mutex(lock->mutex);
+        lock->mutex = UACPI_NULL;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_recursive_lock_acquire(struct uacpi_recursive_lock *lock)
+{
+    uacpi_thread_id this_id;
+    uacpi_status ret = UACPI_STATUS_OK;
+
+    this_id = uacpi_kernel_get_thread_id();
+    if (UACPI_ATOMIC_LOAD_THREAD_ID(&lock->owner) == this_id) {
+        lock->depth++;
+        return ret;
+    }
+
+    ret = uacpi_acquire_native_mutex(lock->mutex);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    UACPI_ATOMIC_STORE_THREAD_ID(&lock->owner, this_id);
+    lock->depth = 1;
+    return ret;
+}
+
+uacpi_status uacpi_recursive_lock_release(struct uacpi_recursive_lock *lock)
+{
+    if (lock->depth-- > 1)
+        return UACPI_STATUS_OK;
+
+    UACPI_ATOMIC_STORE_THREAD_ID(&lock->owner, UACPI_THREAD_ID_NONE);
+    return uacpi_release_native_mutex(lock->mutex);
+}
+
 uacpi_status uacpi_rw_lock_init(struct uacpi_rw_lock *lock)
 {
     lock->read_mutex = uacpi_kernel_create_mutex();

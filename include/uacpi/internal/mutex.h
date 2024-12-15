@@ -50,6 +50,18 @@ static inline uacpi_status uacpi_release_native_mutex_may_be_null(
     return UACPI_STATUS_OK;
 }
 
+struct uacpi_recursive_lock {
+    uacpi_handle mutex;
+    uacpi_size depth;
+    uacpi_thread_id owner;
+};
+
+uacpi_status uacpi_recursive_lock_init(struct uacpi_recursive_lock *lock);
+uacpi_status uacpi_recursive_lock_deinit(struct uacpi_recursive_lock *lock);
+
+uacpi_status uacpi_recursive_lock_acquire(struct uacpi_recursive_lock *lock);
+uacpi_status uacpi_recursive_lock_release(struct uacpi_recursive_lock *lock);
+
 struct uacpi_rw_lock {
     uacpi_handle read_mutex;
     uacpi_handle write_mutex;
