@@ -111,7 +111,7 @@ uacpi_status uacpi_install_gpe_handler(
  * NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
  */
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
-    uacpi_status uacpi_install_gpe_handler_raw(
+uacpi_status uacpi_install_gpe_handler_raw(
     uacpi_namespace_node *gpe_device, uacpi_u16 idx,
     uacpi_gpe_triggering triggering, uacpi_gpe_handler handler, uacpi_handle ctx
 ))
@@ -150,7 +150,6 @@ UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
 uacpi_status uacpi_disable_gpe_for_wake(
     uacpi_namespace_node *gpe_device, uacpi_u16 idx
 ))
-
 
 /*
  * Finalize GPE initialization by enabling all GPEs not configured for wake and
