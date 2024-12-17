@@ -293,7 +293,11 @@ uacpi_status uacpi_kernel_schedule_work(
 );
 
 /*
- * Blocks until all scheduled work is complete and the work queue becomes empty.
+ * Waits for two types of work to finish:
+ * 1. All in-flight interrupts installed via uacpi_kernel_install_interrupt_handler
+ * 2. All work scheduled via uacpi_kernel_schedule_work
+ *
+ * Note that the waits must be done in this order specifically.
  */
 uacpi_status uacpi_kernel_wait_for_work_completion(void);
 
