@@ -1271,7 +1271,7 @@ static uacpi_status do_load_table(
         return ret;
 
     if (is_dynamic_table_load(cause))
-        ret = uacpi_events_match_post_dynamic_table_load();
+        uacpi_events_match_post_dynamic_table_load();
 
     return ret;
 }

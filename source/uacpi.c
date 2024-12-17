@@ -303,6 +303,10 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
     if (uacpi_unlikely_error(ret))
         return ret;
 
+    ret = uacpi_initialize_events_early();
+    if (uacpi_unlikely_error(ret))
+        goto out_fatal_error;
+
     ret = uacpi_initialize_opregion();
     if (uacpi_unlikely_error(ret))
         goto out_fatal_error;
