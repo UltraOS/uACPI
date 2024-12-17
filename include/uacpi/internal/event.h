@@ -12,8 +12,8 @@ UACPI_STUB_IF_REDUCED_HARDWARE(
     void uacpi_deinitialize_events(void)
 )
 
-UACPI_ALWAYS_OK_FOR_REDUCED_HARDWARE(
-    uacpi_status uacpi_events_match_post_dynamic_table_load(void)
+UACPI_STUB_IF_REDUCED_HARDWARE(
+    void uacpi_events_match_post_dynamic_table_load(void)
 )
 
 UACPI_ALWAYS_ERROR_FOR_REDUCED_HARDWARE(
