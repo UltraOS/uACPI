@@ -2,6 +2,9 @@
 
 #include <uacpi/types.h>
 
+uacpi_status uacpi_ininitialize_registers(void);
+void uacpi_deininitialize_registers(void);
+
 enum uacpi_register {
     UACPI_REGISTER_PM1_STS = 0,
     UACPI_REGISTER_PM1_EN,
