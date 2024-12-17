@@ -351,6 +351,25 @@ static const struct register_field fields[UACPI_REGISTER_FIELD_MAX + 1] = {
     },
 };
 
+static uacpi_handle g_reg_lock;
+
+uacpi_status uacpi_ininitialize_registers(void)
+{
+    g_reg_lock = uacpi_kernel_create_spinlock();
+    if (uacpi_unlikely(g_reg_lock == UACPI_NULL))
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_deininitialize_registers(void)
+{
+    if (g_reg_lock != UACPI_NULL) {
+        uacpi_kernel_free_spinlock(g_reg_lock);
+        g_reg_lock = UACPI_NULL;
+    }
+}
+
 uacpi_status uacpi_read_register_field(
     enum uacpi_register_field field_enum, uacpi_u64 *out_value
 )
@@ -383,6 +402,7 @@ uacpi_status uacpi_write_register_field(
     const struct register_field *field;
     const struct register_spec *reg;
     uacpi_u64 data;
+    uacpi_cpu_flags flags;
 
     if (uacpi_unlikely(field_idx > UACPI_REGISTER_FIELD_MAX))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -392,19 +412,28 @@ uacpi_status uacpi_write_register_field(
 
     in_value = (in_value << field->offset) & field->mask;
 
-    if (reg->kind == REGISTER_ACCESS_KIND_WRITE_TO_CLEAR) {
-        if (in_value == 0)
-            return UACPI_STATUS_OK;
+    flags = uacpi_kernel_lock_spinlock(g_reg_lock);
 
-        return do_write_register(reg, in_value);
+    if (reg->kind == REGISTER_ACCESS_KIND_WRITE_TO_CLEAR) {
+        if (in_value == 0) {
+            ret = UACPI_STATUS_OK;
+            goto out;
+        }
+
+        ret = do_write_register(reg, in_value);
+        goto out;
     }
 
     ret = do_read_register(reg, &data);
     if (uacpi_unlikely_error(ret))
-        return ret;
+        goto out;
 
     data &= ~field->mask;
     data |= in_value;
 
-    return do_write_register(reg, data);
+    ret = do_write_register(reg, data);
+
+out:
+    uacpi_kernel_unlock_spinlock(g_reg_lock, flags);
+    return ret;
 }
