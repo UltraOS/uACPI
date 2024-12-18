@@ -283,6 +283,19 @@ If you want to contribute:
 
 **All contributions are very welcome!**
 
+## Notable projects using uACPI & performance leaderboards
+
+|  Project | Description | (qemu w/ Q35 + KVM) ops/s  | CPU |
+|---  |--- |--- |--- |
+| [proxima](https://github.com/proxima-os/proxima) | A monolithic Unix-like operating system | 4.635.028 | AMD Ryzen 7 5800X |
+| [Managarm](https://github.com/managarm/managarm)  | Pragmatic microkernel-based OS with fully asynchronous I/O | 3.200.618 | Intel Core i7-14700K |
+| [ilobilix](https://github.com/ilobilo/ilobilix) | Yet another monolithic Linux clone wannabe. Currently under a rewrite | 2.605.515 | Intel Core i5-13600K |
+| [Astral](https://github.com/mathewnd/astral) | Operating system written in C which aims be POSIX-compliant | 2.411.598 | Intel Core i5-13600K |
+| [menix](https://github.com/menix-os/menix) | A minimal and expandable Unix-like operating system | 1.359.883 | AMD Ryzen 7 7700X |
+| [pmOS](https://gitlab.com/mishakov/pmos) | Microkernel-based operating system written from scratch with uACPI running in userspace | 703.007 | AMD Ryzen 7 7840S |
+| [OBOS](https://github.com/OBOS-dev/obos) | Hybrid Kernel with advanced driver loading | 35.526 | Intel i5-4570 |
+| [NyauxKC](https://github.com/rayanmargham/NyauxKC) | Monolithic UNIX-like multi-architecture kernel | 18.009 | Intel Core Ultra 7 265K |
+
 ## License
 
 <a href="https://opensource.org/licenses/MIT">
