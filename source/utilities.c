@@ -928,7 +928,7 @@ struct device_find_ctx {
     uacpi_iteration_callback cb;
 };
 
-uacpi_iteration_decision find_one_device(
+static uacpi_iteration_decision find_one_device(
     void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
