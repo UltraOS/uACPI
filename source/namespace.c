@@ -124,12 +124,23 @@ static uacpi_object *make_object_for_predefined(
     return obj;
 }
 
+static void namespace_node_detach_object(uacpi_namespace_node *node)
+{
+    uacpi_object *object;
+
+    object = uacpi_namespace_node_get_object(node);
+    if (object != UACPI_NULL) {
+        if (object->type == UACPI_OBJECT_OPERATION_REGION)
+            uacpi_opregion_uninstall_handler(node);
+
+        uacpi_object_unref(node->object);
+        node->object = UACPI_NULL;
+    }
+}
+
 static void free_namespace_node(uacpi_handle handle)
 {
     uacpi_namespace_node *node = handle;
-
-    if (node->object)
-        uacpi_object_unref(node->object);
 
     if (uacpi_likely(!uacpi_namespace_node_is_predefined(node))) {
         uacpi_free(node, sizeof(*node));
@@ -194,10 +205,13 @@ uacpi_status uacpi_initialize_namespace(void)
 
 void uacpi_deinitialize_namespace(void)
 {
+    uacpi_status ret;
     uacpi_namespace_node *current, *next = UACPI_NULL;
     uacpi_u32 depth = 1;
 
     current = uacpi_namespace_root();
+
+    ret = uacpi_namespace_write_lock();
 
     while (depth) {
         next = next == UACPI_NULL ? current->child : next->next;
@@ -233,13 +247,18 @@ void uacpi_deinitialize_namespace(void)
         // This node has no children, move on to its peer
     }
 
+    namespace_node_detach_object(uacpi_namespace_root());
+    free_namespace_node(uacpi_namespace_root());
+
+    if (ret == UACPI_STATUS_OK)
+        uacpi_namespace_write_unlock();
+
     uacpi_object_unref(g_uacpi_rt_ctx.root_object);
     g_uacpi_rt_ctx.root_object = UACPI_NULL;
 
     uacpi_mutex_unref(g_uacpi_rt_ctx.global_lock_mutex);
     g_uacpi_rt_ctx.global_lock_mutex = UACPI_NULL;
 
-    free_namespace_node(uacpi_namespace_root());
     uacpi_rw_lock_deinit(&namespace_lock);
 }
 
@@ -330,7 +349,6 @@ uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node)
 uacpi_status uacpi_namespace_node_uninstall(uacpi_namespace_node *node)
 {
     uacpi_namespace_node *prev;
-    uacpi_object *object;
 
     if (uacpi_unlikely(uacpi_namespace_node_is_dangling(node))) {
         uacpi_warn("attempting to uninstall a dangling namespace node %.4s\n",
@@ -398,14 +416,7 @@ uacpi_status uacpi_namespace_node_uninstall(uacpi_namespace_node *node)
      * namespace node as well as potential infinite cycles between a namespace
      * node and an object.
      */
-    object = uacpi_namespace_node_get_object(node);
-    if (object != UACPI_NULL) {
-        if (object->type == UACPI_OBJECT_OPERATION_REGION)
-            uacpi_opregion_uninstall_handler(node);
-
-        uacpi_object_unref(node->object);
-        node->object = UACPI_NULL;
-    }
+    namespace_node_detach_object(node);
 
     prev = node->parent ? node->parent->child : UACPI_NULL;
 
