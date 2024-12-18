@@ -97,6 +97,9 @@ else ()
         PRIVATE
         -fsanitize=address,undefined -g3
     )
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+    )
 endif ()
 
 find_package(Threads REQUIRED)
