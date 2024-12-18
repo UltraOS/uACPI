@@ -49,6 +49,7 @@ uacpi_status uacpi_kernel_initialize(uacpi_init_level lvl)
 void uacpi_kernel_deinitialize(void)
 {
     delete[] io_space;
+    io_space = nullptr;
 }
 #endif
 
