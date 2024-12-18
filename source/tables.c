@@ -9,7 +9,7 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE(
     table_array, struct uacpi_installed_table, UACPI_STATIC_TABLE_ARRAY_LEN
 )
 DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
-    table_array, struct uacpi_installed_table,
+    table_array, struct uacpi_installed_table, static
 )
 
 static struct table_array tables;

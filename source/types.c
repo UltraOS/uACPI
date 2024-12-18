@@ -1016,7 +1016,7 @@ uacpi_status uacpi_object_assign_integer(uacpi_object *obj, uacpi_u64 value)
     }, UACPI_ASSIGN_BEHAVIOR_DEEP_COPY);
 }
 
-uacpi_status uacpi_object_do_get_string_or_buffer(
+static uacpi_status uacpi_object_do_get_string_or_buffer(
     uacpi_object *obj, uacpi_data_view *out, uacpi_u32 mask
 )
 {
@@ -1166,7 +1166,7 @@ uacpi_object *uacpi_object_create_integer(uacpi_u64 value)
     return obj;
 }
 
-uacpi_object *uacpi_object_do_create_string_or_buffer(
+static uacpi_object *uacpi_object_do_create_string_or_buffer(
     uacpi_data_view view, uacpi_object_type type
 )
 {

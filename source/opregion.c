@@ -426,7 +426,7 @@ struct reg_run_ctx {
     uacpi_size reg_errors;
 };
 
-uacpi_iteration_decision do_run_reg(
+static uacpi_iteration_decision do_run_reg(
     void *opaque, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
