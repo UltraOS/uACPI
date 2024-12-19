@@ -7,8 +7,7 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 > [!WARNING]
 > Not yet ready for production use! While the project is mostly feature-complete,
 > it is still under active development. Public API may change, get added or
-> removed without notice. Thread safety is currently lacking, see
-> [#74](/../../issues/74) for more info & progress. 
+> removed without notice. 
 
 ## Features
 
@@ -27,6 +26,7 @@ A portable and easy-to-integrate implementation of the Advanced Configuration an
 - Client-defined Notify() handlers
 - Firmware global lock management (_GL, locked fields, public API)
 - GAS read/write API
+- Fully thread safe
 
 ## Why would I use this over ACPICA?
 
