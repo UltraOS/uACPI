@@ -15,6 +15,7 @@
 #include <uacpi/osi.h>
 #include <uacpi/tables.h>
 #include <uacpi/opregion.h>
+#include <uacpi/event.h>
 
 void run_resource_tests();
 
@@ -272,6 +273,14 @@ static uacpi_status handle_ec(uacpi_region_op op, uacpi_handle op_data)
     }
 }
 
+static uacpi_interrupt_ret handle_gpe(
+    uacpi_handle, uacpi_namespace_node *, uacpi_u16
+)
+{
+    std::cout << "got a GPE" << std::endl;
+    return UACPI_INTERRUPT_HANDLED | UACPI_GPE_REENABLE;
+}
+
 static void ensure_ok_status(uacpi_status st)
 {
     if (st == UACPI_STATUS_OK)
@@ -505,6 +514,20 @@ static void run_test(
         uacpi_namespace_root(), UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
         handle_ec, nullptr
     );
+    ensure_ok_status(st);
+
+    st = uacpi_install_gpe_handler(
+        UACPI_NULL, 123, UACPI_GPE_TRIGGERING_EDGE, handle_gpe, UACPI_NULL
+    );
+    ensure_ok_status(st);
+
+    st = uacpi_enable_gpe(UACPI_NULL, 123);
+    ensure_ok_status(st);
+
+    st = uacpi_disable_gpe(UACPI_NULL, 123);
+    ensure_ok_status(st);
+
+    st = uacpi_uninstall_gpe_handler(UACPI_NULL, 123, handle_gpe);
     ensure_ok_status(st);
 
     st = uacpi_namespace_initialize();
