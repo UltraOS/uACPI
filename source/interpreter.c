@@ -730,7 +730,7 @@ static uacpi_status handle_buffer(struct execution_context *ctx)
     return UACPI_STATUS_OK;
 }
 
-uacpi_status handle_string(struct execution_context *ctx)
+static uacpi_status handle_string(struct execution_context *ctx)
 {
     struct call_frame *frame = ctx->cur_frame;
     uacpi_object *obj;
@@ -879,7 +879,7 @@ static uacpi_size field_byte_size(uacpi_object *obj)
     return uacpi_round_up_bits_to_bytes(bit_length);
 }
 
-static uacpi_size sizeof_int()
+static uacpi_size sizeof_int(void)
 {
     return g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
 }
@@ -1271,7 +1271,7 @@ static uacpi_status do_load_table(
         return ret;
 
     if (is_dynamic_table_load(cause))
-        ret = uacpi_events_match_post_dynamic_table_load();
+        uacpi_events_match_post_dynamic_table_load();
 
     return ret;
 }
@@ -1537,7 +1537,7 @@ uacpi_status uacpi_execute_table(void *tbl, enum uacpi_table_load_cause cause)
     return ret;
 }
 
-uacpi_u32 get_field_length(struct item *item)
+static uacpi_u32 get_field_length(struct item *item)
 {
     struct package_length *pkg = &item->pkg;
     return pkg->end - pkg->begin;
@@ -1847,7 +1847,7 @@ static void truncate_number_if_needed(uacpi_object *obj)
     obj->integer &= 0xFFFFFFFF;
 }
 
-static uacpi_u64 ones()
+static uacpi_u64 ones(void)
 {
     return g_uacpi_rt_ctx.is_rev1 ? 0xFFFFFFFF : 0xFFFFFFFFFFFFFFFF;
 }
@@ -2151,7 +2151,7 @@ static uacpi_status debug_store(uacpi_object *src)
 /*
  * NOTE: this function returns the parent object
  */
-uacpi_object *reference_unwind(uacpi_object *obj)
+static uacpi_object *reference_unwind(uacpi_object *obj)
 {
     uacpi_object *parent = obj;
 
