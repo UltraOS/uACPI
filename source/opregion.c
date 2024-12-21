@@ -486,9 +486,6 @@ static uacpi_status reg_or_unreg_all_opregions(
         .connection_code = connection_code,
     };
 
-    if (!space_needs_reg(space))
-        return UACPI_STATUS_OK;
-
     handlers = uacpi_node_get_address_space_handlers(device_node);
     if (uacpi_unlikely(handlers == UACPI_NULL))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -549,6 +546,9 @@ uacpi_status uacpi_reg_all_opregions(
     uacpi_status ret;
 
     UACPI_ENSURE_INIT_LEVEL_AT_LEAST(UACPI_INIT_LEVEL_NAMESPACE_LOADED);
+
+    if (!space_needs_reg(space))
+        return UACPI_STATUS_OK;
 
     ret = uacpi_recursive_lock_acquire(&g_opregion_lock);
     if (uacpi_unlikely_error(ret))
@@ -734,7 +734,8 @@ uacpi_status uacpi_uninstall_address_space_handler(
     }
 
 out_unreg:
-    reg_or_unreg_all_opregions(device_node, space, ACPI_REG_DISCONNECT);
+    if (space_needs_reg(space))
+        reg_or_unreg_all_opregions(device_node, space, ACPI_REG_DISCONNECT);
 
 out:
     if (handler != UACPI_NULL)
