@@ -361,6 +361,13 @@ void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
     uacpi_recursive_lock_release(&g_opregion_lock);
 }
 
+uacpi_bool uacpi_address_space_handler_is_default(
+    uacpi_address_space_handler *handler
+)
+{
+    return handler->flags & UACPI_ADDRESS_SPACE_HANDLER_DEFAULT;
+}
+
 enum opregion_iter_action {
     OPREGION_ITER_ACTION_UNINSTALL,
     OPREGION_ITER_ACTION_INSTALL,
@@ -566,9 +573,10 @@ out:
     return ret;
 }
 
-uacpi_status uacpi_install_address_space_handler(
+uacpi_status uacpi_install_address_space_handler_with_flags(
     uacpi_namespace_node *device_node, enum uacpi_address_space space,
-    uacpi_region_handler handler, uacpi_handle handler_context
+    uacpi_region_handler handler, uacpi_handle handler_context,
+    uacpi_u16 flags
 )
 {
     uacpi_status ret;
@@ -610,6 +618,7 @@ uacpi_status uacpi_install_address_space_handler(
     new_handler->user_context = handler_context;
     new_handler->callback = handler;
     new_handler->regions = UACPI_NULL;
+    new_handler->flags = flags;
     handlers->head = new_handler;
 
     iter_ctx.handler = new_handler;
@@ -653,6 +662,16 @@ out:
     uacpi_namespace_write_unlock();
     uacpi_recursive_lock_release(&g_opregion_lock);
     return ret;
+}
+
+uacpi_status uacpi_install_address_space_handler(
+    uacpi_namespace_node *device_node, enum uacpi_address_space space,
+    uacpi_region_handler handler, uacpi_handle handler_context
+)
+{
+    return uacpi_install_address_space_handler_with_flags(
+        device_node, space, handler, handler_context, 0
+    );
 }
 
 uacpi_status uacpi_uninstall_address_space_handler(
