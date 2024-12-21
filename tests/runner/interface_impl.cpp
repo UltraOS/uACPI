@@ -53,45 +53,6 @@ void uacpi_kernel_deinitialize(void)
 }
 #endif
 
-uacpi_status uacpi_kernel_raw_memory_read(
-    uacpi_phys_addr, uacpi_u8, uacpi_u64 *ret
-)
-{
-    *ret = 0;
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_raw_memory_write(
-    uacpi_phys_addr, uacpi_u8, uacpi_u64
-)
-{
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_raw_io_read(
-    uacpi_io_addr addr, uacpi_u8 width, uacpi_u64 *ret
-)
-{
-    if (io_space && addr <= UINT16_MAX) {
-        *ret = 0;
-        memcpy(ret, &io_space[addr], width);
-    } else {
-        *ret = 0xFFFFFFFFFFFFFFFF;
-    }
-
-    return UACPI_STATUS_OK;
-}
-
-uacpi_status uacpi_kernel_raw_io_write(
-    uacpi_io_addr addr, uacpi_u8 width, uacpi_u64 value
-)
-{
-    if (io_space && addr <= UINT16_MAX)
-        memcpy(&io_space[addr], &value, width);
-
-    return UACPI_STATUS_OK;
-}
-
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr addr, uacpi_size,
                                  uacpi_handle *out_handle)
 {
@@ -106,9 +67,16 @@ uacpi_status uacpi_kernel_io_read(
     uacpi_u8 byte_width, uacpi_u64 *value
 )
 {
-    return uacpi_kernel_raw_io_read(
-        (uacpi_io_addr)handle + offset, byte_width, value
-    );
+    auto addr = (uacpi_io_addr)handle + offset;
+
+    if (io_space && addr <= UINT16_MAX) {
+        *value = 0;
+        memcpy(value, &io_space[addr], byte_width);
+    } else {
+        *value = 0xFFFFFFFFFFFFFFFF;
+    }
+
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_pci_read(
@@ -124,16 +92,19 @@ uacpi_status uacpi_kernel_io_write(
     uacpi_u8 byte_width, uacpi_u64 value
 )
 {
-    return uacpi_kernel_raw_io_write(
-        (uacpi_io_addr)handle + offset, byte_width, value
-    );
+    auto addr = (uacpi_io_addr)handle + offset;
+
+    if (io_space && addr <= UINT16_MAX)
+        memcpy(&io_space[addr], &value, byte_width);
+
+    return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_pci_write(
-    uacpi_pci_address*, uacpi_size, uacpi_u8, uacpi_u64
+    uacpi_pci_address*, uacpi_size offset, uacpi_u8 byte_width, uacpi_u64 value
 )
 {
-    return UACPI_STATUS_OK;
+    return uacpi_kernel_io_write(nullptr, offset, byte_width, value);
 }
 
 bool g_expect_virtual_addresses = true;

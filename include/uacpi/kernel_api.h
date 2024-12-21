@@ -31,38 +31,6 @@ void uacpi_kernel_deinitialize(void);
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address);
 
 /*
- * Raw IO API, this is only used for accessing verified data from
- * "safe" code (aka not indirectly invoked by the AML interpreter),
- * e.g. programming FADT & FACS registers.
- *
- * NOTE:
- * 'byte_width' is ALWAYS one of 1, 2, 4, 8. You are NOT allowed to implement
- * this in terms of memcpy, as hardware expects accesses to be of the EXACT
- * width.
- * -------------------------------------------------------------------------
- */
-uacpi_status uacpi_kernel_raw_memory_read(
-    uacpi_phys_addr address, uacpi_u8 byte_width, uacpi_u64 *out_value
-);
-uacpi_status uacpi_kernel_raw_memory_write(
-    uacpi_phys_addr address, uacpi_u8 byte_width, uacpi_u64 in_value
-);
-
-/*
- * NOTE:
- * 'byte_width' is ALWAYS one of 1, 2, 4. You are NOT allowed to break e.g. a
- * 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
- * be of the exact width.
- */
-uacpi_status uacpi_kernel_raw_io_read(
-    uacpi_io_addr address, uacpi_u8 byte_width, uacpi_u64 *out_value
-);
-uacpi_status uacpi_kernel_raw_io_write(
-    uacpi_io_addr address, uacpi_u8 byte_width, uacpi_u64 in_value
-);
-// -------------------------------------------------------------------------
-
-/*
  * NOTE:
  * 'byte_width' is ALWAYS one of 1, 2, 4. Since PCI registers are 32 bits wide
  * this must be able to handle e.g. a 1-byte access by reading at the nearest

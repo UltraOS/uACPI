@@ -3,6 +3,7 @@
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/helpers.h>
 #include <uacpi/internal/log.h>
+#include <uacpi/internal/io.h>
 #include <uacpi/kernel_api.h>
 #include <uacpi/uacpi.h>
 
@@ -262,50 +263,6 @@ static uacpi_status io_region_detach(uacpi_region_detach_data *data)
     return UACPI_STATUS_OK;
 }
 
-static uacpi_status memory_read(void *ptr, uacpi_u8 width, uacpi_u64 *out)
-{
-    switch (width) {
-    case 1:
-        *out = *(volatile uacpi_u8*)ptr;
-        break;
-    case 2:
-        *out = *(volatile uacpi_u16*)ptr;
-        break;
-    case 4:
-        *out = *(volatile uacpi_u32*)ptr;
-        break;
-    case 8:
-        *out = *(volatile uacpi_u64*)ptr;
-        break;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
-
-    return UACPI_STATUS_OK;
-}
-
-static uacpi_status memory_write(void *ptr, uacpi_u8 width, uacpi_u64 in)
-{
-    switch (width) {
-    case 1:
-        *(volatile uacpi_u8*)ptr = in;
-        break;
-    case 2:
-        *(volatile uacpi_u16*)ptr = in;
-        break;
-    case 4:
-        *(volatile uacpi_u32*)ptr = in;
-        break;
-    case 8:
-        *(volatile uacpi_u64*)ptr = in;
-        break;
-    default:
-        return UACPI_STATUS_INVALID_ARGUMENT;
-    }
-
-    return UACPI_STATUS_OK;
-}
-
 static uacpi_status memory_region_do_rw(
     uacpi_region_op op, uacpi_region_rw_data *data
 )
@@ -316,8 +273,8 @@ static uacpi_status memory_region_do_rw(
     ptr = ctx->virt + (data->address - ctx->phys);
 
     return op == UACPI_REGION_OP_READ ?
-        memory_read(ptr, data->byte_width, &data->value) :
-        memory_write(ptr, data->byte_width, data->value);
+        uacpi_system_memory_read(ptr, data->byte_width, &data->value) :
+        uacpi_system_memory_write(ptr, data->byte_width, data->value);
 }
 
 static uacpi_status handle_memory_region(uacpi_region_op op, uacpi_handle op_data)
@@ -342,8 +299,8 @@ static uacpi_status table_data_region_do_rw(
     void *addr = UACPI_VIRT_ADDR_TO_PTR((uacpi_virt_addr)data->offset);
 
     return op == UACPI_REGION_OP_READ ?
-       memory_read(addr, data->byte_width, &data->value) :
-       memory_write(addr, data->byte_width, data->value);
+       uacpi_system_memory_read(addr, data->byte_width, &data->value) :
+       uacpi_system_memory_write(addr, data->byte_width, data->value);
 }
 
 static uacpi_status handle_table_data_region(uacpi_region_op op, uacpi_handle op_data)
