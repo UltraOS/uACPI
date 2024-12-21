@@ -643,16 +643,6 @@ uacpi_status uacpi_install_address_space_handler_with_flags(
     if (g_uacpi_rt_ctx.init_level < UACPI_INIT_LEVEL_NAMESPACE_LOADED)
         goto out;
 
-    /*
-     * _REG methods for global address space handlers (installed to root)
-     * get called during the namespace initialization, no reason
-     * to call them here manually as that will be done later by init code
-     * anyway. Just delay that work until later.
-     */
-    if (device_node == uacpi_namespace_root() &&
-        g_uacpi_rt_ctx.init_level == UACPI_INIT_LEVEL_NAMESPACE_LOADED)
-        goto out;
-
     // Init level is NAMESPACE_INITIALIZED, so we can safely run _REG now
     ret = reg_or_unreg_all_opregions(
         device_node, space, ACPI_REG_CONNECT

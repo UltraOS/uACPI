@@ -594,7 +594,9 @@ uacpi_status uacpi_namespace_initialize(void)
         handler = handlers->head;
 
         while (handler) {
-            uacpi_reg_all_opregions(root, handler->space);
+            if (uacpi_address_space_handler_is_default(handler))
+                uacpi_reg_all_opregions(root, handler->space);
+
             handler = handler->next;
         }
     }
