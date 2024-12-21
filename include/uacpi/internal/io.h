@@ -19,3 +19,13 @@ uacpi_status uacpi_read_field_unit(
 uacpi_status uacpi_write_field_unit(
     uacpi_field_unit *field, const void *src, uacpi_size size
 );
+
+uacpi_status uacpi_system_io_read(
+    uacpi_io_addr address, uacpi_u8 width, uacpi_u64 *out
+);
+uacpi_status uacpi_system_io_write(
+    uacpi_io_addr address, uacpi_u8 width, uacpi_u64 in
+);
+
+uacpi_status uacpi_system_memory_read(void *ptr, uacpi_u8 width, uacpi_u64 *out);
+uacpi_status uacpi_system_memory_write(void *ptr, uacpi_u8 width, uacpi_u64 in);

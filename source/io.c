@@ -517,13 +517,16 @@ uacpi_status uacpi_gas_read(const struct acpi_gas *gas, uacpi_u64 *out_value)
             uacpi_u64 address = gas->address + (index * access_byte_width);
 
             if (gas->address_space_id == UACPI_ADDRESS_SPACE_SYSTEM_IO) {
-                ret = uacpi_kernel_raw_io_read(
-                    address, access_byte_width, &data
-                );
+                ret = uacpi_system_io_read(address, access_byte_width, &data);
             } else {
-                ret = uacpi_kernel_raw_memory_read(
-                    address, access_byte_width, &data
-                );
+                void *virt;
+
+                virt = uacpi_kernel_map(address, access_byte_width);
+                if (uacpi_unlikely(virt == UACPI_NULL))
+                    return UACPI_STATUS_MAPPING_FAILED;
+
+                ret = uacpi_system_memory_read(virt, access_byte_width, &data);
+                uacpi_kernel_unmap(virt, access_bit_width);
             }
             if (uacpi_unlikely_error(ret))
                 return ret;
@@ -564,13 +567,16 @@ uacpi_status uacpi_gas_write(const struct acpi_gas *gas, uacpi_u64 in_value)
             uacpi_u64 address = gas->address + (index * access_byte_width);
 
             if (gas->address_space_id == UACPI_ADDRESS_SPACE_SYSTEM_IO) {
-                ret = uacpi_kernel_raw_io_write(
-                    address, access_byte_width, data
-                );
+                ret = uacpi_system_io_write(address, access_byte_width, data);
             } else {
-                ret = uacpi_kernel_raw_memory_write(
-                    address, access_byte_width, data
-                );
+                void *virt;
+
+                virt = uacpi_kernel_map(address, access_byte_width);
+                if (uacpi_unlikely(virt == UACPI_NULL))
+                    return UACPI_STATUS_MAPPING_FAILED;
+
+                ret = uacpi_system_memory_write(virt, access_byte_width, data);
+                uacpi_kernel_unmap(virt, access_bit_width);
             }
             if (uacpi_unlikely_error(ret))
                 return ret;
@@ -578,6 +584,84 @@ uacpi_status uacpi_gas_write(const struct acpi_gas *gas, uacpi_u64 in_value)
 
         bits_left -= UACPI_MIN(bits_left, access_bit_width);
         ++index;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_system_io_read(
+    uacpi_io_addr address, uacpi_u8 width, uacpi_u64 *out
+)
+{
+    uacpi_status ret;
+    uacpi_handle handle;
+
+    ret = uacpi_kernel_io_map(address, width, &handle);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_kernel_io_read(handle, 0, width, out);
+    uacpi_kernel_io_unmap(handle);
+
+    return ret;
+}
+
+uacpi_status uacpi_system_io_write(
+    uacpi_io_addr address, uacpi_u8 width, uacpi_u64 in
+)
+{
+    uacpi_status ret;
+    uacpi_handle handle;
+
+    ret = uacpi_kernel_io_map(address, width, &handle);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    ret = uacpi_kernel_io_write(handle, 0, width, in);
+    uacpi_kernel_io_unmap(handle);
+
+    return ret;
+}
+
+uacpi_status uacpi_system_memory_read(void *ptr, uacpi_u8 width, uacpi_u64 *out)
+{
+    switch (width) {
+    case 1:
+        *out = *(volatile uacpi_u8*)ptr;
+        break;
+    case 2:
+        *out = *(volatile uacpi_u16*)ptr;
+        break;
+    case 4:
+        *out = *(volatile uacpi_u32*)ptr;
+        break;
+    case 8:
+        *out = *(volatile uacpi_u64*)ptr;
+        break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_system_memory_write(void *ptr, uacpi_u8 width, uacpi_u64 in)
+{
+    switch (width) {
+    case 1:
+        *(volatile uacpi_u8*)ptr = in;
+        break;
+    case 2:
+        *(volatile uacpi_u16*)ptr = in;
+        break;
+    case 4:
+        *(volatile uacpi_u32*)ptr = in;
+        break;
+    case 8:
+        *(volatile uacpi_u64*)ptr = in;
+        break;
+    default:
+        return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
     return UACPI_STATUS_OK;

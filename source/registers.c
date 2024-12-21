@@ -106,7 +106,7 @@ static uacpi_status read_one(
         return uacpi_gas_read(reg, out_value);
     }
 
-    return uacpi_kernel_raw_io_read(*(uacpi_u32*)reg, byte_width, out_value);
+    return uacpi_system_io_read(*(uacpi_u32*)reg, byte_width, out_value);
 }
 
 static uacpi_status write_one(
@@ -123,7 +123,7 @@ static uacpi_status write_one(
         return uacpi_gas_write(reg, in_value);
     }
 
-    return uacpi_kernel_raw_io_write(*(uacpi_u32*)reg, byte_width, in_value);
+    return uacpi_system_io_write(*(uacpi_u32*)reg, byte_width, in_value);
 }
 
 static uacpi_status do_read_register(

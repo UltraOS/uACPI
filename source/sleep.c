@@ -550,9 +550,7 @@ uacpi_status uacpi_reboot(void)
          * For SystemIO we don't do any checking, and we ignore bit width
          * because that's what NT does.
          */
-        ret = uacpi_kernel_raw_io_write(
-            reset_reg->address, 1, fadt->reset_value
-        );
+        ret = uacpi_system_io_write(reset_reg->address, 1, fadt->reset_value);
         break;
     case UACPI_ADDRESS_SPACE_SYSTEM_MEMORY:
         ret = uacpi_write_register(UACPI_REGISTER_RESET, fadt->reset_value);
