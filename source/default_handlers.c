@@ -397,23 +397,27 @@ void uacpi_install_default_address_space_handlers(void)
 
     root = uacpi_namespace_root();
 
-    uacpi_install_address_space_handler(
+    uacpi_install_address_space_handler_with_flags(
         root, UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
-        handle_memory_region, UACPI_NULL
+        handle_memory_region, UACPI_NULL,
+        UACPI_ADDRESS_SPACE_HANDLER_DEFAULT
     );
 
-    uacpi_install_address_space_handler(
+    uacpi_install_address_space_handler_with_flags(
         root, UACPI_ADDRESS_SPACE_SYSTEM_IO,
-        handle_io_region, UACPI_NULL
+        handle_io_region, UACPI_NULL,
+        UACPI_ADDRESS_SPACE_HANDLER_DEFAULT
     );
 
-    uacpi_install_address_space_handler(
+    uacpi_install_address_space_handler_with_flags(
         root, UACPI_ADDRESS_SPACE_PCI_CONFIG,
-        handle_pci_region, UACPI_NULL
+        handle_pci_region, UACPI_NULL,
+        UACPI_ADDRESS_SPACE_HANDLER_DEFAULT
     );
 
-    uacpi_install_address_space_handler(
+    uacpi_install_address_space_handler_with_flags(
         root, UACPI_ADDRESS_SPACE_TABLE_DATA,
-        handle_table_data_region, UACPI_NULL
+        handle_table_data_region, UACPI_NULL,
+        UACPI_ADDRESS_SPACE_HANDLER_DEFAULT
     );
 }

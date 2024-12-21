@@ -67,6 +67,9 @@ typedef struct uacpi_address_space_handler {
     struct uacpi_address_space_handler *next;
     struct uacpi_operation_region *regions;
     uacpi_u16 space;
+
+#define UACPI_ADDRESS_SPACE_HANDLER_DEFAULT (1 << 0)
+    uacpi_u16 flags;
 } uacpi_address_space_handler;
 
 /*
