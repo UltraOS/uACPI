@@ -209,17 +209,21 @@ static uacpi_status access_field_unit(
 
         switch (op) {
         case UACPI_REGION_OP_READ:
-            return uacpi_read_field_unit(
+            ret = uacpi_read_field_unit(
                 field->data, in_out, field->access_width_bytes
             );
+            break;
         case UACPI_REGION_OP_WRITE:
-            return uacpi_write_field_unit(
+            ret = uacpi_write_field_unit(
                 field->data, in_out, field->access_width_bytes
             );
+            break;
         default:
             ret = UACPI_STATUS_INVALID_ARGUMENT;
-            goto out;
+            break;
         }
+
+        goto out;
 
     default:
         uacpi_error("invalid field unit kind %d\n", field->kind);
