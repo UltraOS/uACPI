@@ -1118,6 +1118,19 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
         return UACPI_STATUS_AML_BAD_ENCODING;
     }
 
+    if (op_region->space == UACPI_ADDRESS_SPACE_PCC && op_region->length) {
+        if (uacpi_unlikely(op_region->offset > 255)) {
+            uacpi_warn(
+                "invalid PCC opregion region %.4s subspace %"UACPI_PRIX64"\n",
+                node->name.text, UACPI_FMT64(op_region->offset)
+            );
+        }
+
+        op_region->internal_buffer = uacpi_kernel_calloc(1, op_region->length);
+        if (uacpi_unlikely(op_region->internal_buffer == UACPI_NULL))
+            return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
     node->object = uacpi_create_internal_reference(
         UACPI_REFERENCE_KIND_NAMED, obj
     );
