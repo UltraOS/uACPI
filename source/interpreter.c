@@ -969,13 +969,13 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
 
     case UACPI_OBJECT_BUFFER_FIELD:
         uacpi_write_buffer_field(
-            &dst->buffer_field, src_buf.bytes, src_buf.length
+            &dst->buffer_field, src_buf
         );
         break;
 
     case UACPI_OBJECT_FIELD_UNIT:
         return uacpi_write_field_unit(
-            dst->field_unit, src_buf.bytes, src_buf.length
+            dst->field_unit, src_buf
         );
 
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -3793,8 +3793,7 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
     struct op_context *op_ctx = ctx->cur_op_ctx;
     struct uacpi_namespace_node *node;
     uacpi_object *src_obj, *dst_obj;
-    uacpi_size dst_size;
-    void *dst;
+    uacpi_data_view dst;
 
     node = item_array_at(&op_ctx->items, 0)->node;
     src_obj = uacpi_namespace_node_get_object(node);
@@ -3804,25 +3803,25 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
         uacpi_buffer *buf;
 
         buf = dst_obj->buffer;
-        dst_size = field_byte_size(src_obj);
+        dst.length = field_byte_size(src_obj);
 
-        dst = uacpi_kernel_calloc(dst_size, 1);
-        if (dst == UACPI_NULL)
+        dst.bytes = uacpi_kernel_calloc(dst.length, 1);
+        if (dst.bytes == UACPI_NULL)
             return UACPI_STATUS_OUT_OF_MEMORY;
 
-        buf->data = dst;
-        buf->size = dst_size;
+        buf->data = dst.bytes;
+        buf->size = dst.length;
     } else {
-        dst = &dst_obj->integer;
-        dst_size = sizeof(uacpi_u64);
+        dst.bytes = (uacpi_u8*)&dst_obj->integer;
+        dst.length = sizeof(uacpi_u64);
     }
 
     if (src_obj->type == UACPI_OBJECT_BUFFER_FIELD) {
-        uacpi_read_buffer_field(&src_obj->buffer_field, dst);
+        uacpi_read_buffer_field(&src_obj->buffer_field, dst.bytes);
         return UACPI_STATUS_OK;
     }
 
-    return uacpi_read_field_unit(src_obj->field_unit, dst, dst_size);
+    return uacpi_read_field_unit(src_obj->field_unit, dst);
 }
 
 static uacpi_status handle_create_buffer_field(struct execution_context *ctx)
@@ -4286,7 +4285,9 @@ static uacpi_status handle_inc_dec(struct execution_context *ctx)
 
         if (src->type == UACPI_OBJECT_FIELD_UNIT) {
             ret = uacpi_read_field_unit(
-                src->field_unit, &dst->integer, sizeof_int()
+                src->field_unit, (uacpi_data_view) {
+                    dst->integer, sizeof_int()
+                }
             );
             if (uacpi_unlikely_error(ret))
                 return ret;

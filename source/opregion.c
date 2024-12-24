@@ -796,7 +796,7 @@ out:
 
 uacpi_status uacpi_dispatch_opregion_io(
     uacpi_namespace_node *region_node, uacpi_u32 offset, uacpi_u8 byte_width,
-    uacpi_region_op op, uacpi_u64 *in_out
+    uacpi_region_op op, uacpi_data_view buffer
 )
 {
     uacpi_status ret;
@@ -862,11 +862,11 @@ uacpi_status uacpi_dispatch_opregion_io(
          * buffer.
          */
         if (op == UACPI_REGION_OP_READ) {
-            uacpi_memcpy(in_out, cursor, byte_width);
+            uacpi_memcpy(buffer.bytes, cursor, byte_width);
             break;
         }
 
-        uacpi_memcpy(cursor, in_out, byte_width);
+        uacpi_memcpy(cursor, buffer.const_bytes, byte_width);
 
         /*
          * Dispatch a PCC send command if this was a write to the command field
@@ -901,7 +901,7 @@ uacpi_status uacpi_dispatch_opregion_io(
         };
 
         if (op == UACPI_REGION_OP_WRITE) {
-            data.value = *in_out;
+            data.value = *(uacpi_u64*)buffer.const_bytes;
             uacpi_trace_region_io(
                 region_node, space, op, data.offset,
                 byte_width, data.value
@@ -916,7 +916,7 @@ uacpi_status uacpi_dispatch_opregion_io(
             break;
 
         if (op == UACPI_REGION_OP_READ) {
-            *in_out = data.value;
+            *(uacpi_u64*)buffer.bytes = data.value;
             uacpi_trace_region_io(
                 region_node, space, op, data.offset,
                 byte_width, data.value

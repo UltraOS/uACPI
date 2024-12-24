@@ -128,12 +128,12 @@ void uacpi_read_buffer_field(
 
 static void do_write_misaligned_buffer_field(
     uacpi_buffer_field *field,
-    const void *src, uacpi_size size
+    uacpi_data_view src
 )
 {
     struct bit_span src_span = {
-        .length = size * 8,
-        .const_data = src,
+        .length = src.length * 8,
+        .const_data = src.const_bytes,
     };
     struct bit_span dst_span = {
         .index = field->bit_index,
@@ -144,10 +144,7 @@ static void do_write_misaligned_buffer_field(
     bit_copy(&dst_span, &src_span);
 }
 
-void uacpi_write_buffer_field(
-    uacpi_buffer_field *field,
-    const void *src, uacpi_size size
-)
+void uacpi_write_buffer_field(uacpi_buffer_field *field, uacpi_data_view src)
 {
     if (!(field->bit_index & 7)) {
         uacpi_u8 *dst, last_byte, tail_shift;
@@ -160,7 +157,7 @@ void uacpi_write_buffer_field(
         last_byte = dst[count - 1];
         tail_shift = field->bit_length & 7;
 
-        uacpi_memcpy_zerout(dst, src, count, size);
+        uacpi_memcpy_zerout(dst, src.const_bytes, count, src.length);
         if (tail_shift) {
             uacpi_u8 last_shift = 8 - tail_shift;
             dst[count - 1] = dst[count - 1] << last_shift;
@@ -171,12 +168,12 @@ void uacpi_write_buffer_field(
         return;
     }
 
-    do_write_misaligned_buffer_field(field, src, size);
+    do_write_misaligned_buffer_field(field, src);
 }
 
 static uacpi_status access_field_unit(
     uacpi_field_unit *field, uacpi_u32 offset, uacpi_region_op op,
-    uacpi_u64 *in_out
+    uacpi_data_view data
 )
 {
     uacpi_status ret = UACPI_STATUS_OK;
@@ -193,7 +190,9 @@ static uacpi_status access_field_unit(
     switch (field->kind) {
     case UACPI_FIELD_UNIT_KIND_BANK:
         ret = uacpi_write_field_unit(
-            field->bank_selection, &field->bank_value, sizeof(field->bank_value)
+            field->bank_selection, (uacpi_data_view) {
+                field->bank_value, sizeof(field->bank_value)
+            }
         );
         region_node = field->bank_region;
         break;
@@ -202,7 +201,9 @@ static uacpi_status access_field_unit(
         break;
     case UACPI_FIELD_UNIT_KIND_INDEX:
         ret = uacpi_write_field_unit(
-            field->index, &offset, sizeof(offset)
+            field->index, (uacpi_data_view) {
+                &offset, sizeof(offset)
+            }
         );
         if (uacpi_unlikely_error(ret))
             goto out;
@@ -210,12 +211,12 @@ static uacpi_status access_field_unit(
         switch (op) {
         case UACPI_REGION_OP_READ:
             ret = uacpi_read_field_unit(
-                field->data, in_out, field->access_width_bytes
+                field->data, data, field->access_width_bytes
             );
             break;
         case UACPI_REGION_OP_WRITE:
             ret = uacpi_write_field_unit(
-                field->data, in_out, field->access_width_bytes
+                field->data, data, field->access_width_bytes
             );
             break;
         default:
@@ -234,7 +235,7 @@ static uacpi_status access_field_unit(
         goto out;
 
     ret = uacpi_dispatch_opregion_io(
-        region_node, offset, field->access_width_bytes, op, in_out
+        region_node, field, offset, field->access_width_bytes, op, data
     );
 
 out:
@@ -244,7 +245,7 @@ out:
 }
 
 static uacpi_status do_read_misaligned_field_unit(
-    uacpi_field_unit *field, uacpi_u8 *dst, uacpi_size size
+    uacpi_field_unit *field, uacpi_data_view dst
 )
 {
     uacpi_status ret;
@@ -259,9 +260,9 @@ static uacpi_status do_read_misaligned_field_unit(
         .index = field->bit_offset_within_first_byte,
     };
     struct bit_span dst_span = {
-        .data = dst,
+        .data = dst.bytes,
         .index = 0,
-        .length = size * 8
+        .length = dst.length * 8
     };
 
     reads_to_do = UACPI_ALIGN_UP(
@@ -278,7 +279,7 @@ static uacpi_status do_read_misaligned_field_unit(
 
         ret = access_field_unit(
             field, byte_offset, UACPI_REGION_OP_READ,
-            &out
+            (uacpi_data_view) { &out, sizeof(out) }
         );
         if (uacpi_unlikely_error(ret))
             return ret;
@@ -295,7 +296,7 @@ static uacpi_status do_read_misaligned_field_unit(
 }
 
 uacpi_status uacpi_read_field_unit(
-    uacpi_field_unit *field, void *dst, uacpi_size size
+    uacpi_field_unit *field, uacpi_data_view dst
 )
 {
     uacpi_status ret;
@@ -315,24 +316,25 @@ uacpi_status uacpi_read_field_unit(
         uacpi_u64 out;
 
         ret = access_field_unit(
-            field, field->byte_offset, UACPI_REGION_OP_READ, &out
+            field, field->byte_offset, UACPI_REGION_OP_READ,
+            (uacpi_data_view) { &out, sizeof(out) }
         );
         if (uacpi_unlikely_error(ret))
             return ret;
 
-        uacpi_memcpy_zerout(dst, &out, size, field_byte_length);
-        if (size >= field_byte_length)
-            cut_misaligned_tail(dst, field_byte_length - 1, field->bit_length);
+        uacpi_memcpy_zerout(dst.const_bytes, &out, dst.length, field_byte_length);
+        if (dst.length >= field_byte_length)
+            cut_misaligned_tail(dst.length, field_byte_length - 1, field->bit_length);
 
         return UACPI_STATUS_OK;
     }
 
     // Slow case
-    return do_read_misaligned_field_unit(field, dst, size);
+    return do_read_misaligned_field_unit(field, dst);
 }
 
 uacpi_status uacpi_write_field_unit(
-    uacpi_field_unit *field, const void *src, uacpi_size size
+    uacpi_field_unit *field, uacpi_data_view src
 )
 {
     uacpi_status ret;
@@ -341,9 +343,9 @@ uacpi_status uacpi_write_field_unit(
     uacpi_u64 in;
 
     struct bit_span src_span = {
-        .const_data = src,
+        .const_data = src.const_bytes,
         .index = 0,
-        .length = size * 8
+        .length = src.length * 8
     };
     struct bit_span dst_span = {
         .data = (uacpi_u8*)&in,
