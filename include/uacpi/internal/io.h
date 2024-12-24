@@ -10,14 +10,14 @@ void uacpi_read_buffer_field(
     const uacpi_buffer_field *field, void *dst
 );
 void uacpi_write_buffer_field(
-    uacpi_buffer_field *field, const void *src, uacpi_size size
+    uacpi_buffer_field *field, uacpi_data_view src
 );
 
 uacpi_status uacpi_read_field_unit(
-    uacpi_field_unit *field, void *dst, uacpi_size size
+    uacpi_field_unit *field, uacpi_data_view dst
 );
 uacpi_status uacpi_write_field_unit(
-    uacpi_field_unit *field, const void *src, uacpi_size size
+    uacpi_field_unit *field, uacpi_data_view src
 );
 
 uacpi_status uacpi_system_io_read(

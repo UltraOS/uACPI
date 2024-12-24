@@ -669,6 +669,10 @@ uacpi_status uacpi_for_each_device_resource(
     uacpi_resource_iteration_callback cb, void *user
 );
 
+uacpi_status uacpi_get_resources_from_buffer(
+    uacpi_data_view aml_buffer, uacpi_resources **out_resources
+);
+
 #ifdef __cplusplus
 }
 #endif
