@@ -695,3 +695,17 @@ void uacpi_log(uacpi_log_level lvl, const uacpi_char *str, ...)
     uacpi_va_end(vlist);
 }
 #endif
+
+#ifndef UACPI_NATIVE_ALLOC_ZEROED
+void *uacpi_kernel_alloc_zeroed(uacpi_size size)
+{
+    void *ptr;
+
+    ptr = uacpi_kernel_alloc(size);
+    if (uacpi_unlikely(ptr == UACPI_NULL))
+        return ptr;
+
+    uacpi_memzero(ptr, size);
+    return ptr;
+}
+#endif

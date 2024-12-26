@@ -283,7 +283,7 @@ uacpi_namespace_node *uacpi_namespace_node_alloc(uacpi_object_name name)
 {
     uacpi_namespace_node *ret;
 
-    ret = uacpi_kernel_calloc(1, sizeof(*ret));
+    ret = uacpi_kernel_alloc_zeroed(sizeof(*ret));
     if (uacpi_unlikely(ret == UACPI_NULL))
         return ret;
 

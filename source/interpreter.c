@@ -2729,7 +2729,7 @@ static uacpi_status buffer_to_string(
 static uacpi_status do_make_empty_object(uacpi_buffer *buf,
                                          uacpi_bool is_string)
 {
-    buf->text = uacpi_kernel_calloc(1, sizeof(uacpi_char));
+    buf->text = uacpi_kernel_alloc_zeroed(sizeof(uacpi_char));
     if (uacpi_unlikely(buf->text == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
@@ -3790,7 +3790,7 @@ static uacpi_status handle_field_read(struct execution_context *ctx)
         buf = dst_obj->buffer;
         dst_size = field_byte_size(src_obj);
 
-        dst = uacpi_kernel_calloc(dst_size, 1);
+        dst = uacpi_kernel_alloc_zeroed(dst_size);
         if (dst == UACPI_NULL)
             return UACPI_STATUS_OUT_OF_MEMORY;
 
@@ -5711,7 +5711,7 @@ uacpi_status uacpi_execute_control_method(
     uacpi_status ret = UACPI_STATUS_OK;
     struct execution_context *ctx;
 
-    ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
+    ctx = uacpi_kernel_alloc_zeroed(sizeof(*ctx));
     if (uacpi_unlikely(ctx == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 

@@ -65,6 +65,19 @@ if (FORMATTED_LOGGING_BUILD)
     )
 endif ()
 
+
+if (NOT NATIVE_ALLOC_ZEROED)
+    set(NATIVE_ALLOC_ZEROED 0)
+endif()
+
+if (NATIVE_ALLOC_ZEROED)
+    target_compile_definitions(
+        test-runner
+        PRIVATE
+        -DUACPI_NATIVE_ALLOC_ZEROED
+    )
+endif ()
+
 if (NOT KERNEL_INITIALIZATION)
     set(KERNEL_INITIALIZATION 1)
 endif()

@@ -95,11 +95,13 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len);
  */
 void *uacpi_kernel_alloc(uacpi_size size);
 
+#ifdef UACPI_NATIVE_ALLOC_ZEROED
 /*
- * Allocate a block of memory of 'count' * 'size' bytes.
+ * Allocate a block of memory of 'size' bytes.
  * The returned memory block is expected to be zero-filled.
  */
-void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size);
+void *uacpi_kernel_alloc_zeroed(uacpi_size size);
+#endif
 
 /*
  * Free a previously allocated memory block.

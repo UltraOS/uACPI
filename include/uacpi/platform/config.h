@@ -67,6 +67,13 @@ UACPI_BUILD_BUG_ON_WITH_MSG(
  */
 // #define UACPI_SIZED_FREES
 
+
+/*
+ * Makes uacpi_kernel_alloc_zeroed mandatory to implement by the host, uACPI
+ * will not provide a default implementation if this is enabled.
+ */
+// #define UACPI_NATIVE_ALLOC_ZEROED
+
 /*
  * =========================
  * Platform-specific options
