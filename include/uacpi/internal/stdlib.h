@@ -80,3 +80,7 @@ uacpi_u8 uacpi_bit_scan_forward(uacpi_u64);
 uacpi_u8 uacpi_bit_scan_backward(uacpi_u64);
 
 uacpi_u8 uacpi_popcount(uacpi_u64);
+
+#ifndef UACPI_NATIVE_ALLOC_ZEROED
+void *uacpi_kernel_alloc_zeroed(uacpi_size size);
+#endif

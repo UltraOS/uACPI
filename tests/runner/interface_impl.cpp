@@ -235,16 +235,6 @@ void uacpi_kernel_free(void* mem, uacpi_size size)
     allocations.erase(it);
     free(mem);
 }
-
-void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
-{
-    auto *ret = uacpi_kernel_alloc(count * size);
-    if (ret == nullptr)
-        return ret;
-
-    memset(ret, 0, count * size);
-    return ret;
-}
 #else
 void* uacpi_kernel_alloc(uacpi_size size)
 {
@@ -258,10 +248,17 @@ void uacpi_kernel_free(void* mem)
 {
     return free(mem);
 }
+#endif
 
-void *uacpi_kernel_calloc(uacpi_size count, uacpi_size size)
+#ifdef UACPI_NATIVE_ALLOC_ZEROED
+void *uacpi_kernel_alloc_zeroed(uacpi_size size)
 {
-    return calloc(count, size);
+    auto *ret = uacpi_kernel_alloc(size);
+    if (ret == nullptr)
+        return ret;
+
+    memset(ret, 0, size);
+    return ret;
 }
 #endif
 

@@ -94,7 +94,7 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
 {
     uacpi_buffer *buf;
 
-    buf = uacpi_kernel_calloc(1, sizeof(uacpi_buffer));
+    buf = uacpi_kernel_alloc_zeroed(sizeof(uacpi_buffer));
     if (uacpi_unlikely(buf == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -129,7 +129,9 @@ uacpi_bool uacpi_package_fill(
     if (uacpi_unlikely(num_elements == 0))
         return UACPI_TRUE;
 
-    pkg->objects = uacpi_kernel_calloc(num_elements, sizeof(uacpi_handle));
+    pkg->objects = uacpi_kernel_alloc_zeroed(
+        num_elements * sizeof(uacpi_handle)
+    );
     if (uacpi_unlikely(pkg->objects == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -154,7 +156,7 @@ static uacpi_bool package_alloc(
 {
     uacpi_package *pkg;
 
-    pkg = uacpi_kernel_calloc(1, sizeof(uacpi_package));
+    pkg = uacpi_kernel_alloc_zeroed(sizeof(uacpi_package));
     if (uacpi_unlikely(pkg == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -178,7 +180,7 @@ uacpi_mutex *uacpi_create_mutex(void)
 {
     uacpi_mutex *mutex;
 
-    mutex = uacpi_kernel_calloc(1, sizeof(uacpi_mutex));
+    mutex = uacpi_kernel_alloc_zeroed(sizeof(uacpi_mutex));
     if (uacpi_unlikely(mutex == UACPI_NULL))
         return UACPI_NULL;
 
@@ -204,7 +206,7 @@ static uacpi_bool event_alloc(uacpi_object *obj)
 {
     uacpi_event *event;
 
-    event = uacpi_kernel_calloc(1, sizeof(uacpi_event));
+    event = uacpi_kernel_alloc_zeroed(sizeof(uacpi_event));
     if (uacpi_unlikely(event == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -224,7 +226,7 @@ static uacpi_bool method_alloc(uacpi_object *obj)
 {
     uacpi_control_method *method;
 
-    method = uacpi_kernel_calloc(1, sizeof(*method));
+    method = uacpi_kernel_alloc_zeroed(sizeof(*method));
     if (uacpi_unlikely(method == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -238,7 +240,7 @@ static uacpi_bool op_region_alloc(uacpi_object *obj)
 {
     uacpi_operation_region *op_region;
 
-    op_region = uacpi_kernel_calloc(1, sizeof(*op_region));
+    op_region = uacpi_kernel_alloc_zeroed(sizeof(*op_region));
     if (uacpi_unlikely(op_region == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -252,7 +254,7 @@ static uacpi_bool field_unit_alloc(uacpi_object *obj)
 {
     uacpi_field_unit *field_unit;
 
-    field_unit = uacpi_kernel_calloc(1, sizeof(*field_unit));
+    field_unit = uacpi_kernel_alloc_zeroed(sizeof(*field_unit));
     if (uacpi_unlikely(field_unit == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -266,7 +268,7 @@ static uacpi_bool processor_alloc(uacpi_object *obj)
 {
     uacpi_processor *processor;
 
-    processor = uacpi_kernel_calloc(1, sizeof(*processor));
+    processor = uacpi_kernel_alloc_zeroed(sizeof(*processor));
     if (uacpi_unlikely(processor == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -280,7 +282,7 @@ static uacpi_bool device_alloc(uacpi_object *obj)
 {
     uacpi_device *device;
 
-    device = uacpi_kernel_calloc(1, sizeof(*device));
+    device = uacpi_kernel_alloc_zeroed(sizeof(*device));
     if (uacpi_unlikely(device == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -294,7 +296,7 @@ static uacpi_bool thermal_zone_alloc(uacpi_object *obj)
 {
     uacpi_thermal_zone *thermal_zone;
 
-    thermal_zone = uacpi_kernel_calloc(1, sizeof(*thermal_zone));
+    thermal_zone = uacpi_kernel_alloc_zeroed(sizeof(*thermal_zone));
     if (uacpi_unlikely(thermal_zone == UACPI_NULL))
         return UACPI_FALSE;
 
@@ -325,7 +327,7 @@ uacpi_object *uacpi_create_object(uacpi_object_type type)
     uacpi_object *ret;
     object_ctor ctor;
 
-    ret = uacpi_kernel_calloc(1, sizeof(*ret));
+    ret = uacpi_kernel_alloc_zeroed(sizeof(*ret));
     if (uacpi_unlikely(ret == UACPI_NULL))
         return ret;
 

@@ -1995,7 +1995,7 @@ uacpi_status uacpi_native_resources_from_aml(
         return UACPI_STATUS_INTERNAL_ERROR;
     }
 
-    resources = uacpi_kernel_calloc(ctx.size + sizeof(uacpi_resources), 1);
+    resources = uacpi_kernel_alloc_zeroed(ctx.size + sizeof(uacpi_resources));
     if (uacpi_unlikely(resources == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
     resources->length = ctx.size;
@@ -2456,7 +2456,7 @@ uacpi_status uacpi_native_resources_to_aml(
         return UACPI_STATUS_INTERNAL_ERROR;
     }
 
-    buffer = uacpi_kernel_calloc(ctx.size, 1);
+    buffer = uacpi_kernel_alloc_zeroed(ctx.size);
     if (uacpi_unlikely(buffer == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
