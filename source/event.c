@@ -416,7 +416,7 @@ static void async_run_gpe_handler(uacpi_handle opaque)
 
     ret = uacpi_namespace_write_lock();
     if (uacpi_unlikely_error(ret))
-        goto out;
+        goto out_no_unlock;
 
     switch (event->handler_type) {
     case GPE_HANDLER_TYPE_AML_HANDLER: {
@@ -445,7 +445,6 @@ static void async_run_gpe_handler(uacpi_handle opaque)
                 uacpi_status_to_string(ret)
             );
         }
-        uacpi_object_unref(method_obj);
         break;
     }
 
@@ -469,10 +468,9 @@ static void async_run_gpe_handler(uacpi_handle opaque)
         break;
     }
 
-out:
-    if (uacpi_likely_success(ret))
-        uacpi_namespace_write_unlock();
+    uacpi_namespace_write_unlock();
 
+out_no_unlock:
     /*
      * We schedule the work as NOTIFICATION to make sure all other notifications
      * finish before this GPE is re-enabled.
