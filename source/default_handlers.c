@@ -38,23 +38,14 @@ static uacpi_namespace_node *find_pci_root(uacpi_namespace_node *node)
     return node;
 }
 
-struct pci_region_ctx {
-    uacpi_pci_address address;
-};
-
 static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
 {
-    struct pci_region_ctx *ctx;
     uacpi_namespace_node *node, *pci_root, *device;
-    uacpi_object *obj;
+    uacpi_pci_address address = { 0 };
+    uacpi_u64 value;
     uacpi_status ret;
 
-    ctx = uacpi_kernel_calloc(1, sizeof(*ctx));
-    if (ctx == UACPI_NULL)
-        return UACPI_STATUS_OUT_OF_MEMORY;
-
     node = data->region_node;
-
     pci_root = find_pci_root(node);
 
     /*
@@ -80,53 +71,35 @@ static uacpi_status pci_region_attach(uacpi_region_attach_data *data)
         uacpi_trace_region_error(
             node, "unable to find device responsible for", ret
         );
-        uacpi_free(ctx, sizeof(*ctx));
         return ret;
     }
 
-    ret = uacpi_eval_typed(
-        device, "_ADR", UACPI_NULL,
-        UACPI_OBJECT_INTEGER_BIT, &obj
-    );
+    ret = uacpi_eval_simple_integer(device, "_ADR", &value);
     if (ret == UACPI_STATUS_OK) {
-        ctx->address.function = (obj->integer >> 0)  & 0xFF;
-        ctx->address.device   = (obj->integer >> 16) & 0xFF;
-        uacpi_object_unref(obj);
+        address.function = (value >> 0)  & 0xFF;
+        address.device   = (value >> 16) & 0xFF;
     }
 
-    ret = uacpi_eval_typed(
-        pci_root, "_SEG", UACPI_NULL,
-        UACPI_OBJECT_INTEGER_BIT, &obj
-    );
-    if (ret == UACPI_STATUS_OK) {
-        ctx->address.segment = obj->integer;
-        uacpi_object_unref(obj);
-    }
+    ret = uacpi_eval_simple_integer(pci_root, "_SEG", &value);
+    if (ret == UACPI_STATUS_OK)
+        address.segment = value;
 
-    ret = uacpi_eval_typed(
-        pci_root, "_BBN", UACPI_NULL,
-        UACPI_OBJECT_INTEGER_BIT, &obj
-    );
-    if (ret == UACPI_STATUS_OK) {
-        ctx->address.bus = obj->integer;
-        uacpi_object_unref(obj);
-    }
+    ret = uacpi_eval_simple_integer(pci_root, "_BBN", &value);
+    if (ret == UACPI_STATUS_OK)
+        address.bus = value;
 
     uacpi_trace(
         "detected PCI device %.4s@%04X:%02X:%02X:%01X\n",
-        device->name.text, ctx->address.segment, ctx->address.bus,
-        ctx->address.device, ctx->address.function
+        device->name.text, address.segment, address.bus,
+        address.device, address.function
     );
 
-    data->out_region_context = ctx;
-    return UACPI_STATUS_OK;
+    return uacpi_kernel_pci_device_open(address, &data->out_region_context);
 }
 
 static uacpi_status pci_region_detach(uacpi_region_detach_data *data)
 {
-    struct pci_region_ctx *ctx = data->region_context;
-
-    uacpi_free(ctx, sizeof(*ctx));
+    uacpi_kernel_pci_device_close(data->region_context);
     return UACPI_STATUS_OK;
 }
 
@@ -134,7 +107,7 @@ static uacpi_status pci_region_do_rw(
     uacpi_region_op op, uacpi_region_rw_data *data
 )
 {
-    struct pci_region_ctx *ctx = data->region_context;
+    uacpi_handle dev = data->region_context;
     uacpi_u8 width;
     uacpi_size offset;
 
@@ -142,8 +115,8 @@ static uacpi_status pci_region_do_rw(
     width = data->byte_width;
 
     return op == UACPI_REGION_OP_READ ?
-           uacpi_kernel_pci_read(&ctx->address, offset, width, &data->value) :
-           uacpi_kernel_pci_write(&ctx->address, offset, width, data->value);
+        uacpi_kernel_pci_read(dev, offset, width, &data->value) :
+        uacpi_kernel_pci_write(dev, offset, width, data->value);
 }
 
 static uacpi_status handle_pci_region(uacpi_region_op op, uacpi_handle op_data)

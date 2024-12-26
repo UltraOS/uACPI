@@ -79,8 +79,17 @@ uacpi_status uacpi_kernel_io_read(
     return UACPI_STATUS_OK;
 }
 
+uacpi_status uacpi_kernel_pci_device_open(
+    uacpi_pci_address, uacpi_handle *out_handle
+)
+{
+    *out_handle = nullptr;
+    return UACPI_STATUS_OK;
+}
+void uacpi_kernel_pci_device_close(uacpi_handle) {}
+
 uacpi_status uacpi_kernel_pci_read(
-    uacpi_pci_address*, uacpi_size offset,
+    uacpi_handle, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 *value
 )
 {
@@ -101,7 +110,7 @@ uacpi_status uacpi_kernel_io_write(
 }
 
 uacpi_status uacpi_kernel_pci_write(
-    uacpi_pci_address*, uacpi_size offset, uacpi_u8 byte_width, uacpi_u64 value
+    uacpi_handle, uacpi_size offset, uacpi_u8 byte_width, uacpi_u64 value
 )
 {
     return uacpi_kernel_io_write(nullptr, offset, byte_width, value);
