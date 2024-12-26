@@ -347,7 +347,7 @@ UACPI_OP(                                                          \
     name##Op, code,                                                \
     {                                                              \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                             \
-        __VA_ARGS__                                                \
+        ##__VA_ARGS__,                                             \
         UACPI_PARSE_OP_IF_HAS_DATA, 4,                             \
             UACPI_PARSE_OP_RECORD_AML_PC,                          \
             UACPI_PARSE_OP_TERM_ARG_OR_NAMED_OBJECT_OR_UNRESOLVED, \
@@ -396,7 +396,7 @@ UACPI_OP(                                                             \
         UACPI_PARSE_OP_TERM_ARG_UNWRAP_INTERNAL,                      \
         UACPI_PARSE_OP_TYPECHECK, UACPI_OBJECT_BUFFER,                \
         UACPI_PARSE_OP_OPERAND,                                       \
-        __VA_ARGS__                                                   \
+        ##__VA_ARGS__,                                                \
         UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,             \
         UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, node_idx,              \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER_FIELD, \
@@ -544,11 +544,11 @@ UACPI_OP(                                                        \
 )                                                                \
 UACPI_BUILD_PACKAGE_OP(                                          \
     Package, 0x12, 3,                                            \
-    UACPI_PARSE_OP_LOAD_IMM, 1,                                  \
+    UACPI_PARSE_OP_LOAD_IMM, 1                                   \
 )                                                                \
 UACPI_BUILD_PACKAGE_OP(                                          \
     VarPackage, 0x13, 2,                                         \
-    UACPI_PARSE_OP_OPERAND,                                      \
+    UACPI_PARSE_OP_OPERAND                                       \
 )                                                                \
 UACPI_OP(                                                        \
     MethodOp, 0x14,                                              \
@@ -1074,7 +1074,7 @@ UACPI_OP(                                                        \
     {                                                            \
         UACPI_PARSE_OP_TRACKED_PKGLEN,                           \
         UACPI_PARSE_OP_CREATE_NAMESTRING_OR_NULL_IF_LOAD,        \
-        __VA_ARGS__                                              \
+        ##__VA_ARGS__,                                           \
         UACPI_PARSE_OP_SKIP_WITH_WARN_IF_NULL, 1,                \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, type,                 \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
@@ -1146,7 +1146,7 @@ UACPI_OP(                                                   \
 )                                                           \
 UACPI_DO_BUILD_BUFFER_FIELD_OP(                             \
     Create, UACPI_EXT_OP(0x13), 3,                          \
-    UACPI_PARSE_OP_OPERAND,                                 \
+    UACPI_PARSE_OP_OPERAND                                  \
 )                                                           \
 UACPI_OUT_OF_LINE_OP(                                       \
     LoadTableOp, UACPI_EXT_OP(0x1F),                        \
@@ -1284,12 +1284,12 @@ UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
     Processor, 0x83, UACPI_OBJECT_PROCESSOR,                \
     UACPI_PARSE_OP_LOAD_IMM, 1,                             \
     UACPI_PARSE_OP_LOAD_IMM, 4,                             \
-    UACPI_PARSE_OP_LOAD_IMM, 1,                             \
+    UACPI_PARSE_OP_LOAD_IMM, 1                              \
 )                                                           \
 UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
     PowerRes, 0x84, UACPI_OBJECT_POWER_RESOURCE,            \
     UACPI_PARSE_OP_LOAD_IMM, 1,                             \
-    UACPI_PARSE_OP_LOAD_IMM, 2,                             \
+    UACPI_PARSE_OP_LOAD_IMM, 2                              \
 )                                                           \
 UACPI_BUILD_NAMED_SCOPE_OBJECT_OP(                          \
     ThermalZone, 0x85, UACPI_OBJECT_THERMAL_ZONE            \
