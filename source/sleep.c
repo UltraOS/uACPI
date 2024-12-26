@@ -532,6 +532,7 @@ uacpi_status uacpi_wake_from_sleep_state(
 uacpi_status uacpi_reboot(void)
 {
     uacpi_status ret;
+    uacpi_handle pci_dev = UACPI_NULL;
     struct acpi_fadt *fadt = &g_uacpi_rt_ctx.fadt;
     struct acpi_gas *reset_reg = &fadt->reset_reg;
 
@@ -564,8 +565,12 @@ uacpi_status uacpi_reboot(void)
             .function = (reset_reg->address >> 16) & 0xFF,
         };
 
+        ret = uacpi_kernel_pci_device_open(address, &pci_dev);
+        if (uacpi_unlikely_error(ret))
+            break;
+
         ret = uacpi_kernel_pci_write(
-            &address, reset_reg->address & 0xFFFF, 1, fadt->reset_value
+            pci_dev, reset_reg->address & 0xFFFF, 1, fadt->reset_value
         );
         break;
     }
@@ -591,8 +596,11 @@ uacpi_status uacpi_reboot(void)
         }
 
         uacpi_error("reset timeout\n");
-        return UACPI_STATUS_HARDWARE_TIMEOUT;
+        ret = UACPI_STATUS_HARDWARE_TIMEOUT;
     }
+
+    if (pci_dev != UACPI_NULL)
+        uacpi_kernel_pci_device_close(pci_dev);
 
     return ret;
 }

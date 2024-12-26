@@ -31,6 +31,19 @@ void uacpi_kernel_deinitialize(void);
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address);
 
 /*
+ * Open a PCI device at 'address' for reading & writing.
+ *
+ * The handle returned via 'out_handle' is used to perform IO on the
+ * configuration space of the device.
+ */
+uacpi_status uacpi_kernel_pci_device_open(
+    uacpi_pci_address address, uacpi_handle *out_handle
+);
+void uacpi_kernel_pci_device_close(uacpi_handle);
+
+/*
+ * Read & write the configuration space of a previously open PCI device.
+ *
  * NOTE:
  * 'byte_width' is ALWAYS one of 1, 2, 4. Since PCI registers are 32 bits wide
  * this must be able to handle e.g. a 1-byte access by reading at the nearest
@@ -38,11 +51,11 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address);
  * byte.
  */
 uacpi_status uacpi_kernel_pci_read(
-    uacpi_pci_address *address, uacpi_size offset,
+    uacpi_handle device, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 *value
 );
 uacpi_status uacpi_kernel_pci_write(
-    uacpi_pci_address *address, uacpi_size offset,
+    uacpi_handle device, uacpi_size offset,
     uacpi_u8 byte_width, uacpi_u64 value
 );
 
