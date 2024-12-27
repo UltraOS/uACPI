@@ -99,6 +99,8 @@ const uacpi_char *uacpi_status_to_string(uacpi_status st)
         return "bad table checksum";
     case UACPI_STATUS_INVALID_SIGNATURE:
         return "invalid table signature";
+    case UACPI_STATUS_INVALID_TABLE_LENGTH:
+        return "invalid table length";
     case UACPI_STATUS_NOT_FOUND:
         return "not found";
     case UACPI_STATUS_INVALID_ARGUMENT:
