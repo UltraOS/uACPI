@@ -322,8 +322,23 @@ def build_test_runner(bitness: int) -> str:
     build_dir = f"build-{platform.system().lower()}-{bitness}bits"
     runner_build_dir = test_relpath("runner", build_dir)
     runner_exe = os.path.join(runner_build_dir, test_runner_binary())
+    use_ninja = False
 
-    cmake_args: List[str] = ["cmake", ".."]
+    if platform.system() != "Windows":
+        try:
+            subprocess.run(["ninja", "--version"], check=True,
+                           stdout=subprocess.DEVNULL)
+            use_ninja = True
+        except FileNotFoundError:
+            pass
+
+    cmake_args: List[str] = ["cmake"]
+
+    if use_ninja:
+        cmake_args.extend(["-G", "Ninja"])
+
+    cmake_args.append("..")
+
     if bitness == 32:
         if platform.system() == "Windows":
             cmake_args.extend(["-A", "Win32"])
