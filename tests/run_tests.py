@@ -3,7 +3,9 @@ import subprocess
 import argparse
 import os
 import sys
+import time
 import platform
+from multiprocessing import Manager, Pool, Queue
 from typing import List, Tuple, Optional
 from types import TracebackType
 from abc import ABC, abstractmethod
@@ -211,59 +213,94 @@ def compile_test_cases(
     return compiled_cases
 
 
-def run_tests(cases: List[TestCase], runner: str) -> bool:
-    fail_count = 0
+def run_single_test(case: TestCase, results: Queue, runner: str) -> bool:
+    timeout = False
+    start_time = time.time()
+    proc = subprocess.Popen(
+        [runner, case.path, *case.extra_runner_args()],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
 
-    for case in cases:
-        print(f"{case.name}...", end=" ", flush=True)
+    try:
+        stdout, stderr = proc.communicate(timeout=60)
+        elapsed_time = time.time() - start_time
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+        timeout = True
 
-        proc = subprocess.Popen(
-            [runner, case.path, *case.extra_runner_args()],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True
-        )
-        try:
-            stdout, stderr = proc.communicate(timeout=60)
-            if proc.returncode == 0:
-                print("OK", flush=True)
-                continue
-        except subprocess.TimeoutExpired:
-            print("TIMEOUT", flush=True)
-            proc.kill()
-            stdout, stderr = proc.communicate()
-        else:
-            print("FAIL", flush=True)
+    elapsed_time = time.time() - start_time
 
-        fail_count += 1
-        output = ""
-
-        def format_output(source: str, data: Optional[str]) -> str:
-            output = ""
-
-            if not data:
-                return output
-
-            output += f"\t{source}:\n"
-            output += "\n".join(["\t" + line for line in data.split("\n")])
-
-            return output
-
-        output += format_output("stdout", stdout)
-        output += format_output("stderr", stderr)
-
-        if output:
-            print("TEST OUTPUT:", flush=True)
-            print(output, flush=True)
-        else:
-            print("NO OUTPUT FROM TEST", flush=True)
-
-    pass_count = len(cases) - fail_count
-    print(f"SUMMARY: {pass_count}/{len(cases)}", end="")
-
-    if fail_count:
-        print(f" ({fail_count} FAILED)")
+    if proc.returncode == 0:
+        results.put((True, case, elapsed_time))
+        return True
     else:
+        results.put((False, case, elapsed_time, stdout, stderr, timeout))
+        return False
+
+
+def run_tests(cases: List[TestCase], runner: str, parallelism: int) -> bool:
+    pass_count = 0
+    fail_count = 0
+    start_time = time.time()
+
+    def print_test_header(case: TestCase, success: bool, timeout: bool,
+                          elapsed: float) -> None:
+        status_str = "OK" if success else "TIMEOUT" if timeout else "FAILED"
+
+        print(f"[{pass_count}/{len(cases)}] {case.name} "
+              f"{status_str} in {elapsed:.2f}s", flush=True)
+
+    def format_output(data: str) -> str:
+        return "\n".join(["\t" + line for line in data.split("\n")])
+
+    with Pool(processes=parallelism) as pool:
+        manager = Manager()
+        result_queue = manager.Queue()
+
+        pool.starmap_async(run_single_test,
+                           [(case, result_queue, runner) for case in cases])
+
+        while pass_count + fail_count < len(cases):
+            success, case, elapsed_time, *args = result_queue.get()
+
+            if success:
+                pass_count += 1
+
+                print_test_header(case, True, False, elapsed_time)
+            else:
+                fail_count += 1
+                stdout, stderr, timeout = args
+
+                print_test_header(case, False, timeout, elapsed_time)
+
+                stdout_output = format_output(stdout)
+                stderr_output = format_output(stderr)
+
+                if stdout_output:
+                    print(f"STDOUT FOR {case.name}:", flush=True)
+                    print(stdout_output, flush=True)
+                else:
+                    print(f"NO STDOUT FROM TEST {case.name}", flush=True)
+
+                if stderr_output:
+                    print(f"STDERR FOR {case.name}:", flush=True)
+                    print(stderr_output, flush=True)
+                else:
+                    print(f"NO STDERR FROM TEST {case.name}", flush=True)
+
+        pool.close()
+        pool.join()
+
+    elapsed_time = time.time() - start_time
+
+    print(f"SUMMARY: {pass_count}/{len(cases)} in {elapsed_time:.2f}s", end="")
+
+    if not fail_count:
         print(" (ALL PASS!)")
+    else:
+        print(f" ({fail_count} FAILED)")
 
     return not fail_count
 
@@ -327,6 +364,9 @@ def main() -> int:
                         help="uACPI build bitness")
     parser.add_argument("--large", action="store_true",
                         help="Run the large test suite as well")
+    parser.add_argument("--parallelism", type=int,
+                        default=os.cpu_count() or 1,
+                        help="Number of test runners to run in parallel")
     args = parser.parse_args()
 
     test_compiler = args.asl_compiler
@@ -353,7 +393,7 @@ def main() -> int:
         test_cases, test_compiler, bin_dir
     )
     with TestHeaderFooter("AML Tests"):
-        ret = run_tests(base_test_cases, test_runner)
+        ret = run_tests(base_test_cases, test_runner, args.parallelism)
 
     if ret and args.large:
         large_test_cases = generate_large_test_cases(
@@ -361,7 +401,7 @@ def main() -> int:
         )
 
         with TestHeaderFooter("Large AML Tests"):
-            ret = run_tests(large_test_cases, test_runner)
+            ret = run_tests(large_test_cases, test_runner, args.parallelism)
 
     sys.exit(not ret)
 
