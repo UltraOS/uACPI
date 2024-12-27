@@ -77,8 +77,9 @@
                 }                                                            \
                                                                              \
                 new_buf = uacpi_kernel_alloc(bytes);                         \
-                if (!new_buf)                                                \
-                    return NULL;                                             \
+                if (uacpi_unlikely(new_buf == UACPI_NULL))                   \
+                    return UACPI_NULL;                                       \
+                                                                             \
                 arr->dynamic_capacity = bytes / type_size;                   \
                                                                              \
                 if (arr->dynamic_storage) {                                  \
