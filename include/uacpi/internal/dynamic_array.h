@@ -65,8 +65,16 @@
                 void *new_buf;                                               \
                                                                              \
                 type_size = sizeof(*arr->dynamic_storage);                   \
-                bytes = arr->dynamic_capacity * type_size;                   \
-                bytes += type_size;                                          \
+                                                                             \
+                if (arr->dynamic_capacity == 0) {                            \
+                    bytes = type_size * inline_cap;                          \
+                } else {                                                     \
+                    bytes = (arr->dynamic_capacity / 2) * type_size;         \
+                    if (bytes == 0)                                          \
+                        bytes += type_size;                                  \
+                                                                             \
+                    bytes += arr->dynamic_capacity * type_size;              \
+                }                                                            \
                                                                              \
                 new_buf = uacpi_kernel_alloc(bytes);                         \
                 if (!new_buf)                                                \
