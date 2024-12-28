@@ -365,6 +365,8 @@ typedef enum uacpi_region_op {
     UACPI_REGION_OP_WRITE,
 
     UACPI_REGION_OP_PCC_SEND,
+    UACPI_REGION_OP_GPIO_READ,
+    UACPI_REGION_OP_GPIO_WRITE,
 } uacpi_region_op;
 
 typedef struct uacpi_generic_region_info {
@@ -377,12 +379,18 @@ typedef struct uacpi_pcc_region_info {
     uacpi_u8 subspace_id;
 } uacpi_pcc_region_info;
 
+typedef struct uacpi_gpio_region_info
+{
+    uacpi_u64 num_pins;
+} uacpi_gpio_region_info;
+
 typedef struct uacpi_region_attach_data {
     void *handler_context;
     uacpi_namespace_node *region_node;
     union {
         uacpi_generic_region_info generic_info;
         uacpi_pcc_region_info pcc_info;
+        uacpi_gpio_region_info gpio_info;
     };
     void *out_region_context;
 } uacpi_region_attach_data;
@@ -403,6 +411,16 @@ typedef struct uacpi_region_pcc_send_data {
     void *region_context;
     uacpi_data_view buffer;
 } uacpi_region_pcc_send_data;
+
+typedef struct uacpi_region_gpio_rw_data
+{
+    void *handler_context;
+    void *region_context;
+    uacpi_data_view connection;
+    uacpi_u32 pin_offset;
+    uacpi_u32 num_pins;
+    uacpi_u64 value;
+} uacpi_region_gpio_rw_data;
 
 typedef struct uacpi_region_detach_data {
     void *handler_context;

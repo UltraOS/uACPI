@@ -244,6 +244,9 @@ uacpi_status uacpi_opregion_attach(uacpi_namespace_node *node)
         attach_data.pcc_info.buffer.length = region->length;
         attach_data.pcc_info.subspace_id = region->offset;
         break;
+    case UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO:
+        attach_data.gpio_info.num_pins = region->length;
+        break;
     default:
         attach_data.generic_info.base = region->offset;
         attach_data.generic_info.length = region->length;
@@ -801,8 +804,8 @@ out:
 }
 
 uacpi_status uacpi_dispatch_opregion_io(
-    uacpi_namespace_node *region_node, uacpi_u32 offset, uacpi_u8 byte_width,
-    uacpi_region_op op, uacpi_u64 *in_out
+    uacpi_namespace_node *region_node, uacpi_field_unit *field,
+    uacpi_u32 offset, uacpi_region_op op, uacpi_u64 *in_out
 )
 {
     uacpi_status ret;
@@ -815,6 +818,7 @@ uacpi_status uacpi_dispatch_opregion_io(
     union {
         uacpi_region_rw_data rw;
         uacpi_region_pcc_send_data pcc;
+        uacpi_region_gpio_rw_data gpio;
     } data;
 
     ret = upgrade_to_opregion_lock();
@@ -842,7 +846,7 @@ uacpi_status uacpi_dispatch_opregion_io(
     handler = region->handler;
 
     abs_offset = region->offset + offset;
-    offset_end += byte_width;
+    offset_end += field->access_width_bytes;
 
     if (uacpi_unlikely(region->length < offset_end || abs_offset < offset)) {
         const uacpi_char *path;
@@ -853,7 +857,7 @@ uacpi_status uacpi_dispatch_opregion_io(
             "0x%"UACPI_PRIX64"] at 0x%"UACPI_PRIX64" (idx=%u, width=%d)\n",
             path, UACPI_FMT64(region->offset),
             UACPI_FMT64(region->offset + region->length),
-            UACPI_FMT64(abs_offset), offset, byte_width
+            UACPI_FMT64(abs_offset), offset, field->access_width_bytes
         );
         uacpi_free_dynamic_string(path);
         ret = UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
@@ -863,7 +867,7 @@ uacpi_status uacpi_dispatch_opregion_io(
     if (op == UACPI_REGION_OP_WRITE) {
         uacpi_trace_region_io(
             region_node, space, op, abs_offset,
-            byte_width, *in_out
+            field->access_width_bytes, *in_out
         );
     }
 
@@ -881,11 +885,13 @@ uacpi_status uacpi_dispatch_opregion_io(
          * buffer.
          */
         if (op == UACPI_REGION_OP_READ) {
-            uacpi_memcpy_zerout(in_out, cursor, sizeof(*in_out), byte_width);
+            uacpi_memcpy_zerout(
+                in_out, cursor, sizeof(*in_out), field->access_width_bytes
+            );
             goto io_done;
         }
 
-        uacpi_memcpy(cursor, in_out, byte_width);
+        uacpi_memcpy(cursor, in_out, field->access_width_bytes);
 
         /*
          * Dispatch a PCC send command if this was a write to the command field
@@ -905,8 +911,22 @@ uacpi_status uacpi_dispatch_opregion_io(
         // No dispatch needed, IO is done
         goto io_done;
     }
+    case UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO: {
+        data.gpio.pin_offset = field->pin_offset;
+        data.gpio.num_pins = field->bit_length;
+
+        ret = uacpi_object_get_string_or_buffer(
+            field->connection, &data.gpio.connection
+        );
+        if (uacpi_unlikely_error(ret))
+            goto io_done;
+
+        op = op == UACPI_REGION_OP_READ ?
+            UACPI_REGION_OP_GPIO_READ : UACPI_REGION_OP_GPIO_WRITE;
+        break;
+    }
     default:
-        data.rw.byte_width = byte_width;
+        data.rw.byte_width = field->access_width_bytes;
         data.rw.offset = abs_offset;
         data.rw.value = *in_out;
         break;
@@ -929,7 +949,7 @@ io_done:
     if (op == UACPI_REGION_OP_READ) {
         uacpi_trace_region_io(
             region_node, space, op, abs_offset,
-            byte_width, *in_out
+            field->access_width_bytes, *in_out
         );
 
         switch (region->space) {
