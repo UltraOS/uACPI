@@ -8,6 +8,7 @@
 #include <uacpi/internal/notify.h>
 #include <uacpi/internal/utilities.h>
 #include <uacpi/internal/mutex.h>
+#include <uacpi/internal/stdlib.h>
 #include <uacpi/acpi.h>
 
 #define UACPI_EVENT_DISABLED 0

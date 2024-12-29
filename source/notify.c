@@ -4,6 +4,7 @@
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/mutex.h>
 #include <uacpi/internal/utilities.h>
+#include <uacpi/internal/stdlib.h>
 #include <uacpi/kernel_api.h>
 
 static uacpi_handle notify_mutex;
