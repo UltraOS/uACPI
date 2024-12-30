@@ -17,30 +17,6 @@
 
 struct uacpi_runtime_context g_uacpi_rt_ctx = { 0 };
 
-void uacpi_state_reset(void)
-{
-    uacpi_deinitialize_namespace();
-    uacpi_deinitialize_interfaces();
-    uacpi_deinitialize_events();
-    uacpi_deinitialize_notify();
-    uacpi_deinitialize_opregion();
-    uacpi_deininitialize_registers();
-    uacpi_deinitialize_tables();
-
-#ifndef UACPI_REDUCED_HARDWARE
-    if (g_uacpi_rt_ctx.global_lock_event)
-        uacpi_kernel_free_event(g_uacpi_rt_ctx.global_lock_event);
-    if (g_uacpi_rt_ctx.global_lock_spinlock)
-        uacpi_kernel_free_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
-#endif
-
-    uacpi_memzero(&g_uacpi_rt_ctx, sizeof(g_uacpi_rt_ctx));
-
-#ifdef UACPI_KERNEL_INITIALIZATION
-    uacpi_kernel_deinitialize();
-#endif
-}
-
 void uacpi_context_set_log_level(uacpi_log_level lvl)
 {
     if (lvl == 0)
@@ -225,7 +201,7 @@ static uacpi_status set_mode(enum hw_mode mode)
     return UACPI_STATUS_HARDWARE_TIMEOUT;
 }
 
-static uacpi_status enter_mode(enum hw_mode mode)
+static uacpi_status enter_mode(enum hw_mode mode, uacpi_bool *did_change)
 {
     uacpi_status ret;
     const uacpi_char *mode_str;
@@ -252,23 +228,59 @@ static uacpi_status enter_mode(enum hw_mode mode)
     }
 
     uacpi_trace("entered %s mode\n", mode_str);
+    if (did_change != UACPI_NULL)
+        *did_change = UACPI_TRUE;
+
     return ret;
 }
 
 uacpi_status uacpi_enter_acpi_mode(void)
 {
-    return enter_mode(HW_MODE_ACPI);
+    return enter_mode(HW_MODE_ACPI, UACPI_NULL);
 }
 
 uacpi_status uacpi_leave_acpi_mode(void)
 {
-    return enter_mode(HW_MODE_LEGACY);
+    return enter_mode(HW_MODE_LEGACY, UACPI_NULL);
 }
+
+static void enter_acpi_mode_initial(void)
+{
+    enter_mode(HW_MODE_ACPI, &g_uacpi_rt_ctx.was_in_legacy_mode);
+}
+#else
+static void enter_acpi_mode_initial(void) { }
 #endif
 
 uacpi_init_level uacpi_get_current_init_level(void)
 {
     return g_uacpi_rt_ctx.init_level;
+}
+
+void uacpi_state_reset(void)
+{
+    uacpi_deinitialize_namespace();
+    uacpi_deinitialize_interfaces();
+    uacpi_deinitialize_events();
+    uacpi_deinitialize_notify();
+    uacpi_deinitialize_opregion();
+    uacpi_deininitialize_registers();
+    uacpi_deinitialize_tables();
+
+#ifndef UACPI_REDUCED_HARDWARE
+    if (g_uacpi_rt_ctx.was_in_legacy_mode)
+        uacpi_leave_acpi_mode();
+    if (g_uacpi_rt_ctx.global_lock_event)
+        uacpi_kernel_free_event(g_uacpi_rt_ctx.global_lock_event);
+    if (g_uacpi_rt_ctx.global_lock_spinlock)
+        uacpi_kernel_free_spinlock(g_uacpi_rt_ctx.global_lock_spinlock);
+#endif
+
+    uacpi_memzero(&g_uacpi_rt_ctx, sizeof(g_uacpi_rt_ctx));
+
+#ifdef UACPI_KERNEL_INITIALIZATION
+    uacpi_kernel_deinitialize();
+#endif
 }
 
 uacpi_status uacpi_initialize(uacpi_u64 flags)
@@ -327,10 +339,9 @@ uacpi_status uacpi_initialize(uacpi_u64 flags)
 
     uacpi_install_default_address_space_handlers();
 
-    if (!uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE)) {
-        // This is not critical, so just ignore the return status
-        uacpi_enter_acpi_mode();
-    }
+    if (!uacpi_check_flag(UACPI_FLAG_NO_ACPI_MODE))
+        enter_acpi_mode_initial();
+
     return UACPI_STATUS_OK;
 
 out_fatal_error:
