@@ -1592,7 +1592,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_namespace_node *node;
     uacpi_object *obj, *connection_obj = UACPI_NULL;
-    struct field_specific_data field_data;
+    struct field_specific_data field_data = { 0 };
     uacpi_size i = 1, bit_offset = 0;
 
     uacpi_u8 raw_value, access_type, lock_rule, update_rule;
