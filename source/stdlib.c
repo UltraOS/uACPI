@@ -697,7 +697,7 @@ void uacpi_log(uacpi_log_level lvl, const uacpi_char *str, ...)
 #endif
 
 #ifndef UACPI_NATIVE_ALLOC_ZEROED
-void *uacpi_kernel_alloc_zeroed(uacpi_size size)
+void *uacpi_builtin_alloc_zeroed(uacpi_size size)
 {
     void *ptr;
 
