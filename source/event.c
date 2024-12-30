@@ -2146,6 +2146,7 @@ uacpi_status uacpi_initialize_events(void)
         );
         return ret;
     }
+    g_uacpi_rt_ctx.sci_handle_valid = UACPI_TRUE;
 
     g_uacpi_rt_ctx.global_lock_event = uacpi_kernel_create_event();
     if (uacpi_unlikely(g_uacpi_rt_ctx.global_lock_event == UACPI_NULL))
@@ -2180,6 +2181,13 @@ void uacpi_deinitialize_events(void)
     uacpi_size i;
 
     g_gpes_finalized = UACPI_FALSE;
+
+    if (g_uacpi_rt_ctx.sci_handle_valid) {
+        uacpi_kernel_uninstall_interrupt_handler(
+            handle_sci, g_uacpi_rt_ctx.sci_handle
+        );
+        g_uacpi_rt_ctx.sci_handle_valid = UACPI_FALSE;
+    }
 
     while (next_ctx) {
         ctx = next_ctx;
