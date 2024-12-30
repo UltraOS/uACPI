@@ -47,6 +47,7 @@ struct uacpi_runtime_context {
 
 #ifndef UACPI_REDUCED_HARDWARE
     uacpi_bool is_hardware_reduced;
+    uacpi_bool was_in_legacy_mode;
     uacpi_bool has_global_lock;
     uacpi_bool sci_handle_valid;
     uacpi_handle sci_handle;
