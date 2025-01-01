@@ -884,36 +884,31 @@ static uacpi_size sizeof_int(void)
     return g_uacpi_rt_ctx.is_rev1 ? 4 : 8;
 }
 
-struct object_storage_as_buffer {
-    void *ptr;
-    uacpi_size len;
-};
-
-static uacpi_status get_object_storage(uacpi_object *obj,
-                                       struct object_storage_as_buffer *out_buf,
-                                       uacpi_bool include_null)
+static uacpi_status get_object_storage(
+    uacpi_object *obj, uacpi_data_view *out_buf, uacpi_bool include_null
+)
 {
     switch (obj->type) {
     case UACPI_OBJECT_INTEGER:
-        out_buf->len = sizeof_int();
-        out_buf->ptr = &obj->integer;
+        out_buf->length = sizeof_int();
+        out_buf->data = &obj->integer;
         break;
     case UACPI_OBJECT_STRING:
-        out_buf->len = obj->buffer->size;
-        if (out_buf->len && !include_null)
-            out_buf->len--;
+        out_buf->length = obj->buffer->size;
+        if (out_buf->length && !include_null)
+            out_buf->length--;
 
-        out_buf->ptr = obj->buffer->text;
+        out_buf->text = obj->buffer->text;
         break;
     case UACPI_OBJECT_BUFFER:
         if (obj->buffer->size == 0) {
-            out_buf->ptr = UACPI_NULL;
-            out_buf->len = 0;
+            out_buf->bytes = UACPI_NULL;
+            out_buf->length = 0;
             break;
         }
 
-        out_buf->len = obj->buffer->size;
-        out_buf->ptr = obj->buffer->data;
+        out_buf->length = obj->buffer->size;
+        out_buf->bytes = obj->buffer->data;
         break;
     case UACPI_OBJECT_REFERENCE:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -935,10 +930,10 @@ static uacpi_u8 *buffer_index_cursor(uacpi_buffer_index *buf_idx)
 }
 
 static void write_buffer_index(uacpi_buffer_index *buf_idx,
-                               struct object_storage_as_buffer *src_buf)
+                               uacpi_data_view *src_buf)
 {
-    uacpi_memcpy_zerout(buffer_index_cursor(buf_idx), src_buf->ptr,
-                        1, src_buf->len);
+    uacpi_memcpy_zerout(buffer_index_cursor(buf_idx), src_buf->bytes,
+                        1, src_buf->length);
 }
 
 /*
@@ -950,7 +945,7 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
                                                      uacpi_object *src)
 {
     uacpi_status ret;
-    struct object_storage_as_buffer src_buf;
+    uacpi_data_view src_buf;
 
     ret = get_object_storage(src, &src_buf, UACPI_FALSE);
     if (uacpi_unlikely_error(ret))
@@ -960,23 +955,27 @@ static uacpi_status object_assign_with_implicit_cast(uacpi_object *dst,
     case UACPI_OBJECT_INTEGER:
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER: {
-        struct object_storage_as_buffer dst_buf;
+        uacpi_data_view dst_buf;
 
         ret = get_object_storage(dst, &dst_buf, UACPI_FALSE);
         if (uacpi_unlikely_error(ret))
             goto out_bad_cast;
 
-        uacpi_memcpy_zerout(dst_buf.ptr, src_buf.ptr, dst_buf.len, src_buf.len);
+        uacpi_memcpy_zerout(
+            dst_buf.bytes, src_buf.bytes, dst_buf.length, src_buf.length
+        );
         break;
     }
 
     case UACPI_OBJECT_BUFFER_FIELD:
-        uacpi_write_buffer_field(&dst->buffer_field, src_buf.ptr, src_buf.len);
+        uacpi_write_buffer_field(
+            &dst->buffer_field, src_buf.bytes, src_buf.length
+        );
         break;
 
     case UACPI_OBJECT_FIELD_UNIT:
         return uacpi_write_field_unit(
-            dst->field_unit, src_buf.ptr, src_buf.len
+            dst->field_unit, src_buf.bytes, src_buf.length
         );
 
     case UACPI_OBJECT_BUFFER_INDEX:
@@ -1116,6 +1115,13 @@ static uacpi_status handle_create_op_region(struct execution_context *ctx)
             UACPI_FMT64(op_region->offset), UACPI_FMT64(op_region->length)
         );
         return UACPI_STATUS_AML_BAD_ENCODING;
+    }
+
+    if (op_region->space == UACPI_ADDRESS_SPACE_PCC && op_region->offset > 255) {
+        uacpi_warn(
+            "invalid PCC operation region %.4s subspace %"UACPI_PRIX64"\n",
+            node->name.text, UACPI_FMT64(op_region->offset)
+        );
     }
 
     node->object = uacpi_create_internal_reference(
@@ -1594,6 +1600,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
     uacpi_object *obj, *connection_obj = UACPI_NULL;
     struct field_specific_data field_data = { 0 };
     uacpi_size i = 1, bit_offset = 0;
+    uacpi_u32 length, pin_offset = 0;
 
     uacpi_u8 raw_value, access_type, lock_rule, update_rule;
     uacpi_u8 access_attrib = 0, access_length = 0;
@@ -1667,7 +1674,6 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
 
         // An actual field object
         if (item->type == ITEM_NAMESPACE_NODE) {
-            uacpi_u32 length;
             uacpi_field_unit *field;
 
             length = get_field_length(item_array_at(&op_ctx->items, i++));
@@ -1715,6 +1721,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
             }
 
             field->bit_length = length;
+            field->pin_offset = pin_offset;
 
             // FIXME: overflow, OOB, etc checks
             field->byte_offset = UACPI_ALIGN_DOWN(
@@ -1775,6 +1782,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 return ret;
 
             bit_offset += length;
+            pin_offset += length;
             continue;
         }
 
@@ -1782,7 +1790,9 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
         switch (item->immediate) {
         // ReservedField := 0x00 PkgLength
         case 0x00:
-            bit_offset += get_field_length(item_array_at(&op_ctx->items, i++));
+            length = get_field_length(item_array_at(&op_ctx->items, i++));
+            bit_offset += length;
+            pin_offset += length;
             break;
 
         // AccessField := 0x01 AccessType AccessAttrib
@@ -1829,6 +1839,7 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
         // ConnectField := <0x02 NameString> | <0x02 BufferData>
         case 0x02:
             connection_obj = item_array_at(&op_ctx->items, i++)->obj;
+            pin_offset = 0;
             break;
 
         default:
@@ -2535,10 +2546,10 @@ static uacpi_status handle_index(struct execution_context *ctx)
     case UACPI_OBJECT_BUFFER:
     case UACPI_OBJECT_STRING: {
         uacpi_buffer_index *buf_idx;
-        struct object_storage_as_buffer buf;
+        uacpi_data_view buf;
         get_object_storage(src, &buf, UACPI_FALSE);
 
-        ret = ensure_valid_idx(src, idx, buf.len);
+        ret = ensure_valid_idx(src, idx, buf.length);
         if (uacpi_unlikely_error(ret))
             return ret;
 
@@ -2786,23 +2797,23 @@ static uacpi_status handle_to(struct execution_context *ctx)
         UACPI_FALLTHROUGH;
     }
     case UACPI_AML_OP_ToBufferOp: {
-        struct object_storage_as_buffer buf;
+        uacpi_data_view buf;
         uacpi_u8 *dst_buf;
 
         ret = get_object_storage(src, &buf, UACPI_TRUE);
         if (uacpi_unlikely_error(ret))
             return ret;
 
-        if (uacpi_unlikely(buf.len == 0))
+        if (uacpi_unlikely(buf.length == 0))
             return make_null_buffer(dst->buffer);
 
-        dst_buf = uacpi_kernel_alloc(buf.len);
+        dst_buf = uacpi_kernel_alloc(buf.length);
         if (uacpi_unlikely(dst_buf == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
 
-        uacpi_memcpy(dst_buf, buf.ptr, buf.len);
+        uacpi_memcpy(dst_buf, buf.bytes, buf.length);
         dst->buffer->data = dst_buf;
-        dst->buffer->size = buf.len;
+        dst->buffer->size = buf.length;
         break;
     }
 
@@ -2844,7 +2855,7 @@ static uacpi_status handle_mid(struct execution_context *ctx)
 {
     struct op_context *op_ctx = ctx->cur_op_ctx;
     uacpi_object *src, *dst;
-    struct object_storage_as_buffer src_buf;
+    uacpi_data_view src_buf;
     uacpi_buffer *dst_buf;
     uacpi_size idx, len;
     uacpi_bool is_string;
@@ -2867,7 +2878,8 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     is_string = src->type == UACPI_OBJECT_STRING;
     get_object_storage(src, &src_buf, UACPI_FALSE);
 
-    if (uacpi_unlikely(src_buf.len == 0 || idx >= src_buf.len || len == 0)) {
+    if (uacpi_unlikely(src_buf.length == 0 || idx >= src_buf.length ||
+                       len == 0)) {
         if (src->type == UACPI_OBJECT_STRING) {
             dst->type = UACPI_OBJECT_STRING;
             return make_null_string(dst_buf);
@@ -2877,13 +2889,13 @@ static uacpi_status handle_mid(struct execution_context *ctx)
     }
 
     // Guaranteed to be at least 1 here
-    len = UACPI_MIN(len, src_buf.len - idx);
+    len = UACPI_MIN(len, src_buf.length - idx);
 
     dst_buf->data = uacpi_kernel_alloc(len + is_string);
     if (uacpi_unlikely(dst_buf->data == UACPI_NULL))
         return UACPI_STATUS_OUT_OF_MEMORY;
 
-    uacpi_memcpy(dst_buf->data, (uacpi_u8*)src_buf.ptr + idx, len);
+    uacpi_memcpy(dst_buf->data, (uacpi_u8*)src_buf.bytes + idx, len);
     dst_buf->size = len;
 
     if (is_string) {
@@ -2926,17 +2938,17 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
     }
     case UACPI_OBJECT_BUFFER: {
         uacpi_buffer *arg0_buf = arg0->buffer;
-        struct object_storage_as_buffer arg1_buf;
+        uacpi_data_view arg1_buf = { 0 };
 
         get_object_storage(arg1, &arg1_buf, UACPI_TRUE);
-        buf_size = arg0_buf->size + arg1_buf.len;
+        buf_size = arg0_buf->size + arg1_buf.length;
 
         dst_buf = uacpi_kernel_alloc(buf_size);
         if (uacpi_unlikely(dst_buf == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
 
         uacpi_memcpy(dst_buf, arg0_buf->data, arg0_buf->size);
-        uacpi_memcpy(dst_buf + arg0_buf->size, arg1_buf.ptr, arg1_buf.len);
+        uacpi_memcpy(dst_buf + arg0_buf->size, arg1_buf.bytes, arg1_buf.length);
         break;
     }
     case UACPI_OBJECT_STRING: {
@@ -3009,6 +3021,7 @@ static uacpi_status handle_concatenate_res(struct execution_context *ctx)
 {
     uacpi_status ret;
     struct op_context *op_ctx = ctx->cur_op_ctx;
+    uacpi_data_view buffer;
     uacpi_object *arg0, *arg1, *dst;
     uacpi_u8 *dst_buf;
     uacpi_size dst_size, arg0_size, arg1_size;
@@ -3017,11 +3030,13 @@ static uacpi_status handle_concatenate_res(struct execution_context *ctx)
     arg1 = item_array_at(&op_ctx->items, 1)->obj;
     dst = item_array_at(&op_ctx->items, 3)->obj;
 
-    ret = uacpi_find_aml_resource_end_tag(arg0->buffer, &arg0_size);
+    uacpi_buffer_to_view(arg0->buffer, &buffer);
+    ret = uacpi_find_aml_resource_end_tag(buffer, &arg0_size);
     if (uacpi_unlikely_error(ret))
         return ret;
 
-    ret = uacpi_find_aml_resource_end_tag(arg1->buffer, &arg1_size);
+    uacpi_buffer_to_view(arg1->buffer, &buffer);
+    ret = uacpi_find_aml_resource_end_tag(buffer, &arg1_size);
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -3063,10 +3078,10 @@ static uacpi_status handle_sizeof(struct execution_context *ctx)
     switch (src->type) {
     case UACPI_OBJECT_STRING:
     case UACPI_OBJECT_BUFFER: {
-        struct object_storage_as_buffer buf;
+        uacpi_data_view buf;
         get_object_storage(src, &buf, UACPI_FALSE);
 
-        dst->integer = buf.len;
+        dst->integer = buf.length;
         break;
     }
 

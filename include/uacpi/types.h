@@ -84,6 +84,9 @@ typedef struct uacpi_data_view {
 
         uacpi_char *text;
         const uacpi_char *const_text;
+
+        void *data;
+        const void *const_data;
     };
     uacpi_size length;
 } uacpi_data_view;
@@ -355,15 +358,40 @@ uacpi_status uacpi_object_get_power_resource_info(
 );
 
 typedef enum uacpi_region_op {
-    UACPI_REGION_OP_ATTACH = 1,
-    UACPI_REGION_OP_READ = 2,
-    UACPI_REGION_OP_WRITE = 3,
-    UACPI_REGION_OP_DETACH = 4,
+    UACPI_REGION_OP_ATTACH = 0,
+    UACPI_REGION_OP_DETACH,
+
+    UACPI_REGION_OP_READ,
+    UACPI_REGION_OP_WRITE,
+
+    UACPI_REGION_OP_PCC_SEND,
+    UACPI_REGION_OP_GPIO_READ,
+    UACPI_REGION_OP_GPIO_WRITE,
 } uacpi_region_op;
+
+typedef struct uacpi_generic_region_info {
+    uacpi_u64 base;
+    uacpi_u64 length;
+} uacpi_generic_region_info;
+
+typedef struct uacpi_pcc_region_info {
+    uacpi_data_view buffer;
+    uacpi_u8 subspace_id;
+} uacpi_pcc_region_info;
+
+typedef struct uacpi_gpio_region_info
+{
+    uacpi_u64 num_pins;
+} uacpi_gpio_region_info;
 
 typedef struct uacpi_region_attach_data {
     void *handler_context;
     uacpi_namespace_node *region_node;
+    union {
+        uacpi_generic_region_info generic_info;
+        uacpi_pcc_region_info pcc_info;
+        uacpi_gpio_region_info gpio_info;
+    };
     void *out_region_context;
 } uacpi_region_attach_data;
 
@@ -377,6 +405,22 @@ typedef struct uacpi_region_rw_data {
     uacpi_u64 value;
     uacpi_u8 byte_width;
 } uacpi_region_rw_data;
+
+typedef struct uacpi_region_pcc_send_data {
+    void *handler_context;
+    void *region_context;
+    uacpi_data_view buffer;
+} uacpi_region_pcc_send_data;
+
+typedef struct uacpi_region_gpio_rw_data
+{
+    void *handler_context;
+    void *region_context;
+    uacpi_data_view connection;
+    uacpi_u32 pin_offset;
+    uacpi_u32 num_pins;
+    uacpi_u64 value;
+} uacpi_region_gpio_rw_data;
 
 typedef struct uacpi_region_detach_data {
     void *handler_context;
