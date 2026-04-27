@@ -1176,22 +1176,32 @@ void uacpi_table_mark_as_loaded(uacpi_size idx)
 }
 #endif // !UACPI_BAREBONES_MODE
 
-uacpi_status uacpi_table_ref(uacpi_table *tbl)
+uacpi_status uacpi_table_ref_by_index(uacpi_size index)
 {
     struct table_ctl_request req = {
         .type = TABLE_CTL_GET
     };
 
-    return table_ctl(tbl->index, &req);
+    return table_ctl(index, &req);
 }
 
-uacpi_status uacpi_table_unref(uacpi_table *tbl)
+uacpi_status uacpi_table_ref(uacpi_table *tbl)
+{
+    return uacpi_table_ref_by_index(tbl->index);
+}
+
+uacpi_status uacpi_table_unref_by_index(uacpi_size index)
 {
     struct table_ctl_request req = {
         .type = TABLE_CTL_PUT
     };
 
-    return table_ctl(tbl->index, &req);
+    return table_ctl(index, &req);
+}
+
+uacpi_status uacpi_table_unref(uacpi_table *tbl)
+{
+    return uacpi_table_unref_by_index(tbl->index);
 }
 
 uacpi_u16 fadt_version_sizes[] = {
