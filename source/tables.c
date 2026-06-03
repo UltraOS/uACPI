@@ -13,6 +13,7 @@ DYNAMIC_ARRAY_WITH_INLINE_STORAGE_IMPL(
 
 static struct table_array tables;
 static uacpi_bool early_table_access;
+static uacpi_bool fadt_available;
 static uacpi_table_installation_handler installation_handler;
 
 #ifndef UACPI_BAREBONES_MODE
@@ -378,6 +379,7 @@ void uacpi_deinitialize_tables(void)
     }
 
     installation_handler = UACPI_NULL;
+    fadt_available = UACPI_FALSE;
 
 #ifndef UACPI_BAREBONES_MODE
     if (table_mutex)
@@ -1550,12 +1552,16 @@ static uacpi_status initialize_fadt(const void *virt)
 #endif
     }
 
+    fadt_available = true;
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_table_fadt(struct acpi_fadt **out_fadt)
 {
     ENSURE_TABLES_ONLINE();
+
+    if (!fadt_available)
+        return UACPI_STATUS_NOT_FOUND;
 
     *out_fadt = &g_uacpi_rt_ctx.fadt;
     return UACPI_STATUS_OK;
