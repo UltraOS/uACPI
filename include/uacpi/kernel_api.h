@@ -231,7 +231,7 @@ void uacpi_kernel_free_event(uacpi_handle);
 uacpi_thread_id uacpi_kernel_get_thread_id(void);
 
 /**
- * Disable interrupts and return an kernel-defined value representing the
+ * Disable interrupts and return a kernel-defined value representing the
  * "before" state. This value is used in the subsequent call to restore the
  * prior state.
  *
