@@ -116,7 +116,7 @@ static uacpi_bool buffer_alloc(uacpi_object *obj, uacpi_size initial_size)
     return UACPI_TRUE;
 }
 
-static uacpi_bool empty_buffer_or_string_alloc(uacpi_object *object)
+static uacpi_bool empty_string_or_buffer_alloc(uacpi_object *object)
 {
     return buffer_alloc(object, 0);
 }
@@ -311,8 +311,8 @@ static uacpi_bool thermal_zone_alloc(uacpi_object *obj)
 typedef uacpi_bool (*object_ctor)(uacpi_object *obj);
 
 static object_ctor object_constructor_table[UACPI_OBJECT_MAX_TYPE_VALUE + 1] = {
-    [UACPI_OBJECT_STRING] = empty_buffer_or_string_alloc,
-    [UACPI_OBJECT_BUFFER] = empty_buffer_or_string_alloc,
+    [UACPI_OBJECT_STRING] = empty_string_or_buffer_alloc,
+    [UACPI_OBJECT_BUFFER] = empty_string_or_buffer_alloc,
     [UACPI_OBJECT_PACKAGE] = empty_package_alloc,
     [UACPI_OBJECT_FIELD_UNIT] = field_unit_alloc,
     [UACPI_OBJECT_MUTEX] = mutex_alloc,

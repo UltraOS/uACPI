@@ -916,7 +916,7 @@ uacpi_status uacpi_eval_simple_integer(
     return uacpi_eval_integer(parent, path, UACPI_NULL, out_value);
 }
 
-uacpi_status uacpi_eval_buffer_or_string(
+uacpi_status uacpi_eval_string_or_buffer(
     uacpi_namespace_node *parent, const uacpi_char *path,
     const uacpi_object_array *args, uacpi_object **ret
 )
@@ -928,7 +928,7 @@ uacpi_status uacpi_eval_buffer_or_string(
     );
 }
 
-uacpi_status uacpi_eval_simple_buffer_or_string(
+uacpi_status uacpi_eval_simple_string_or_buffer(
     uacpi_namespace_node *parent, const uacpi_char *path, uacpi_object **ret
 )
 {
