@@ -166,6 +166,24 @@ uacpi_status uacpi_kernel_io_write32(
 );
 
 /**
+ * Read/write to previously mapped memory
+ *
+ * If UACPI_NATIVE_MMIO is not defined, uACPI uses builtin generic MMIO
+ * helpers that use simple volatile stores/loads.
+ */
+#ifdef UACPI_NATIVE_MMIO
+uacpi_u8 uacpi_kernel_mmio_read8(void*);
+uacpi_u16 uacpi_kernel_mmio_read16(void*);
+uacpi_u32 uacpi_kernel_mmio_read32(void*);
+uacpi_u64 uacpi_kernel_mmio_read64(void*);
+
+void uacpi_kernel_mmio_write8(void*, uacpi_u8);
+void uacpi_kernel_mmio_write16(void*, uacpi_u16);
+void uacpi_kernel_mmio_write32(void*, uacpi_u32);
+void uacpi_kernel_mmio_write64(void*, uacpi_u64);
+#endif
+
+/**
  * Allocate a block of memory of 'size' bytes.
  * The contents of the allocated memory are unspecified.
  */

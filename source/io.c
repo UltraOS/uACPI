@@ -936,6 +936,48 @@ uacpi_status uacpi_gas_write(const struct acpi_gas *gas, uacpi_u64 in_value)
     return ret;
 }
 
+#ifndef UACPI_NATIVE_MMIO
+uacpi_u8 uacpi_builtin_mmio_read8(void *ptr)
+{
+    return *(volatile uacpi_u8*)ptr;
+}
+
+uacpi_u16 uacpi_builtin_mmio_read16(void *ptr)
+{
+    return *(volatile uacpi_u16*)ptr;
+}
+
+uacpi_u32 uacpi_builtin_mmio_read32(void *ptr)
+{
+    return *(volatile uacpi_u32*)ptr;
+}
+
+uacpi_u64 uacpi_builtin_mmio_read64(void *ptr)
+{
+    return *(volatile uacpi_u64*)ptr;
+}
+
+void uacpi_builtin_mmio_write8(void *ptr, uacpi_u8 data)
+{
+    *(volatile uacpi_u8*)ptr = data;
+}
+
+void uacpi_builtin_mmio_write16(void *ptr, uacpi_u16 data)
+{
+    *(volatile uacpi_u16*)ptr = data;
+}
+
+void uacpi_builtin_mmio_write32(void *ptr, uacpi_u32 data)
+{
+    *(volatile uacpi_u32*)ptr = data;
+}
+
+void uacpi_builtin_mmio_write64(void *ptr, uacpi_u64 data)
+{
+    *(volatile uacpi_u64*)ptr = data;
+}
+#endif
+
 uacpi_status uacpi_system_memory_read(
     void *ptr, uacpi_size offset, uacpi_u8 width, uacpi_u64 *out
 )
@@ -944,16 +986,16 @@ uacpi_status uacpi_system_memory_read(
 
     switch (width) {
     case 1:
-        *out = *(volatile uacpi_u8*)ptr;
+        *out = uacpi_mmio_read8(ptr);
         break;
     case 2:
-        *out = *(volatile uacpi_u16*)ptr;
+        *out = uacpi_mmio_read16(ptr);
         break;
     case 4:
-        *out = *(volatile uacpi_u32*)ptr;
+        *out = uacpi_mmio_read32(ptr);
         break;
     case 8:
-        *out = *(volatile uacpi_u64*)ptr;
+        *out = uacpi_mmio_read64(ptr);
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -970,16 +1012,16 @@ uacpi_status uacpi_system_memory_write(
 
     switch (width) {
     case 1:
-        *(volatile uacpi_u8*)ptr = in;
+        uacpi_mmio_write8(ptr, in);
         break;
     case 2:
-        *(volatile uacpi_u16*)ptr = in;
+        uacpi_mmio_write16(ptr, in);
         break;
     case 4:
-        *(volatile uacpi_u32*)ptr = in;
+        uacpi_mmio_write32(ptr, in);
         break;
     case 8:
-        *(volatile uacpi_u64*)ptr = in;
+        uacpi_mmio_write64(ptr, in);
         break;
     default:
         return UACPI_STATUS_INVALID_ARGUMENT;

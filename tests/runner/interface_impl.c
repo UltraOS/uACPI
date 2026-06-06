@@ -124,6 +124,18 @@ void uacpi_kernel_io_unmap(uacpi_handle handle)
         return UACPI_STATUS_OK;                                     \
     }
 
+#define UACPI_MMIO_READ(bits)                                       \
+    uint##bits##_t uacpi_kernel_mmio_read##bits(void *mem)          \
+    {                                                               \
+        return *(volatile uint##bits##_t*)mem;                      \
+    }
+
+#define UACPI_MMIO_WRITE(bits)                                        \
+    void uacpi_kernel_mmio_write##bits(void *mem, uint##bits##_t val) \
+    {                                                                 \
+        *(volatile uint##bits##_t*)mem = val;                         \
+    }
+
 UACPI_IO_READ(8)
 UACPI_IO_READ(16)
 UACPI_IO_READ(32)
@@ -139,6 +151,18 @@ UACPI_PCI_READ(32)
 UACPI_PCI_WRITE(8)
 UACPI_PCI_WRITE(16)
 UACPI_PCI_WRITE(32)
+
+#ifdef UACPI_NATIVE_MMIO
+UACPI_MMIO_READ(8)
+UACPI_MMIO_READ(16)
+UACPI_MMIO_READ(32)
+UACPI_MMIO_READ(64)
+
+UACPI_MMIO_WRITE(8)
+UACPI_MMIO_WRITE(16)
+UACPI_MMIO_WRITE(32)
+UACPI_MMIO_WRITE(64)
+#endif
 
 uacpi_status uacpi_kernel_pci_device_open(
     uacpi_pci_address address, uacpi_handle *out_handle

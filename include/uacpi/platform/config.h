@@ -80,6 +80,14 @@ UACPI_BUILD_BUG_ON_WITH_MSG(
  */
 // #define UACPI_SIZED_FREES
 
+/*
+ * Makes uacpi_kernel_mmio_read{8,16,32,64} and
+ * uacpi_kernel_mmio_write{8,16,32,64} mandatory to implement by the host,
+ * uACPI will not provide a default implementation if this is enabled.
+ * By default, uACPI ships with simple builtin MMIO helpers that use volatile
+ * loads and stores.
+ */
+// #define UACPI_NATIVE_MMIO
 
 /*
  * Makes uacpi_kernel_alloc_zeroed mandatory to implement by the host, uACPI

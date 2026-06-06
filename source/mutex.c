@@ -3,6 +3,7 @@
 #include <uacpi/internal/log.h>
 #include <uacpi/internal/registers.h>
 #include <uacpi/internal/context.h>
+#include <uacpi/internal/io.h>
 #include <uacpi/kernel_api.h>
 #include <uacpi/internal/namespace.h>
 
@@ -22,7 +23,7 @@ static uacpi_bool try_acquire_global_lock_from_firmware(uacpi_u32 *lock)
     uacpi_u32 value, new_value;
     uacpi_bool was_owned;
 
-    value = *(volatile uacpi_u32*)lock;
+    value = uacpi_mmio_read32(lock);
     do {
         was_owned = (value & GLOBAL_LOCK_OWNED) >> GLOBAL_LOCK_OWNED_BIT;
 
@@ -44,7 +45,7 @@ static uacpi_bool do_release_global_lock_to_firmware(uacpi_u32 *lock)
 {
     uacpi_u32 value, new_value;
 
-    value = *(volatile uacpi_u32*)lock;
+    value = uacpi_mmio_read32(lock);
     do {
         new_value = value & ~GLOBAL_LOCK_MASK;
     } while (!uacpi_atomic_cmpxchg32(lock, &value, new_value));

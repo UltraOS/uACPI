@@ -166,3 +166,15 @@ if (BUILTIN_STRING)
         -DUACPI_USE_BUILTIN_STRING
     )
 endif ()
+
+if (NOT NATIVE_MMIO)
+    set(NATIVE_MMIO 0)
+endif ()
+
+if (NATIVE_MMIO)
+    target_compile_definitions(
+        test-runner
+        PRIVATE
+        -DUACPI_NATIVE_MMIO
+    )
+endif ()
