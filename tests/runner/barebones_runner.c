@@ -92,7 +92,7 @@ static void ensure_signature_is(const char *signature, uacpi_table tbl)
         return;
 
     error(
-        "incorrect table signature: expected %s got %.4s\n", signature,
+        "incorrect table signature: expected %.4s got %.4s\n", signature,
         tbl.hdr->signature
     );
 }
@@ -152,6 +152,234 @@ static void test_table_installation(void)
     ensure_ok_status(st);
     ensure_signature_is(ACPI_MCFG_SIGNATURE, tbl);
     uacpi_table_unref(&tbl);
+}
+
+static void ensure_table_count(uacpi_size expected_count)
+{
+    uacpi_size count;
+
+    count = uacpi_table_count();
+    if (count != expected_count)
+        error("unexpected table count: %d (expected %d)\n",
+              count, expected_count);
+}
+
+static void verify_table_info(
+    const uacpi_table_info *info, const char *signature, size_t size,
+    uacpi_table_origin origin, uacpi_u8 flags, uacpi_u16 reference_count
+)
+{
+    if (memcmp(info->signature, signature, sizeof(info->signature)) != 0)
+        error("unexpected table signature: %.4s (expected %.4s)\n",
+              info->signature, signature);
+    if (info->size != size)
+        error("unexpected table size: %d (expected %d)\n",
+              info->size, size);
+    if (info->origin != origin)
+        error("unexpected table origin: %d (expected %d)\n",
+              info->origin, origin);
+    if (info->flags != flags)
+        error("unexpected table flags: %d (expected %d)\n",
+              info->flags, flags);
+    if (info->reference_count != reference_count)
+        error("unexpected table reference count: %d (expected %d)\n",
+              info->reference_count, reference_count);
+}
+
+static void verify_table(
+    size_t idx, const char *signature, size_t size,
+    uacpi_table_origin origin, uacpi_u8 flags, uacpi_u16 reference_count
+)
+{
+    uacpi_table_info info;
+    uacpi_status st;
+
+    st = uacpi_table_info_get_by_index(idx, &info);
+    ensure_ok_status(st);
+
+    verify_table_info(&info, signature, size, origin, flags, reference_count);
+}
+
+static size_t install_one_blob(uint8_t *data, bool physical)
+{
+    uacpi_status st;
+    uacpi_table tbl;
+
+    if (physical)
+        st = uacpi_table_install_physical(
+            (uacpi_phys_addr)((uintptr_t)data), &tbl
+        );
+    else
+        st = uacpi_table_install(data, &tbl);
+
+    ensure_ok_status(st);
+    ensure_signature_is((const char*)data, tbl);
+    uacpi_table_unref(&tbl);
+
+    st = uacpi_table_get_by_index(tbl.index, &tbl);
+    ensure_ok_status(st);
+    ensure_signature_is((const char*)data, tbl);
+    uacpi_table_unref(&tbl);
+
+    return tbl.index;
+}
+
+static uacpi_iteration_decision check_each_table(
+    uacpi_handle ctx, uacpi_table_info *info
+)
+{
+    size_t *ptr = ctx;
+    if (info->idx == 0 && *ptr != SIZE_MAX)
+        error("context doesn't get passed correctly");
+
+    if (*ptr + 1 != info->idx)
+        error("incorrect table order");
+    *ptr = info->idx;
+
+    switch (info->idx) {
+    case 0:
+        verify_table_info(info, ACPI_DSDT_SIGNATURE, sizeof(test_dsdt),
+                          UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
+                          UACPI_TABLE_CSUM_CHECKED, 0);
+        break;
+    case 1:
+        verify_table_info(info, ACPI_FADT_SIGNATURE, sizeof(struct acpi_fadt),
+                          UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL,
+                          UACPI_TABLE_CSUM_CHECKED, 0);
+        break;
+    case 2:
+        verify_table_info(info, ACPI_MCFG_SIGNATURE, sizeof(test_mcfg),
+                          UACPI_TABLE_ORIGIN_HOST_VIRTUAL,
+                          UACPI_TABLE_CSUM_CHECKED, 0xFFFF);
+        break;
+    case 3:
+        verify_table_info(info, "GCFG", sizeof(test_mcfg),
+                          UACPI_TABLE_ORIGIN_HOST_PHYSICAL,
+                          UACPI_TABLE_CSUM_CHECKED | UACPI_TABLE_CSUM_BAD, 0);
+        break;
+    case 4:
+    case 5:
+    case 6:
+    case 7: {
+        uacpi_table_origin orig;
+        size_t refs;
+
+        if (info->idx == 4 || info->idx == 6) {
+            orig = UACPI_TABLE_ORIGIN_HOST_PHYSICAL;
+            refs = info->idx == 4 ? 3 : 2;
+        } else {
+            orig = UACPI_TABLE_ORIGIN_HOST_VIRTUAL;
+            refs = 1;
+        }
+
+        verify_table_info(info, "APIC", sizeof(test_apic),
+                          orig, UACPI_TABLE_CSUM_CHECKED, refs);
+        break;
+    }
+    default:
+        error("unexpected table index: %zu\n", info->idx);
+    }
+
+    return UACPI_ITERATION_DECISION_CONTINUE;
+}
+
+static void test_table_advanced(void)
+{
+    uint8_t bad_mcfg[sizeof(test_mcfg)];
+    size_t idx;
+    uacpi_table tbl;
+    uacpi_status st;
+
+    // Expected here is FADT & DSDT
+    ensure_table_count(2);
+
+    // DSDT should be at index 0
+    verify_table(
+        0, ACPI_DSDT_SIGNATURE, sizeof(test_dsdt),
+        UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, 0, 0
+    );
+    st = uacpi_table_get_by_index(0, &tbl);
+    ensure_ok_status(st);
+    verify_table(
+        0, ACPI_DSDT_SIGNATURE, sizeof(test_dsdt),
+        UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_TABLE_CSUM_CHECKED, 1
+    );
+    uacpi_table_unref_by_index(tbl.index);
+    verify_table(
+        0, ACPI_DSDT_SIGNATURE, sizeof(test_dsdt),
+        UACPI_TABLE_ORIGIN_FIRMWARE_PHYSICAL, UACPI_TABLE_CSUM_CHECKED, 0
+    );
+
+    idx = install_one_blob(test_mcfg, false);
+    ensure_table_count(idx + 1);
+    verify_table(
+        idx, ACPI_MCFG_SIGNATURE, sizeof(test_mcfg),
+        UACPI_TABLE_ORIGIN_HOST_VIRTUAL, UACPI_TABLE_CSUM_CHECKED, 0
+    );
+
+    // Try to overflow the u16 checksum
+    for (idx = 0; idx < 0x1FFFF; idx++) {
+        st = uacpi_table_ref_by_index(2);
+        ensure_ok_status(st);
+    }
+
+    verify_table(
+        2, ACPI_MCFG_SIGNATURE, sizeof(test_mcfg),
+        UACPI_TABLE_ORIGIN_HOST_VIRTUAL, UACPI_TABLE_CSUM_CHECKED, 0xFFFF
+    );
+    /*
+     * It's expected that after checksum overflow the table will be mapped
+     * permenantly
+     */
+    uacpi_table_unref_by_index(2);
+    verify_table(
+        2, ACPI_MCFG_SIGNATURE, sizeof(test_mcfg),
+        UACPI_TABLE_ORIGIN_HOST_VIRTUAL, UACPI_TABLE_CSUM_CHECKED, 0xFFFF
+    );
+
+    memcpy(bad_mcfg, test_mcfg, sizeof(test_mcfg));
+    bad_mcfg[0] = 'G';
+    idx = install_one_blob(bad_mcfg, true);
+    ensure_table_count(idx + 1);
+    verify_table(
+        3, "GCFG", sizeof(bad_mcfg),
+        UACPI_TABLE_ORIGIN_HOST_PHYSICAL,
+        UACPI_TABLE_CSUM_CHECKED | UACPI_TABLE_CSUM_BAD, 0
+    );
+
+    idx = install_one_blob(test_apic, true);
+    ensure_table_count(idx + 1);
+    idx = install_one_blob(test_apic, false);
+    ensure_table_count(idx + 1);
+    idx = install_one_blob(test_apic, true);
+    ensure_table_count(idx + 1);
+    idx = install_one_blob(test_apic, false);
+    ensure_table_count(idx + 1);
+
+    // DSDT, FADT, MCFG, GCFG, APIC, APIC, APIC, APIC
+    ensure_table_count(8);
+
+    st = uacpi_table_find_by_signature(ACPI_MADT_SIGNATURE, &tbl);
+    ensure_ok_status(st);
+    if (tbl.index != 4)
+        error("unexpected MADT index %d\n", tbl.index);
+
+#define FIND_CHECK_IDX(suffix, idx, expect_idx)                     \
+    st = uacpi_table_find_##suffix(ACPI_MADT_SIGNATURE, idx, &tbl); \
+    ensure_ok_status(st);                                           \
+    if (tbl.index != expect_idx)                                    \
+        error("unexpected MADT index %d (expected %zu)\n",          \
+              tbl.index, expect_idx)
+
+    FIND_CHECK_IDX(by_signature_at, 0, 4);
+    FIND_CHECK_IDX(by_signature_at, 6, 6);
+    FIND_CHECK_IDX(nth_by_signature, 0, 4);
+    FIND_CHECK_IDX(nth_by_signature, 1, 5);
+    FIND_CHECK_IDX(nth_by_signature, 2, 6);
+    FIND_CHECK_IDX(nth_by_signature, 3, 7);
+
+    idx = SIZE_MAX;
+    uacpi_for_each_table(check_each_table, &idx);
 }
 
 static uacpi_iteration_decision check_madt(
@@ -317,6 +545,7 @@ static struct {
 } test_cases[] = {
     { "basic-operation", test_basic_operation },
     { "table-installation", test_table_installation },
+    { "table-advanced", test_table_advanced },
     { "foreach-subtable", test_foreach_subtable },
     { "reduced-hardware", test_reduced_hardware },
     { "misaligned-early-tables-buffer", test_misaligned_early_tables_buffer },
