@@ -42,6 +42,13 @@ uacpi_status uacpi_prepare_for_sleep_state(uacpi_sleep_state);
 uacpi_status uacpi_enter_sleep_state(uacpi_sleep_state);
 
 /**
+ * Prepare & enter a given sleep state
+ * May be used as a shortcut if the kernel doesn't have any other work to do
+ * inbetween calling the two separate helpers
+ */
+uacpi_status uacpi_enter_sleep_state_simple(uacpi_sleep_state);
+
+/**
  * Prepare to leave the given sleep state.
  */
 uacpi_status uacpi_prepare_for_wake_from_sleep_state(uacpi_sleep_state);

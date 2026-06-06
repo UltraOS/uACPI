@@ -514,6 +514,17 @@ uacpi_status uacpi_enter_sleep_state(enum uacpi_sleep_state state_enum)
     return CALL_SLEEP_FN(enter_sleep_state, state);
 }
 
+uacpi_status uacpi_enter_sleep_state_simple(uacpi_sleep_state state)
+{
+    uacpi_status ret;
+
+    ret = uacpi_prepare_for_sleep_state(state);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
+    return uacpi_enter_sleep_state(state);
+}
+
 uacpi_status uacpi_prepare_for_wake_from_sleep_state(
     uacpi_sleep_state state_enum
 )
