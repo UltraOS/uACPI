@@ -57,16 +57,11 @@ jobs:
         name: Install tools & libraries (Windows)
         run: |
           # Hardcode ACPICA version due to a regression in https://github.com/acpica/acpica/issues/1154
-          $VERSION = "20251212"
-          $URL = "https://downloadmirror.intel.com/871609/iasl-win-$VERSION.zip"
+          # We use a locally committed ZIP because Intel blocks GitHub Actions from downloading stuff
+          $ZIP_PATH = ".\.github\workflows\acpica-pre-regression.zip"
+          $DEST_DIR = "C:\iasl-20251212"
 
-          $ZIP_PATH = "iasl.zip"
-          $DEST_DIR = "C:\iasl-$VERSION"
-
-          Write-Host "Downloading iASL v$VERSION from $URL..."
-          Invoke-WebRequest -Uri $URL -OutFile $ZIP_PATH
-
-          Write-Host "Extracting to $DEST_DIR..."
+          Write-Host "Extracting local iASL to $DEST_DIR..."
           Expand-Archive -Path $ZIP_PATH -DestinationPath $DEST_DIR -Force
 
           Write-Host "Adding $DEST_DIR to GITHUB_PATH..."
