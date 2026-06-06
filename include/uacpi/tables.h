@@ -72,6 +72,14 @@ uacpi_status uacpi_table_load(uacpi_size index);
  *     necessary and can be omitted (especially useful for non-C language
  *     bindings)
  *
+ * for find_by_signature_at:
+ *    'offset' specifies the base index in the internal array where to start
+ *    searching for the table
+ *
+ * for find_nth_by_signature:
+ *    This works exactly like find_by_signature, but finds the nth copy of the
+ *    specified table in the firmware enumeration order
+ *
  * 'out_table' is a pointer to a caller allocated uacpi_table structure that
  * receives the table pointer & its internal index in case the call was
  * successful.
@@ -86,6 +94,13 @@ uacpi_status uacpi_table_load(uacpi_size index);
 uacpi_status uacpi_table_find_by_signature(
     const uacpi_char *signature, uacpi_table *out_table
 );
+uacpi_status uacpi_table_find_by_signature_at(
+    const uacpi_char *signature, uacpi_size offset, uacpi_table *out_table
+);
+uacpi_status uacpi_table_find_nth_by_signature(
+    const uacpi_char *signature, uacpi_size nth, uacpi_table *out_table
+);
+
 uacpi_status uacpi_table_find_next_with_same_signature(
     uacpi_table *in_out_table
 );

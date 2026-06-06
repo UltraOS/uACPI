@@ -1011,6 +1011,7 @@ struct table_search_ctx {
 
     uacpi_table *out_table;
     uacpi_u8 search_type;
+    uacpi_size to_skip;
     uacpi_status status;
 };
 
@@ -1048,6 +1049,12 @@ static uacpi_iteration_decision do_search_tables(
     default:
         ctx->status = UACPI_STATUS_INVALID_ARGUMENT;
         return UACPI_ITERATION_DECISION_BREAK;
+    }
+
+    // Match, but we were asked for an nth table
+    if (ctx->to_skip) {
+        ctx->to_skip--;
+        return UACPI_ITERATION_DECISION_CONTINUE;
     }
 
     ret = table_ref_unlocked(tbl);
@@ -1092,7 +1099,7 @@ uacpi_status uacpi_table_match(
 #endif
 
 static uacpi_status find_table(
-    uacpi_size base_idx, const uacpi_table_identifiers *id,
+    uacpi_size idx, uacpi_size nth, const uacpi_table_identifiers *id,
     uacpi_table *out_table
 )
 {
@@ -1102,29 +1109,52 @@ static uacpi_status find_table(
     ctx.id = id;
     ctx.out_table = out_table;
     ctx.search_type = SEARCH_TYPE_BY_ID;
+    ctx.to_skip = nth;
     ctx.status = UACPI_STATUS_NOT_FOUND;
 
-    ret = uacpi_for_each_installed_table(base_idx, do_search_tables, &ctx);
+    ret = uacpi_for_each_installed_table(idx, do_search_tables, &ctx);
     if (uacpi_unlikely_error(ret))
         return ret;
 
     return ctx.status;
 }
 
-uacpi_status uacpi_table_find_by_signature(
-    const uacpi_char *signature_string, struct uacpi_table *out_table
+static uacpi_status find_table_by_signature(
+    const uacpi_char *signature_string, uacpi_size idx, uacpi_size nth,
+    uacpi_table *out_table
 )
 {
     struct uacpi_table_identifiers id = { 0 };
+
+    ENSURE_TABLES_ONLINE();
 
     id.signature.text[0] = signature_string[0];
     id.signature.text[1] = signature_string[1];
     id.signature.text[2] = signature_string[2];
     id.signature.text[3] = signature_string[3];
 
-    ENSURE_TABLES_ONLINE();
+    return find_table(idx, nth, &id, out_table);
+}
 
-    return find_table(0, &id, out_table);
+uacpi_status uacpi_table_find_by_signature_at(
+    const uacpi_char *signature, uacpi_size idx, uacpi_table *out_table
+)
+{
+    return find_table_by_signature(signature, idx, 0, out_table);
+}
+
+uacpi_status uacpi_table_find_nth_by_signature(
+    const uacpi_char *signature, uacpi_size nth, uacpi_table *out_table
+)
+{
+    return find_table_by_signature(signature, 0, nth, out_table);
+}
+
+uacpi_status uacpi_table_find_by_signature(
+    const uacpi_char *signature_string, struct uacpi_table *out_table
+)
+{
+    return find_table_by_signature(signature_string, 0, 0, out_table);
 }
 
 uacpi_status uacpi_table_find_next_with_same_signature(
@@ -1142,7 +1172,7 @@ uacpi_status uacpi_table_find_next_with_same_signature(
                  sizeof(id.signature));
     uacpi_table_unref(in_out_table);
 
-    return find_table(in_out_table->index + 1, &id, in_out_table);
+    return find_table(in_out_table->index + 1, 0, &id, in_out_table);
 }
 
 uacpi_status uacpi_table_find(
@@ -1151,7 +1181,7 @@ uacpi_status uacpi_table_find(
 {
     ENSURE_TABLES_ONLINE();
 
-    return find_table(0, id, out_table);
+    return find_table(0, 0, id, out_table);
 }
 
 #define TABLE_CTL_SET_FLAGS (1 << 0)
