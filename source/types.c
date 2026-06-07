@@ -1449,6 +1449,12 @@ uacpi_status uacpi_object_assign(uacpi_object *dst, uacpi_object *src,
         dst->thermal_zone = src->thermal_zone;
         uacpi_shareable_ref(dst->thermal_zone);
         break;
+    case UACPI_OBJECT_POWER_RESOURCE:
+        uacpi_memcpy(
+            &dst->power_resource, &src->power_resource,
+            sizeof(dst->power_resource)
+        );
+        break;
     default:
         ret = UACPI_STATUS_UNIMPLEMENTED;
     }
