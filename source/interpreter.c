@@ -874,8 +874,10 @@ static uacpi_status handle_package(struct execution_context *ctx)
                 item_array_at(&op_ctx->items, base_pkg_index)->immediate,
                 &path, &length
             );
-            if (uacpi_unlikely_error(ret))
+            if (uacpi_unlikely_error(ret)) {
+                uacpi_object_unref(obj);
                 return ret;
+            }
 
             obj->flags = UACPI_STRING_KIND_PATH;
             obj->buffer->text = path;
