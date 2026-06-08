@@ -603,7 +603,7 @@ uacpi_i32 uacpi_vsnprintf(
 
         if (consume(&fmt, "hh")) {
             if (consume(&fmt, "d") || consume(&fmt, "i")) {
-                value = (signed char)uacpi_va_arg(vlist, int);
+                value = (uacpi_u64)uacpi_va_arg(vlist, int);
                 fm.is_signed = UACPI_TRUE;
             } else if (consume_one_of(&fmt, "oxXu", &flag)) {
                 value = (unsigned char)uacpi_va_arg(vlist, int);
