@@ -1,7 +1,9 @@
 #pragma once
 
 #include <uacpi/types.h>
-#include <uacpi/acpi.h>
+
+// Forward declared to reduce pollution, include acpi.h if needed
+struct acpi_gas;
 
 #ifdef __cplusplus
 extern "C" {

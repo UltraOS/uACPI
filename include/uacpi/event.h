@@ -2,7 +2,6 @@
 
 #include <uacpi/types.h>
 #include <uacpi/uacpi.h>
-#include <uacpi/acpi.h>
 
 #ifdef __cplusplus
 extern "C" {
