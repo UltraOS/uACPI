@@ -5731,6 +5731,10 @@ static uacpi_status exec_op(struct execution_context *ctx)
         case UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE:
             item = item_array_at(&op_ctx->items, op_decode_byte(op_ctx));
             ret = do_install_node_item(frame, item);
+            if (uacpi_unlikely_error(ret) && item->node != UACPI_NULL) {
+                uacpi_object_unref(item->node->object);
+                item->node->object = UACPI_NULL;
+            }
             break;
 
         case UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV:
