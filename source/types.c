@@ -468,6 +468,9 @@ static void free_package(uacpi_handle handle)
          */
         for (i = 0; i < pkg->count; ++i) {
             obj = pkg->objects[i];
+            if (uacpi_unlikely(obj == UACPI_NULL))
+                continue;
+
             unref_object_no_recurse(obj, &queue);
         }
 
