@@ -2809,8 +2809,7 @@ static uacpi_status handle_to(struct execution_context *ctx)
 
     switch (op_ctx->op->code) {
     case UACPI_AML_OP_ToIntegerOp:
-        // NT always takes the first 8 bytes, even for revision 1
-        dst->integer = object_to_integer(src, 8);
+        dst->integer = object_to_integer(src, sizeof_int());
         break;
 
     case UACPI_AML_OP_ToHexStringOp:
@@ -2963,7 +2962,7 @@ static uacpi_status handle_concatenate(struct execution_context *ctx)
         if (uacpi_unlikely(dst_buf == UACPI_NULL))
             return UACPI_STATUS_OUT_OF_MEMORY;
 
-        arg1_as_int = object_to_integer(arg1, 8);
+        arg1_as_int = object_to_integer(arg1, int_size);
 
         uacpi_memcpy(dst_buf, &arg0->integer, int_size);
         uacpi_memcpy(dst_buf+ int_size, &arg1_as_int, int_size);
