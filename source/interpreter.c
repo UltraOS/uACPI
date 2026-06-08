@@ -1844,8 +1844,11 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 return UACPI_STATUS_OUT_OF_MEMORY;
 
             ret = do_install_node_item(ctx->cur_frame, item);
-            if (uacpi_unlikely_error(ret))
+            if (uacpi_unlikely_error(ret)) {
+                uacpi_object_unref(node->object);
+                node->object = UACPI_NULL;
                 return ret;
+            }
 
             bit_offset += length;
             pin_offset += length;
