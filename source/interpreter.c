@@ -273,7 +273,10 @@ struct call_frame {
     struct op_context_array pending_ops;
     struct code_block_array code_blocks;
     struct temp_namespace_node_array temp_nodes;
-    struct code_block *last_while;
+
+    // 0 -> none, N -> N - 1
+    uacpi_size last_while_idx_plus_one;
+
     uacpi_u64 prev_while_expiration;
     uacpi_u32 prev_while_code_offset;
 
@@ -1989,8 +1992,10 @@ static uacpi_status method_get_ret_object(struct execution_context *ctx,
     return UACPI_STATUS_OK;
 }
 
-static struct code_block *find_last_block(struct code_block_array *blocks,
-                                          enum code_block_type type)
+static struct code_block *find_last_block(
+    struct code_block_array *blocks, enum code_block_type type,
+    uacpi_size *out_idx_plus_one
+)
 {
     uacpi_size i;
 
@@ -1999,24 +2004,16 @@ static struct code_block *find_last_block(struct code_block_array *blocks,
         struct code_block *block;
 
         block = code_block_array_at(blocks, i);
-        if (block->type == type)
+        if (block->type == type) {
+            if (out_idx_plus_one != UACPI_NULL)
+                *out_idx_plus_one = i + 1;
             return block;
+        }
     }
 
+    if (out_idx_plus_one != UACPI_NULL)
+        *out_idx_plus_one = 0;
     return UACPI_NULL;
-}
-
-static void update_scope(struct call_frame *frame)
-{
-    struct code_block *block;
-
-    block = find_last_block(&frame->code_blocks, CODE_BLOCK_SCOPE);
-    if (block == UACPI_NULL) {
-        frame->cur_scope = uacpi_namespace_root();
-        return;
-    }
-
-    frame->cur_scope = block->node;
 }
 
 static uacpi_status begin_block_execution(struct execution_context *ctx)
@@ -2067,6 +2064,10 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
             block->expiration_point +=
                 g_uacpi_rt_ctx.loop_timeout_seconds * UACPI_NANOSECONDS_PER_SEC;
         }
+
+        cur_frame->last_while_idx_plus_one = code_block_array_size(
+            &cur_frame->code_blocks
+        );
         break;
     case UACPI_AML_OP_ScopeOp:
     case UACPI_AML_OP_DeviceOp:
@@ -2075,6 +2076,7 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
     case UACPI_AML_OP_ThermalZoneOp:
         block->type = CODE_BLOCK_SCOPE;
         block->node = item_array_at(&op_ctx->items, 1)->node;
+        cur_frame->cur_scope = block->node;
         break;
     default:
         code_block_array_pop(&cur_frame->code_blocks);
@@ -2086,9 +2088,6 @@ static uacpi_status begin_block_execution(struct execution_context *ctx)
     block->end = pkg->end;
     ctx->cur_block = block;
 
-    cur_frame->last_while = find_last_block(&cur_frame->code_blocks,
-                                            CODE_BLOCK_WHILE);
-    update_scope(cur_frame);
     return UACPI_STATUS_OK;
 }
 
@@ -2109,9 +2108,21 @@ static void frame_reset_post_end_block(struct execution_context *ctx,
     ctx->cur_block = code_block_array_last(&frame->code_blocks);
 
     if (type == CODE_BLOCK_WHILE) {
-        frame->last_while = find_last_block(&frame->code_blocks, type);
+        find_last_block(
+            &frame->code_blocks, type, &frame->last_while_idx_plus_one
+        );
     } else if (type == CODE_BLOCK_SCOPE) {
-        update_scope(frame);
+        struct code_block *block;
+
+        block = find_last_block(
+            &frame->code_blocks, CODE_BLOCK_SCOPE, UACPI_NULL
+        );
+        if (block == UACPI_NULL) {
+            frame->cur_scope = uacpi_namespace_root();
+            return;
+        }
+
+        frame->cur_scope = block->node;
     }
 }
 
@@ -4109,7 +4120,7 @@ static uacpi_status handle_control_flow(struct execution_context *ctx)
     struct call_frame *frame = ctx->cur_frame;
     struct op_context *op_ctx = ctx->cur_op_ctx;
 
-    if (uacpi_unlikely(frame->last_while == UACPI_NULL)) {
+    if (uacpi_unlikely(frame->last_while_idx_plus_one == 0)) {
         uacpi_error(
             "attempting to %s outside of a While block",
             op_ctx->op->code == UACPI_AML_OP_BreakOp ? "Break" : "Continue"
@@ -4118,7 +4129,8 @@ static uacpi_status handle_control_flow(struct execution_context *ctx)
     }
 
     for (;;) {
-        if (ctx->cur_block != frame->last_while) {
+        if (code_block_array_size(&frame->code_blocks) >
+            frame->last_while_idx_plus_one) {
             frame_reset_post_end_block(ctx, ctx->cur_block->type);
             continue;
         }
