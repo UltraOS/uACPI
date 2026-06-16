@@ -22,6 +22,7 @@
 #include <uacpi/types.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
+#include <uacpi/sleep.h>
 
 void run_resource_tests(void);
 void test_object_api(void);
@@ -305,7 +306,7 @@ static uacpi_interrupt_ret handle_gpe(
 static void run_test(
     const char *dsdt_path, const vector_t *ssdt_paths,
     uacpi_object_type expected_type, const char *expected_value,
-    bool dump_namespace
+    bool dump_namespace, bool run_pts3
 )
 {
     static uint8_t early_table_buf[4096];
@@ -430,6 +431,9 @@ static void run_test(
     if (dump_namespace)
         enumerate_namespace();
 
+    if (run_pts3)
+        uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S3);
+
     if (!is_test_mode)
         goto done;
 
@@ -494,6 +498,9 @@ static arg_spec_t EXTRA_TABLES_ARG = ARG_LIST(
 static arg_spec_t ENUMERATE_NAMESPACE_ARG = ARG_FLAG(
     "enumerate-namespace", 'd', "dump the entire namespace after loading it"
 );
+static arg_spec_t RUN_PTS3_ARG = ARG_FLAG(
+    "run-pts3", 's', "run _PTS(3) after loading the namespace"
+);
 static arg_spec_t WHILE_LOOP_TIMEOUT_ARG = ARG_PARAM(
     "while-loop-timeout", 't',
     "number of seconds to use for the while loop timeout"
@@ -514,6 +521,7 @@ static arg_spec_t *const OPTION_ARGS[] = {
     &EXPECT_ARG,
     &EXTRA_TABLES_ARG,
     &ENUMERATE_NAMESPACE_ARG,
+    &RUN_PTS3_ARG,
     &WHILE_LOOP_TIMEOUT_ARG,
     &LOG_LEVEL_ARG,
     &HELP_ARG,
@@ -531,7 +539,7 @@ int main(int argc, char *argv[])
     const char *dsdt_path_or_keyword;
     const char *expected_value = NULL;
     uacpi_object_type expected_type = UACPI_OBJECT_UNINITIALIZED;
-    bool dump_namespace;
+    bool dump_namespace, run_pts3;
     uacpi_log_level log_level;
 
     parse_args(&PARSER, argc, argv);
@@ -553,6 +561,7 @@ int main(int argc, char *argv[])
     }
 
     dump_namespace = is_set(&ENUMERATE_NAMESPACE_ARG);
+    run_pts3 = is_set(&RUN_PTS3_ARG);
     // Don't spam the log with traces if enumeration is enabled
     log_level = dump_namespace ? UACPI_LOG_INFO : UACPI_LOG_TRACE;
 
@@ -563,7 +572,7 @@ int main(int argc, char *argv[])
 
     run_test(
         dsdt_path_or_keyword, &EXTRA_TABLES_ARG.values, expected_type,
-        expected_value, dump_namespace
+        expected_value, dump_namespace, run_pts3
     );
 
     return 0;

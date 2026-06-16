@@ -90,7 +90,7 @@ class TestCaseHardwareBlob(TestCase):
             ]
 
     def extra_runner_args(self) -> List[str]:
-        args = ["--enumerate-namespace"]
+        args = ["--enumerate-namespace", "--run-pts3"]
 
         if self.ssdt_paths:
             args.append("--extra-tables")
