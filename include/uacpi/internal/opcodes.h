@@ -279,15 +279,6 @@ enum uacpi_parse_op {
 };
 const uacpi_char *uacpi_parse_op_to_string(enum uacpi_parse_op op);
 
-/*
- * A few notes about op properties:
- * Technically the spec says that RefOfOp is considered a SuperName, but NT
- * disagrees about this. For example Store(..., RefOf) fails with
- * "Invalid SuperName". MethodInvocation could also technically be considered
- * a SuperName, but NT doesn't allow that either: Store(..., MethodInvocation)
- * fails with "Invalid Target Method, expected a DataObject" error.
- */
-
 enum uacpi_op_property {
     UACPI_OP_PROPERTY_TERM_ARG = 1,
     UACPI_OP_PROPERTY_SUPERNAME = 2,
