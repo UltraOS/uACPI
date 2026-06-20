@@ -348,7 +348,7 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
  */
 #define UACPI_UNRESOLVED_NAME_STRING_OP(character, code)        \
     UACPI_OP(                                                   \
-        UACPI_InternalOpUnresolvedNameString_##character, code, \
+        UnresolvedNameString_##character, code,                 \
         UACPI_OP_PROPERTY_SIMPLE_NAME |                         \
         UACPI_OP_PROPERTY_SUPERNAME |                           \
         UACPI_OP_PROPERTY_TERM_ARG,                             \
