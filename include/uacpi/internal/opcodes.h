@@ -288,8 +288,11 @@ enum uacpi_op_property {
     // The ops to execute are pointed to by indirect_decode_ops
     UACPI_OP_PROPERTY_OUT_OF_LINE = 16,
 
-    // Error if encountered in the AML byte strem
-    UACPI_OP_PROPERTY_RESERVED = 128,
+    /*
+     * Error if encountered in the AML byte stream
+     * NOTE: all opcodes with this property must be prefixed with InternalOp
+     */
+    UACPI_OP_PROPERTY_INTERNAL = 128,
 };
 
 struct uacpi_op_spec {
@@ -314,7 +317,7 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
     UACPI_OP(                                                  \
         InternalOpMethodCall##nargs##Args, 0xF7 + nargs,       \
         UACPI_OP_PROPERTY_TERM_ARG |                           \
-        UACPI_OP_PROPERTY_RESERVED,                            \
+        UACPI_OP_PROPERTY_INTERNAL,                            \
         {                                                      \
             UACPI_PARSE_OP_LOAD_INLINE_IMM, 1, nargs,          \
             UACPI_PARSE_OP_IF_NOT_NULL, 1, 6,                  \
@@ -1067,7 +1070,7 @@ UACPI_BAD_OPCODE(0xF3)                                           \
 UACPI_OP(                                                        \
     InternalOpReadFieldAsBuffer, 0xF4,                           \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_RESERVED,                                  \
+    UACPI_OP_PROPERTY_INTERNAL,                                  \
     {                                                            \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_BUFFER,  \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
@@ -1077,7 +1080,7 @@ UACPI_OP(                                                        \
 UACPI_OP(                                                        \
     InternalOpReadFieldAsInteger, 0xF5,                          \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_RESERVED,                                  \
+    UACPI_OP_PROPERTY_INTERNAL,                                  \
     {                                                            \
         UACPI_PARSE_OP_OBJECT_ALLOC_TYPED, UACPI_OBJECT_INTEGER, \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
@@ -1089,7 +1092,7 @@ UACPI_OP(                                                        \
     UACPI_OP_PROPERTY_SIMPLE_NAME |                              \
     UACPI_OP_PROPERTY_SUPERNAME |                                \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
-    UACPI_OP_PROPERTY_RESERVED,                                  \
+    UACPI_OP_PROPERTY_INTERNAL,                                  \
     {                                                            \
         UACPI_PARSE_OP_EMPTY_OBJECT_ALLOC,                       \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \

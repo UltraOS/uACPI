@@ -696,7 +696,7 @@ static uacpi_status get_op(struct execution_context *ctx)
     g_uacpi_rt_ctx.opcodes_executed++;
 
     ctx->cur_op = uacpi_get_op_spec(op);
-    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_RESERVED)) {
+    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_INTERNAL)) {
         uacpi_error(
             "invalid opcode '%s' encountered in bytestream",
             ctx->cur_op->name
