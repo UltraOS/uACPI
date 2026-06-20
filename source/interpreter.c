@@ -683,6 +683,16 @@ static uacpi_u8 peek_next_op(struct call_frame *frame, uacpi_aml_op *out_op)
     return length;
 }
 
+static inline bool op_is_internal(const struct uacpi_op_spec *op)
+{
+    return (op->properties & UACPI_OP_PROPERTY_INTERNAL) != 0;
+}
+
+static inline bool op_is_invalid(const struct uacpi_op_spec *op)
+{
+    return (op->properties & UACPI_OP_PROPERTY_INVALID) != 0;
+}
+
 static uacpi_status get_op(struct execution_context *ctx)
 {
     uacpi_aml_op op;
@@ -692,17 +702,18 @@ static uacpi_status get_op(struct execution_context *ctx)
     if (uacpi_unlikely(length == 0))
         return UACPI_STATUS_AML_BAD_ENCODING;
 
-    ctx->cur_frame->code_offset += length;
-    g_uacpi_rt_ctx.opcodes_executed++;
-
     ctx->cur_op = uacpi_get_op_spec(op);
-    if (uacpi_unlikely(ctx->cur_op->properties & UACPI_OP_PROPERTY_INTERNAL)) {
+    if (uacpi_unlikely(op_is_internal(ctx->cur_op) ||
+                       op_is_invalid(ctx->cur_op))) {
         uacpi_error(
-            "invalid opcode '%s' encountered in bytestream",
-            ctx->cur_op->name
+            "invalid opcode '%s' (0x%04X) at AML offset %u",
+            ctx->cur_op->name, op, ctx->cur_frame->code_offset
         );
         return UACPI_STATUS_AML_INVALID_OPCODE;
     }
+
+    ctx->cur_frame->code_offset += length;
+    g_uacpi_rt_ctx.opcodes_executed++;
 
     return UACPI_STATUS_OK;
 }
@@ -5560,11 +5571,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
             );
             break;
         }
-
-        case UACPI_PARSE_OP_BAD_OPCODE:
-            EXEC_OP_ERR("invalid/unexpected opcode");
-            ret = UACPI_STATUS_AML_INVALID_OPCODE;
-            break;
 
         case UACPI_PARSE_OP_AML_PC_DECREMENT:
             frame->code_offset--;

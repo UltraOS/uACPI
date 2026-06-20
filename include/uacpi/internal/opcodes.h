@@ -181,9 +181,6 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT,
 
-    // Invalid opcode, should never be encountered in the stream
-    UACPI_PARSE_OP_BAD_OPCODE,
-
     // Decrement the current AML instruction pointer
     UACPI_PARSE_OP_AML_PC_DECREMENT,
 
@@ -281,8 +278,12 @@ enum uacpi_op_property {
     // The ops to execute are pointed to by indirect_decode_ops
     UACPI_OP_PROPERTY_OUT_OF_LINE = 16,
 
+    // An opcode that's not part of the AML ISA, error out if encountered
+    UACPI_OP_PROPERTY_INVALID = 64,
+
     /*
-     * Error if encountered in the AML byte stream
+     * An opcode that's not part of the AML ISA _and_ has been repurposed by
+     * uACPI for some internal operation.
      * NOTE: all opcodes with this property must be prefixed with InternalOp
      */
     UACPI_OP_PROPERTY_INTERNAL = 128,
@@ -300,8 +301,11 @@ struct uacpi_op_spec {
 
 const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
 
-#define UACPI_BAD_OPCODE(code) \
-    UACPI_OP(Reserved_##code, code, 0, { UACPI_PARSE_OP_BAD_OPCODE })
+#define UACPI_INVALID_OPCODE(code)                       \
+    UACPI_OP(                                            \
+        Invalid_##code, code, UACPI_OP_PROPERTY_INVALID, \
+        { UACPI_PARSE_OP_END, }                          \
+    )
 
 #define UACPI_METHOD_CALL_OPCODE(nargs)                        \
     UACPI_OP(                                                  \
@@ -505,10 +509,10 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0x02)                                           \
-UACPI_BAD_OPCODE(0x03)                                           \
-UACPI_BAD_OPCODE(0x04)                                           \
-UACPI_BAD_OPCODE(0x05)                                           \
+UACPI_INVALID_OPCODE(0x02)                                       \
+UACPI_INVALID_OPCODE(0x03)                                       \
+UACPI_INVALID_OPCODE(0x04)                                       \
+UACPI_INVALID_OPCODE(0x05)                                       \
 UACPI_OP(                                                        \
     AliasOp, 0x06, 0,                                            \
     {                                                            \
@@ -520,7 +524,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 1,                \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0x07)                                           \
+UACPI_INVALID_OPCODE(0x07)                                       \
 UACPI_OP(                                                        \
     NameOp, 0x08, 0,                                             \
     {                                                            \
@@ -532,7 +536,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INSTALL_NAMESPACE_NODE, 0,                \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0x09)                                           \
+UACPI_INVALID_OPCODE(0x09)                                       \
 UACPI_INTEGER_LITERAL_OP(Byte, 0x0A, 1)                          \
 UACPI_INTEGER_LITERAL_OP(Word, 0x0B, 2)                          \
 UACPI_INTEGER_LITERAL_OP(DWord, 0x0C, 4)                         \
@@ -546,7 +550,7 @@ UACPI_OP(                                                        \
     }                                                            \
 )                                                                \
 UACPI_INTEGER_LITERAL_OP(QWord, 0x0E, 8)                         \
-UACPI_BAD_OPCODE(0x0F)                                           \
+UACPI_INVALID_OPCODE(0x0F)                                       \
 UACPI_OP(                                                        \
     ScopeOp, 0x10, 0,                                            \
     {                                                            \
@@ -597,49 +601,49 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_LOAD_IMM, 1,                              \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0x16)                                           \
-UACPI_BAD_OPCODE(0x17)                                           \
-UACPI_BAD_OPCODE(0x18)                                           \
-UACPI_BAD_OPCODE(0x19)                                           \
-UACPI_BAD_OPCODE(0x1A)                                           \
-UACPI_BAD_OPCODE(0x1B)                                           \
-UACPI_BAD_OPCODE(0x1C)                                           \
-UACPI_BAD_OPCODE(0x1D)                                           \
-UACPI_BAD_OPCODE(0x1E)                                           \
-UACPI_BAD_OPCODE(0x1F)                                           \
-UACPI_BAD_OPCODE(0x20)                                           \
-UACPI_BAD_OPCODE(0x21)                                           \
-UACPI_BAD_OPCODE(0x22)                                           \
-UACPI_BAD_OPCODE(0x23)                                           \
-UACPI_BAD_OPCODE(0x24)                                           \
-UACPI_BAD_OPCODE(0x25)                                           \
-UACPI_BAD_OPCODE(0x26)                                           \
-UACPI_BAD_OPCODE(0x27)                                           \
-UACPI_BAD_OPCODE(0x28)                                           \
-UACPI_BAD_OPCODE(0x29)                                           \
-UACPI_BAD_OPCODE(0x2A)                                           \
-UACPI_BAD_OPCODE(0x2B)                                           \
-UACPI_BAD_OPCODE(0x2C)                                           \
-UACPI_BAD_OPCODE(0x2D)                                           \
+UACPI_INVALID_OPCODE(0x16)                                       \
+UACPI_INVALID_OPCODE(0x17)                                       \
+UACPI_INVALID_OPCODE(0x18)                                       \
+UACPI_INVALID_OPCODE(0x19)                                       \
+UACPI_INVALID_OPCODE(0x1A)                                       \
+UACPI_INVALID_OPCODE(0x1B)                                       \
+UACPI_INVALID_OPCODE(0x1C)                                       \
+UACPI_INVALID_OPCODE(0x1D)                                       \
+UACPI_INVALID_OPCODE(0x1E)                                       \
+UACPI_INVALID_OPCODE(0x1F)                                       \
+UACPI_INVALID_OPCODE(0x20)                                       \
+UACPI_INVALID_OPCODE(0x21)                                       \
+UACPI_INVALID_OPCODE(0x22)                                       \
+UACPI_INVALID_OPCODE(0x23)                                       \
+UACPI_INVALID_OPCODE(0x24)                                       \
+UACPI_INVALID_OPCODE(0x25)                                       \
+UACPI_INVALID_OPCODE(0x26)                                       \
+UACPI_INVALID_OPCODE(0x27)                                       \
+UACPI_INVALID_OPCODE(0x28)                                       \
+UACPI_INVALID_OPCODE(0x29)                                       \
+UACPI_INVALID_OPCODE(0x2A)                                       \
+UACPI_INVALID_OPCODE(0x2B)                                       \
+UACPI_INVALID_OPCODE(0x2C)                                       \
+UACPI_INVALID_OPCODE(0x2D)                                       \
 UACPI_UNRESOLVED_NAME_STRING_OP(DualNamePrefix, 0x2E)            \
 UACPI_UNRESOLVED_NAME_STRING_OP(MultiNamePrefix, 0x2F)           \
-UACPI_BAD_OPCODE(0x30)                                           \
-UACPI_BAD_OPCODE(0x31)                                           \
-UACPI_BAD_OPCODE(0x32)                                           \
-UACPI_BAD_OPCODE(0x33)                                           \
-UACPI_BAD_OPCODE(0x34)                                           \
-UACPI_BAD_OPCODE(0x35)                                           \
-UACPI_BAD_OPCODE(0x36)                                           \
-UACPI_BAD_OPCODE(0x37)                                           \
-UACPI_BAD_OPCODE(0x38)                                           \
-UACPI_BAD_OPCODE(0x39)                                           \
-UACPI_BAD_OPCODE(0x3A)                                           \
-UACPI_BAD_OPCODE(0x3B)                                           \
-UACPI_BAD_OPCODE(0x3C)                                           \
-UACPI_BAD_OPCODE(0x3D)                                           \
-UACPI_BAD_OPCODE(0x3E)                                           \
-UACPI_BAD_OPCODE(0x3F)                                           \
-UACPI_BAD_OPCODE(0x40)                                           \
+UACPI_INVALID_OPCODE(0x30)                                       \
+UACPI_INVALID_OPCODE(0x31)                                       \
+UACPI_INVALID_OPCODE(0x32)                                       \
+UACPI_INVALID_OPCODE(0x33)                                       \
+UACPI_INVALID_OPCODE(0x34)                                       \
+UACPI_INVALID_OPCODE(0x35)                                       \
+UACPI_INVALID_OPCODE(0x36)                                       \
+UACPI_INVALID_OPCODE(0x37)                                       \
+UACPI_INVALID_OPCODE(0x38)                                       \
+UACPI_INVALID_OPCODE(0x39)                                       \
+UACPI_INVALID_OPCODE(0x3A)                                       \
+UACPI_INVALID_OPCODE(0x3B)                                       \
+UACPI_INVALID_OPCODE(0x3C)                                       \
+UACPI_INVALID_OPCODE(0x3D)                                       \
+UACPI_INVALID_OPCODE(0x3E)                                       \
+UACPI_INVALID_OPCODE(0x3F)                                       \
+UACPI_INVALID_OPCODE(0x40)                                       \
 UACPI_UNRESOLVED_NAME_STRING_OP(A, 0x41)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(B, 0x42)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(C, 0x43)                         \
@@ -666,9 +670,9 @@ UACPI_UNRESOLVED_NAME_STRING_OP(W, 0x57)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(X, 0x58)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(Y, 0x59)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(Z, 0x5A)                         \
-UACPI_BAD_OPCODE(0x5B)                                           \
+UACPI_INVALID_OPCODE(0x5B)                                       \
 UACPI_UNRESOLVED_NAME_STRING_OP(RootChar, 0x5C)                  \
-UACPI_BAD_OPCODE(0x5D)                                           \
+UACPI_INVALID_OPCODE(0x5D)                                       \
 UACPI_UNRESOLVED_NAME_STRING_OP(ParentPrefixChar, 0x5E)          \
 UACPI_UNRESOLVED_NAME_STRING_OP(Underscore, 0x5F)                \
 UACPI_LOCALX_OP(0)                                               \
@@ -686,7 +690,7 @@ UACPI_ARGX_OP(3)                                                 \
 UACPI_ARGX_OP(4)                                                 \
 UACPI_ARGX_OP(5)                                                 \
 UACPI_ARGX_OP(6)                                                 \
-UACPI_BAD_OPCODE(0x6F)                                           \
+UACPI_INVALID_OPCODE(0x6F)                                       \
 UACPI_OP(                                                        \
     StoreOp, 0x70,                                               \
     UACPI_OP_PROPERTY_TERM_ARG,                                  \
@@ -869,8 +873,8 @@ UACPI_BUILD_TO_OP(Buffer, 0x96, UACPI_OBJECT_BUFFER)             \
 UACPI_BUILD_TO_OP(DecimalString, 0x97, UACPI_OBJECT_STRING)      \
 UACPI_BUILD_TO_OP(HexString, 0x98, UACPI_OBJECT_STRING)          \
 UACPI_BUILD_TO_OP(Integer, 0x99, UACPI_OBJECT_INTEGER)           \
-UACPI_BAD_OPCODE(0x9A)                                           \
-UACPI_BAD_OPCODE(0x9B)                                           \
+UACPI_INVALID_OPCODE(0x9A)                                       \
+UACPI_INVALID_OPCODE(0x9B)                                       \
 UACPI_OP(                                                        \
     ToStringOp, 0x9C,                                            \
     UACPI_OP_PROPERTY_TERM_ARG,                                  \
@@ -974,89 +978,89 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0xA6)                                           \
-UACPI_BAD_OPCODE(0xA7)                                           \
-UACPI_BAD_OPCODE(0xA8)                                           \
-UACPI_BAD_OPCODE(0xA9)                                           \
-UACPI_BAD_OPCODE(0xAA)                                           \
-UACPI_BAD_OPCODE(0xAB)                                           \
-UACPI_BAD_OPCODE(0xAC)                                           \
-UACPI_BAD_OPCODE(0xAD)                                           \
-UACPI_BAD_OPCODE(0xAE)                                           \
-UACPI_BAD_OPCODE(0xAF)                                           \
-UACPI_BAD_OPCODE(0xB0)                                           \
-UACPI_BAD_OPCODE(0xB1)                                           \
-UACPI_BAD_OPCODE(0xB2)                                           \
-UACPI_BAD_OPCODE(0xB3)                                           \
-UACPI_BAD_OPCODE(0xB4)                                           \
-UACPI_BAD_OPCODE(0xB5)                                           \
-UACPI_BAD_OPCODE(0xB6)                                           \
-UACPI_BAD_OPCODE(0xB7)                                           \
-UACPI_BAD_OPCODE(0xB8)                                           \
-UACPI_BAD_OPCODE(0xB9)                                           \
-UACPI_BAD_OPCODE(0xBA)                                           \
-UACPI_BAD_OPCODE(0xBB)                                           \
-UACPI_BAD_OPCODE(0xBC)                                           \
-UACPI_BAD_OPCODE(0xBD)                                           \
-UACPI_BAD_OPCODE(0xBE)                                           \
-UACPI_BAD_OPCODE(0xBF)                                           \
-UACPI_BAD_OPCODE(0xC0)                                           \
-UACPI_BAD_OPCODE(0xC1)                                           \
-UACPI_BAD_OPCODE(0xC2)                                           \
-UACPI_BAD_OPCODE(0xC3)                                           \
-UACPI_BAD_OPCODE(0xC4)                                           \
-UACPI_BAD_OPCODE(0xC5)                                           \
-UACPI_BAD_OPCODE(0xC6)                                           \
-UACPI_BAD_OPCODE(0xC7)                                           \
-UACPI_BAD_OPCODE(0xC8)                                           \
-UACPI_BAD_OPCODE(0xC9)                                           \
-UACPI_BAD_OPCODE(0xCA)                                           \
-UACPI_BAD_OPCODE(0xCB)                                           \
+UACPI_INVALID_OPCODE(0xA6)                                       \
+UACPI_INVALID_OPCODE(0xA7)                                       \
+UACPI_INVALID_OPCODE(0xA8)                                       \
+UACPI_INVALID_OPCODE(0xA9)                                       \
+UACPI_INVALID_OPCODE(0xAA)                                       \
+UACPI_INVALID_OPCODE(0xAB)                                       \
+UACPI_INVALID_OPCODE(0xAC)                                       \
+UACPI_INVALID_OPCODE(0xAD)                                       \
+UACPI_INVALID_OPCODE(0xAE)                                       \
+UACPI_INVALID_OPCODE(0xAF)                                       \
+UACPI_INVALID_OPCODE(0xB0)                                       \
+UACPI_INVALID_OPCODE(0xB1)                                       \
+UACPI_INVALID_OPCODE(0xB2)                                       \
+UACPI_INVALID_OPCODE(0xB3)                                       \
+UACPI_INVALID_OPCODE(0xB4)                                       \
+UACPI_INVALID_OPCODE(0xB5)                                       \
+UACPI_INVALID_OPCODE(0xB6)                                       \
+UACPI_INVALID_OPCODE(0xB7)                                       \
+UACPI_INVALID_OPCODE(0xB8)                                       \
+UACPI_INVALID_OPCODE(0xB9)                                       \
+UACPI_INVALID_OPCODE(0xBA)                                       \
+UACPI_INVALID_OPCODE(0xBB)                                       \
+UACPI_INVALID_OPCODE(0xBC)                                       \
+UACPI_INVALID_OPCODE(0xBD)                                       \
+UACPI_INVALID_OPCODE(0xBE)                                       \
+UACPI_INVALID_OPCODE(0xBF)                                       \
+UACPI_INVALID_OPCODE(0xC0)                                       \
+UACPI_INVALID_OPCODE(0xC1)                                       \
+UACPI_INVALID_OPCODE(0xC2)                                       \
+UACPI_INVALID_OPCODE(0xC3)                                       \
+UACPI_INVALID_OPCODE(0xC4)                                       \
+UACPI_INVALID_OPCODE(0xC5)                                       \
+UACPI_INVALID_OPCODE(0xC6)                                       \
+UACPI_INVALID_OPCODE(0xC7)                                       \
+UACPI_INVALID_OPCODE(0xC8)                                       \
+UACPI_INVALID_OPCODE(0xC9)                                       \
+UACPI_INVALID_OPCODE(0xCA)                                       \
+UACPI_INVALID_OPCODE(0xCB)                                       \
 UACPI_OP(                                                        \
     BreakPointOp, 0xCC, 0,                                       \
     {                                                            \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
     }                                                            \
 )                                                                \
-UACPI_BAD_OPCODE(0xCD)                                           \
-UACPI_BAD_OPCODE(0xCE)                                           \
-UACPI_BAD_OPCODE(0xCF)                                           \
-UACPI_BAD_OPCODE(0xD0)                                           \
-UACPI_BAD_OPCODE(0xD1)                                           \
-UACPI_BAD_OPCODE(0xD2)                                           \
-UACPI_BAD_OPCODE(0xD3)                                           \
-UACPI_BAD_OPCODE(0xD4)                                           \
-UACPI_BAD_OPCODE(0xD5)                                           \
-UACPI_BAD_OPCODE(0xD6)                                           \
-UACPI_BAD_OPCODE(0xD7)                                           \
-UACPI_BAD_OPCODE(0xD8)                                           \
-UACPI_BAD_OPCODE(0xD9)                                           \
-UACPI_BAD_OPCODE(0xDA)                                           \
-UACPI_BAD_OPCODE(0xDB)                                           \
-UACPI_BAD_OPCODE(0xDC)                                           \
-UACPI_BAD_OPCODE(0xDD)                                           \
-UACPI_BAD_OPCODE(0xDE)                                           \
-UACPI_BAD_OPCODE(0xDF)                                           \
-UACPI_BAD_OPCODE(0xE0)                                           \
-UACPI_BAD_OPCODE(0xE1)                                           \
-UACPI_BAD_OPCODE(0xE2)                                           \
-UACPI_BAD_OPCODE(0xE3)                                           \
-UACPI_BAD_OPCODE(0xE4)                                           \
-UACPI_BAD_OPCODE(0xE5)                                           \
-UACPI_BAD_OPCODE(0xE6)                                           \
-UACPI_BAD_OPCODE(0xE7)                                           \
-UACPI_BAD_OPCODE(0xE8)                                           \
-UACPI_BAD_OPCODE(0xE9)                                           \
-UACPI_BAD_OPCODE(0xEA)                                           \
-UACPI_BAD_OPCODE(0xEB)                                           \
-UACPI_BAD_OPCODE(0xEC)                                           \
-UACPI_BAD_OPCODE(0xED)                                           \
-UACPI_BAD_OPCODE(0xEE)                                           \
-UACPI_BAD_OPCODE(0xEF)                                           \
-UACPI_BAD_OPCODE(0xF0)                                           \
-UACPI_BAD_OPCODE(0xF1)                                           \
-UACPI_BAD_OPCODE(0xF2)                                           \
-UACPI_BAD_OPCODE(0xF3)                                           \
+UACPI_INVALID_OPCODE(0xCD)                                       \
+UACPI_INVALID_OPCODE(0xCE)                                       \
+UACPI_INVALID_OPCODE(0xCF)                                       \
+UACPI_INVALID_OPCODE(0xD0)                                       \
+UACPI_INVALID_OPCODE(0xD1)                                       \
+UACPI_INVALID_OPCODE(0xD2)                                       \
+UACPI_INVALID_OPCODE(0xD3)                                       \
+UACPI_INVALID_OPCODE(0xD4)                                       \
+UACPI_INVALID_OPCODE(0xD5)                                       \
+UACPI_INVALID_OPCODE(0xD6)                                       \
+UACPI_INVALID_OPCODE(0xD7)                                       \
+UACPI_INVALID_OPCODE(0xD8)                                       \
+UACPI_INVALID_OPCODE(0xD9)                                       \
+UACPI_INVALID_OPCODE(0xDA)                                       \
+UACPI_INVALID_OPCODE(0xDB)                                       \
+UACPI_INVALID_OPCODE(0xDC)                                       \
+UACPI_INVALID_OPCODE(0xDD)                                       \
+UACPI_INVALID_OPCODE(0xDE)                                       \
+UACPI_INVALID_OPCODE(0xDF)                                       \
+UACPI_INVALID_OPCODE(0xE0)                                       \
+UACPI_INVALID_OPCODE(0xE1)                                       \
+UACPI_INVALID_OPCODE(0xE2)                                       \
+UACPI_INVALID_OPCODE(0xE3)                                       \
+UACPI_INVALID_OPCODE(0xE4)                                       \
+UACPI_INVALID_OPCODE(0xE5)                                       \
+UACPI_INVALID_OPCODE(0xE6)                                       \
+UACPI_INVALID_OPCODE(0xE7)                                       \
+UACPI_INVALID_OPCODE(0xE8)                                       \
+UACPI_INVALID_OPCODE(0xE9)                                       \
+UACPI_INVALID_OPCODE(0xEA)                                       \
+UACPI_INVALID_OPCODE(0xEB)                                       \
+UACPI_INVALID_OPCODE(0xEC)                                       \
+UACPI_INVALID_OPCODE(0xED)                                       \
+UACPI_INVALID_OPCODE(0xEE)                                       \
+UACPI_INVALID_OPCODE(0xEF)                                       \
+UACPI_INVALID_OPCODE(0xF0)                                       \
+UACPI_INVALID_OPCODE(0xF1)                                       \
+UACPI_INVALID_OPCODE(0xF2)                                       \
+UACPI_INVALID_OPCODE(0xF3)                                       \
 UACPI_OP(                                                        \
     InternalOpReadFieldAsBuffer, 0xF4,                           \
     UACPI_OP_PROPERTY_TERM_ARG |                                 \
@@ -1145,9 +1149,9 @@ UACPI_OP(                                       \
 
 #define UACPI_ENUMERATE_EXT_OPCODES                         \
 UACPI_OP(                                                   \
-    ReservedExtOp, UACPI_EXT_OP(0x00), 0,                   \
+    InvalidExtOp, 0, UACPI_OP_PROPERTY_INVALID,             \
     {                                                       \
-        UACPI_PARSE_OP_BAD_OPCODE,                          \
+        UACPI_PARSE_OP_END,                                 \
     }                                                       \
 )                                                           \
 UACPI_OP(                                                   \
