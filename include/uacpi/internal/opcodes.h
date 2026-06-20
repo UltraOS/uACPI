@@ -349,17 +349,17 @@ const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
  * DualNamePath := DualNamePrefix NameSeg NameSeg
  * MultiNamePath := MultiNamePrefix SegCount NameSeg(SegCount)
  */
-#define UACPI_UNRESOLVED_NAME_STRING_OP(character, code)        \
-    UACPI_OP(                                                   \
-        UnresolvedNameString_##character, code,                 \
-        UACPI_OP_PROPERTY_SIMPLE_NAME |                         \
-        UACPI_OP_PROPERTY_SUPERNAME |                           \
-        UACPI_OP_PROPERTY_TERM_ARG,                             \
-        {                                                       \
-            UACPI_PARSE_OP_AML_PC_DECREMENT,                    \
-            UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,         \
-            UACPI_PARSE_OP_CONVERT_NAMESTRING,                  \
-        }                                                       \
+#define UACPI_UNRESOLVED_NAME_STRING_OP(character, code)  \
+    UACPI_OP(                                             \
+        UnresolvedNameString_##character, code,           \
+        UACPI_OP_PROPERTY_SIMPLE_NAME |                   \
+        UACPI_OP_PROPERTY_SUPERNAME |                     \
+        UACPI_OP_PROPERTY_TERM_ARG,                       \
+        {                                                 \
+            UACPI_PARSE_OP_AML_PC_DECREMENT,              \
+            UACPI_PARSE_OP_EXISTING_NAMESTRING_OR_NULL,   \
+            UACPI_PARSE_OP_CONVERT_NAMESTRING,            \
+        }                                                 \
     )
 
 #define UACPI_BUILD_LOCAL_OR_ARG_OP(prefix, base, offset) \
@@ -871,7 +871,7 @@ UACPI_OP(                                                        \
         UACPI_PARSE_OP_INVOKE_HANDLER,                           \
         UACPI_PARSE_OP_OBJECT_TRANSFER_TO_PREV,                  \
     }                                                            \
-)                                                                  \
+)                                                                \
 UACPI_BUILD_BINARY_LOGIC_OP(LEqual, 0x93)                        \
 UACPI_BUILD_BINARY_LOGIC_OP(LGreater, 0x94)                      \
 UACPI_BUILD_BINARY_LOGIC_OP(LLess, 0x95)                         \
