@@ -6027,7 +6027,10 @@ static void ctx_reload_post_ret(struct execution_context *ctx)
     refresh_ctx_pointers(ctx);
 }
 
-static void trace_method_abort(struct code_block *block, uacpi_size depth)
+static void trace_method_abort(
+    struct code_block *block, uacpi_size depth,
+    uacpi_u32 aml_offset, uacpi_u32 method_size, const uacpi_char *op
+)
 {
     static const uacpi_char *unknown_path = "<unknown>";
     uacpi_char oom_absolute_path[9] = "<?>.";
@@ -6042,7 +6045,10 @@ static void trace_method_abort(struct code_block *block, uacpi_size depth)
         absolute_path = unknown_path;
     }
 
-    uacpi_error("    #%zu in %s()", depth, absolute_path);
+    uacpi_error(
+        "    #%zu in %s()+%u/%u at %s",
+        depth, absolute_path, aml_offset, method_size, op
+    );
 
     if (absolute_path != oom_absolute_path && absolute_path != unknown_path)
         uacpi_free_dynamic_string(absolute_path);
@@ -6062,8 +6068,11 @@ static void stack_unwind(struct execution_context *ctx)
     if (depth != 0) {
         uacpi_size idx = 0;
         uacpi_bool table_level_code;
+        const struct uacpi_op_spec *op;
+        const uacpi_char *op_name;
 
         do {
+            op = UACPI_NULL;
             table_level_code = ctx->cur_frame->method->named_objects_persist;
 
             if (table_level_code && idx != 0)
@@ -6075,11 +6084,44 @@ static void stack_unwind(struct execution_context *ctx)
                  */
                 break;
 
-            while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0)
+            while (op_context_array_size(&ctx->cur_frame->pending_ops) != 0) {
+                if (op == UACPI_NULL)
+                    op = op_context_array_last(
+                        &ctx->cur_frame->pending_ops
+                    )->op;
+
                 pop_op(ctx);
+            }
+
+            /*
+             * For the very first frame, fetch the opcode from the execution
+             * context directly if we got nothing from the pending_ops array.
+             * The reason we do this is because in case this was an invalid
+             * opcode it won't actually end up in the pending_ops array at all.
+             * This is only possible for the first frame, since all the frames
+             * below are guaranteed to be either in MethodCallOp or
+             * Load{Table}Op.
+             */
+            if (op == UACPI_NULL && idx == 0)
+                op = ctx->cur_op;
+
+            if (uacpi_likely(op != UACPI_NULL)) {
+                op_name = op->name;
+
+                if (op_is_internal(op))
+                    /*
+                     * All internal OPs are prefixed with this, strip to
+                     * make them look nicer in the backtrace.
+                     */
+                    op_name += sizeof("InternalOp") - 1;
+            } else {
+                op_name = "<unknown>";
+            }
 
             trace_method_abort(
-                code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx
+                code_block_array_at(&ctx->cur_frame->code_blocks, 0), idx,
+                ctx->cur_frame->code_offset, ctx->cur_frame->method->size,
+                op_name
             );
 
             should_stop = idx++ == 0 && table_level_code;
