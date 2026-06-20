@@ -5562,7 +5562,6 @@ static uacpi_status exec_op(struct execution_context *ctx)
         }
 
         case UACPI_PARSE_OP_BAD_OPCODE:
-        case UACPI_PARSE_OP_UNREACHABLE:
             EXEC_OP_ERR("invalid/unexpected opcode");
             ret = UACPI_STATUS_AML_INVALID_OPCODE;
             break;

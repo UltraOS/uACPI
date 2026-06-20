@@ -181,13 +181,6 @@ enum uacpi_parse_op {
      */
     UACPI_PARSE_OP_STORE_TO_TARGET_INDIRECT,
 
-    /*
-     * Error if reached. Should be used for opcodes that are supposed to be
-     * converted at op parse time, e.g. invoking a method or referring to
-     * a named object.
-     */
-    UACPI_PARSE_OP_UNREACHABLE,
-
     // Invalid opcode, should never be encountered in the stream
     UACPI_PARSE_OP_BAD_OPCODE,
 
@@ -306,9 +299,6 @@ struct uacpi_op_spec {
 };
 
 const struct uacpi_op_spec *uacpi_get_op_spec(uacpi_aml_op);
-
-#define UACPI_INTERNAL_OP(code) \
-    UACPI_OP(Internal_##code, code, 0, { UACPI_PARSE_OP_UNREACHABLE })
 
 #define UACPI_BAD_OPCODE(code) \
     UACPI_OP(Reserved_##code, code, 0, { UACPI_PARSE_OP_BAD_OPCODE })
@@ -633,16 +623,16 @@ UACPI_BAD_OPCODE(0x2C)                                           \
 UACPI_BAD_OPCODE(0x2D)                                           \
 UACPI_UNRESOLVED_NAME_STRING_OP(DualNamePrefix, 0x2E)            \
 UACPI_UNRESOLVED_NAME_STRING_OP(MultiNamePrefix, 0x2F)           \
-UACPI_INTERNAL_OP(0x30)                                          \
-UACPI_INTERNAL_OP(0x31)                                          \
-UACPI_INTERNAL_OP(0x32)                                          \
-UACPI_INTERNAL_OP(0x33)                                          \
-UACPI_INTERNAL_OP(0x34)                                          \
-UACPI_INTERNAL_OP(0x35)                                          \
-UACPI_INTERNAL_OP(0x36)                                          \
-UACPI_INTERNAL_OP(0x37)                                          \
-UACPI_INTERNAL_OP(0x38)                                          \
-UACPI_INTERNAL_OP(0x39)                                          \
+UACPI_BAD_OPCODE(0x30)                                           \
+UACPI_BAD_OPCODE(0x31)                                           \
+UACPI_BAD_OPCODE(0x32)                                           \
+UACPI_BAD_OPCODE(0x33)                                           \
+UACPI_BAD_OPCODE(0x34)                                           \
+UACPI_BAD_OPCODE(0x35)                                           \
+UACPI_BAD_OPCODE(0x36)                                           \
+UACPI_BAD_OPCODE(0x37)                                           \
+UACPI_BAD_OPCODE(0x38)                                           \
+UACPI_BAD_OPCODE(0x39)                                           \
 UACPI_BAD_OPCODE(0x3A)                                           \
 UACPI_BAD_OPCODE(0x3B)                                           \
 UACPI_BAD_OPCODE(0x3C)                                           \
@@ -676,7 +666,7 @@ UACPI_UNRESOLVED_NAME_STRING_OP(W, 0x57)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(X, 0x58)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(Y, 0x59)                         \
 UACPI_UNRESOLVED_NAME_STRING_OP(Z, 0x5A)                         \
-UACPI_INTERNAL_OP(0x5B)                                          \
+UACPI_BAD_OPCODE(0x5B)                                           \
 UACPI_UNRESOLVED_NAME_STRING_OP(RootChar, 0x5C)                  \
 UACPI_BAD_OPCODE(0x5D)                                           \
 UACPI_UNRESOLVED_NAME_STRING_OP(ParentPrefixChar, 0x5E)          \
