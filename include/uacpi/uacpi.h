@@ -5,7 +5,7 @@
 #include <uacpi/kernel_api.h>
 #include <uacpi/namespace.h>
 
-#define UACPI_MAJOR 5
+#define UACPI_MAJOR 6
 #define UACPI_MINOR 0
 #define UACPI_PATCH 0
 
