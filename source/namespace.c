@@ -14,11 +14,8 @@
 #define UACPI_REV_VALUE 2
 #define UACPI_OS_VALUE "Microsoft Windows NT"
 
-#define MAKE_PREDEFINED(c0, c1, c2, c3)          \
-    {                                            \
-        .name.text = { c0, c1, c2, c3 },         \
-        .flags = UACPI_NAMESPACE_NODE_PREDEFINED \
-    }
+#define MAKE_PREDEFINED(c0, c1, c2, c3) \
+    { .name.text = { c0, c1, c2, c3 } }
 
 static uacpi_namespace_node
 predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_MAX + 1] = {
@@ -149,7 +146,7 @@ static void free_namespace_node(uacpi_handle handle)
         return;
     }
 
-    node->flags = UACPI_NAMESPACE_NODE_PREDEFINED;
+    node->flags = 0;
     node->object = UACPI_NULL;
     node->parent = UACPI_NULL;
     node->child = UACPI_NULL;
@@ -345,7 +342,8 @@ uacpi_bool uacpi_namespace_node_is_temporary(uacpi_namespace_node *node)
 
 uacpi_bool uacpi_namespace_node_is_predefined(uacpi_namespace_node *node)
 {
-    return node->flags & UACPI_NAMESPACE_NODE_PREDEFINED;
+    return node >= &predefined_namespaces[0] &&
+           node <= &predefined_namespaces[UACPI_PREDEFINED_NAMESPACE_MAX];
 }
 
 uacpi_status uacpi_namespace_node_uninstall(uacpi_namespace_node *node)
