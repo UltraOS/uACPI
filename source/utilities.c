@@ -285,7 +285,7 @@ uacpi_status uacpi_string_to_integer(
 
 out:
     if (negative)
-        value = -((uacpi_i64)value);
+        value = 0 - value;
 
     *out_value = value;
     if (max_chars == 0 || c == '\0')
