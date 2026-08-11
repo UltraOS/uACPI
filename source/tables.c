@@ -141,7 +141,7 @@ static uacpi_status initialize_from_rxsdt(uacpi_phys_addr rxsdt_addr,
     if (uacpi_unlikely(rxsdt == UACPI_MAP_FAILED))
         return UACPI_STATUS_MAPPING_FAILED;
 
-    ret = uacpi_verify_table_checksum(rxsdt, map_len, NULL);
+    ret = uacpi_verify_table_checksum(rxsdt, map_len, UACPI_NULL);
     if (uacpi_unlikely_error(ret))
         goto error_out;
 
