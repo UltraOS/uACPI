@@ -1810,7 +1810,6 @@ static uacpi_status handle_create_field(struct execution_context *ctx)
                 uacpi_size
             );
 
-            field->bit_offset_within_first_byte = bit_offset;
             field->bit_offset_within_first_byte =
                 bit_offset & ((field->access_width_bytes * 8) - 1);
 
