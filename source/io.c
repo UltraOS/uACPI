@@ -397,6 +397,8 @@ do_wtr:
 
     if (wtr_response != UACPI_NULL)
         *wtr_response = wtr_buffer;
+    else
+        uacpi_free(wtr_buffer.data, wtr_buffer.length);
 
 out_handled:
     *did_handle = UACPI_TRUE;
