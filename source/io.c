@@ -175,20 +175,33 @@ void uacpi_write_buffer_field(
     do_write_misaligned_buffer_field(field, src, size);
 }
 
+/*
+ * The global lock is held for the duration of an entire field transaction
+ * (that is, across every hardware access it decomposes into) instead of
+ * individual data accesses, as it protects fields shared with firmware
+ * (e.g. SMM), which expects multi-datum accesses and read-modify-writes
+ * to be atomic.
+ */
+static uacpi_status lock_field_unit_transaction(uacpi_field_unit *field)
+{
+    if (!field->lock_rule)
+        return UACPI_STATUS_OK;
+
+    return uacpi_acquire_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex, 0xFFFF);
+}
+
+static void unlock_field_unit_transaction(uacpi_field_unit *field)
+{
+    if (field->lock_rule)
+        uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+}
+
 static uacpi_status access_field_unit(
     uacpi_field_unit *field, uacpi_u32 offset, uacpi_region_op op,
     union uacpi_opregion_io_data data
 )
 {
     uacpi_status ret = UACPI_STATUS_OK;
-
-    if (field->lock_rule) {
-        ret = uacpi_acquire_aml_mutex(
-            g_uacpi_rt_ctx.global_lock_mutex, 0xFFFF
-        );
-        if (uacpi_unlikely_error(ret))
-            return ret;
-    }
 
     switch (field->kind) {
     case UACPI_FIELD_UNIT_KIND_BANK:
@@ -205,27 +218,22 @@ static uacpi_status access_field_unit(
             UACPI_NULL
         );
         if (uacpi_unlikely_error(ret))
-            goto out;
+            return ret;
 
         switch (op) {
         case UACPI_REGION_OP_READ:
-            ret = uacpi_read_field_unit(
+            return uacpi_read_field_unit(
                 field->data, data.integer, field->access_width_bytes,
                 UACPI_NULL
             );
-            break;
         case UACPI_REGION_OP_WRITE:
-            ret = uacpi_write_field_unit(
+            return uacpi_write_field_unit(
                 field->data, data.integer, field->access_width_bytes,
                 UACPI_NULL
             );
-            break;
         default:
-            ret = UACPI_STATUS_INVALID_ARGUMENT;
-            break;
+            return UACPI_STATUS_INVALID_ARGUMENT;
         }
-
-        goto out;
 
     default:
         uacpi_error("invalid field unit kind %d", field->kind);
@@ -233,14 +241,9 @@ static uacpi_status access_field_unit(
     }
 
     if (uacpi_unlikely_error(ret))
-        goto out;
+        return ret;
 
-    ret = uacpi_dispatch_opregion_io(field, offset, op, data);
-
-out:
-    if (field->lock_rule)
-        uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
-    return ret;
+    return uacpi_dispatch_opregion_io(field, offset, op, data);
 }
 
 #define SERIAL_HEADER_SIZE 2
@@ -472,12 +475,16 @@ uacpi_status uacpi_read_field_unit(
     data_view.data = dst;
     data_view.length = size;
 
+    ret = lock_field_unit_transaction(field);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
     ret = handle_special_field(
         field, data_view, UACPI_REGION_OP_READ,
         wtr_response, &did_handle
     );
     if (did_handle)
-        return ret;
+        goto out;
 
     field_byte_length = uacpi_round_up_bits_to_bytes(field->bit_length);
 
@@ -499,17 +506,21 @@ uacpi_status uacpi_read_field_unit(
             data
         );
         if (uacpi_unlikely_error(ret))
-            return ret;
+            goto out;
 
         uacpi_memcpy_zerout(dst, &out, size, field_byte_length);
         if (size >= field_byte_length)
             cut_misaligned_tail(dst, field_byte_length - 1, field->bit_length);
 
-        return UACPI_STATUS_OK;
+        goto out;
     }
 
     // Slow case
-    return do_read_misaligned_field_unit(field, dst, size);
+    ret = do_read_misaligned_field_unit(field, dst, size);
+
+out:
+    unlock_field_unit_transaction(field);
+    return ret;
 }
 
 static uacpi_status write_generic_field_unit(
@@ -595,14 +606,22 @@ uacpi_status uacpi_write_field_unit(
     data_view.const_data = src;
     data_view.length = size;
 
+    ret = lock_field_unit_transaction(field);
+    if (uacpi_unlikely_error(ret))
+        return ret;
+
     ret = handle_special_field(
         field, data_view, UACPI_REGION_OP_WRITE,
         wtr_response, &did_handle
     );
     if (did_handle)
-        return ret;
+        goto out;
 
-    return write_generic_field_unit(field, src, size);
+    ret = write_generic_field_unit(field, src, size);
+
+out:
+    unlock_field_unit_transaction(field);
+    return ret;
 }
 
 uacpi_status uacpi_field_unit_get_read_type(
