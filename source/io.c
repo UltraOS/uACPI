@@ -235,6 +235,14 @@ static void unlock_field_unit_transaction(uacpi_field_unit *field)
         uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
 }
 
+static uacpi_bool field_fits(uacpi_field_unit *field, uacpi_u64 value)
+{
+    if (field->bit_length >= 64)
+        return UACPI_TRUE;
+
+    return value < ((uacpi_u64)1 << field->bit_length);
+}
+
 static uacpi_status access_field_unit(
     uacpi_field_unit *field, uacpi_u32 offset, uacpi_region_op op,
     union uacpi_opregion_io_data data
@@ -244,6 +252,16 @@ static uacpi_status access_field_unit(
 
     switch (field->kind) {
     case UACPI_FIELD_UNIT_KIND_BANK:
+        if (uacpi_unlikely(!field_fits(field->bank_selection,
+                                       field->bank_value))) {
+            uacpi_error(
+                "bank value 0x%"UACPI_PRIX64" doesn't fit in the %u-bit "
+                "bank register", UACPI_FMT64(field->bank_value),
+                field->bank_selection->bit_length
+            );
+            return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
+        }
+
         ret = uacpi_write_field_unit(
             field->bank_selection, &field->bank_value, sizeof(field->bank_value),
             UACPI_NULL
@@ -252,6 +270,14 @@ static uacpi_status access_field_unit(
     case UACPI_FIELD_UNIT_KIND_NORMAL:
         break;
     case UACPI_FIELD_UNIT_KIND_INDEX:
+        if (uacpi_unlikely(!field_fits(field->index, offset))) {
+            uacpi_error(
+                "offset 0x%X doesn't fit in the %u-bit index register",
+                offset, field->index->bit_length
+            );
+            return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
+        }
+
         ret = uacpi_write_field_unit(
             field->index, &offset, sizeof(offset),
             UACPI_NULL
