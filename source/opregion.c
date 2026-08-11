@@ -380,7 +380,7 @@ out:
     region->state_flags &= ~UACPI_OP_REGION_STATE_ATTACHED;
 }
 
-static uacpi_status upgrade_to_opregion_lock(void)
+uacpi_status uacpi_upgrade_to_opregion_lock(void)
 {
     uacpi_status ret;
 
@@ -395,9 +395,14 @@ static uacpi_status upgrade_to_opregion_lock(void)
     return ret;
 }
 
+void uacpi_release_opregion_lock(void)
+{
+    uacpi_recursive_lock_release(&g_opregion_lock);
+}
+
 void uacpi_opregion_uninstall_handler(uacpi_namespace_node *node)
 {
-    if (uacpi_unlikely_error(upgrade_to_opregion_lock()))
+    if (uacpi_unlikely_error(uacpi_upgrade_to_opregion_lock()))
         return;
 
     region_uninstall_handler(node, UNREG_YES);
@@ -788,7 +793,7 @@ uacpi_status uacpi_initialize_opregion_node(uacpi_namespace_node *node)
     uacpi_address_space_handlers *handlers;
     uacpi_address_space_handler *handler;
 
-    ret = upgrade_to_opregion_lock();
+    ret = uacpi_upgrade_to_opregion_lock();
     if (uacpi_unlikely_error(ret))
         return ret;
 
@@ -869,25 +874,19 @@ uacpi_status uacpi_dispatch_opregion_io(
         uacpi_region_serial_rw_data serial;
     } handler_data;
 
-    ret = upgrade_to_opregion_lock();
-    if (uacpi_unlikely_error(ret))
-        return ret;
-
     ret = uacpi_opregion_attach(field->region);
     if (uacpi_unlikely_error(ret)) {
         uacpi_trace_region_error(
             field->region, "unable to attach", ret
         );
-        goto out;
+        return ret;
     }
 
     obj = uacpi_namespace_node_get_object_typed(
         field->region, UACPI_OBJECT_OPERATION_REGION_BIT
     );
-    if (uacpi_unlikely(obj == UACPI_NULL)) {
-        ret = UACPI_STATUS_INVALID_ARGUMENT;
-        goto out;
-    }
+    if (uacpi_unlikely(obj == UACPI_NULL))
+        return UACPI_STATUS_INVALID_ARGUMENT;
 
     region = obj->op_region;
     space = region->space;
@@ -910,8 +909,7 @@ uacpi_status uacpi_dispatch_opregion_io(
             UACPI_FMT64(abs_offset), offset, field->access_width_bytes
         );
         uacpi_free_dynamic_string(path);
-        ret = UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
-        goto out;
+        return UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX;
     }
 
     handler_data.rw.region_context = region->user_context;
@@ -1025,7 +1023,7 @@ uacpi_status uacpi_dispatch_opregion_io(
 io_done:
     if (uacpi_unlikely_error(ret)) {
         uacpi_trace_region_error(field->region, "unable to perform IO", ret);
-        goto out;
+        return ret;
     }
 
     if (orig_op == UACPI_REGION_OP_READ) {
@@ -1047,9 +1045,6 @@ io_done:
     }
 
     trace_region_io(field, space, abs_offset, orig_op, data);
-
-out:
-    uacpi_recursive_lock_release(&g_opregion_lock);
     return ret;
 }
 
