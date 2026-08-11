@@ -175,24 +175,63 @@ void uacpi_write_buffer_field(
     do_write_misaligned_buffer_field(field, src, size);
 }
 
+static uacpi_bool field_unit_needs_global_lock(uacpi_field_unit *field)
+{
+    if (field->lock_rule)
+        return UACPI_TRUE;
+
+    /*
+     * The global lock must be acquired before the opregion lock, however,
+     * the subfields of an index/bank field are only accessed once the
+     * opregion lock is already held, so their lock rules have to be
+     * considered upfront to keep the ordering consistent.
+     */
+    switch (field->kind) {
+    case UACPI_FIELD_UNIT_KIND_INDEX:
+        return field_unit_needs_global_lock(field->index) ||
+               field_unit_needs_global_lock(field->data);
+    case UACPI_FIELD_UNIT_KIND_BANK:
+        return field_unit_needs_global_lock(field->bank_selection);
+    default:
+        return UACPI_FALSE;
+    }
+}
+
 /*
- * The global lock is held for the duration of an entire field transaction
- * (that is, across every hardware access it decomposes into) instead of
- * individual data accesses, as it protects fields shared with firmware
- * (e.g. SMM), which expects multi-datum accesses and read-modify-writes
- * to be atomic.
+ * Both the global lock and the opregion lock are held for the duration of
+ * an entire field transaction (that is, across every hardware access it
+ * decomposes into) instead of individual data accesses:
+ * - The global lock protects fields shared with firmware (e.g. SMM), which
+ *   expects multi-datum accesses and read-modify-writes to be atomic.
+ * - The opregion lock makes the index/bank selection register writes atomic
+ *   with respect to the data accesses that rely on them, which could
+ *   otherwise interleave with IO done by other threads, as every other lock
+ *   is dropped around address space handler invocations.
  */
 static uacpi_status lock_field_unit_transaction(uacpi_field_unit *field)
 {
-    if (!field->lock_rule)
-        return UACPI_STATUS_OK;
+    uacpi_status ret;
 
-    return uacpi_acquire_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex, 0xFFFF);
+    if (field_unit_needs_global_lock(field)) {
+        ret = uacpi_acquire_aml_mutex(
+            g_uacpi_rt_ctx.global_lock_mutex, 0xFFFF
+        );
+        if (uacpi_unlikely_error(ret))
+            return ret;
+    }
+
+    ret = uacpi_upgrade_to_opregion_lock();
+    if (uacpi_unlikely_error(ret) && field_unit_needs_global_lock(field))
+        uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
+
+    return ret;
 }
 
 static void unlock_field_unit_transaction(uacpi_field_unit *field)
 {
-    if (field->lock_rule)
+    uacpi_release_opregion_lock();
+
+    if (field_unit_needs_global_lock(field))
         uacpi_release_aml_mutex(g_uacpi_rt_ctx.global_lock_mutex);
 }
 
