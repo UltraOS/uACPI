@@ -121,13 +121,66 @@ static void dump_resources(
         );
 }
 
+static void run_osc(uacpi_u32 depth, uacpi_namespace_node *node)
+{
+    // Platform-wide _OSC UUID 0811B06E-4A27-44F9-8D60-3CBBC22E7B48
+    static const uint8_t platform_uuid[16] = {
+        0x6E, 0xB0, 0x11, 0x08, 0x27, 0x4A, 0xF9, 0x44,
+        0x8D, 0x60, 0x3C, 0xBB, 0xC2, 0x2E, 0x7B, 0x48,
+    };
+    // PCI host bridge _OSC UUID 33DB4D5B-1FF7-401C-9657-7441C03DD766
+    static const uint8_t pci_uuid[16] = {
+        0x5B, 0x4D, 0xDB, 0x33, 0xF7, 0x1F, 0x1C, 0x40,
+        0x96, 0x57, 0x74, 0x41, 0xC0, 0x3D, 0xD7, 0x66,
+    };
+    uint32_t capabilities[3] = { 0, 0xFFFFFFFF, 0xFFFFFFFF };
+    uacpi_object *args[4];
+    uacpi_object_array arr;
+    uacpi_object *ret_obj = NULL;
+    uacpi_data_view view;
+    uacpi_status ret;
+    size_t i;
+
+    arr.objects = args;
+    arr.count = UACPI_ARRAY_SIZE(args);
+
+    if (node == uacpi_namespace_get_predefined(UACPI_PREDEFINED_NAMESPACE_SB))
+        view.const_bytes = platform_uuid;
+    else
+        view.const_bytes = pci_uuid;
+    view.length = 16;
+    args[0] = uacpi_object_create_buffer(view);
+    args[1] = uacpi_object_create_integer(1);
+    args[2] = uacpi_object_create_integer(UACPI_ARRAY_SIZE(capabilities));
+
+    view.const_bytes = (const uint8_t*)capabilities;
+    view.length = sizeof(capabilities);
+    args[3] = uacpi_object_create_buffer(view);
+
+    ret = uacpi_eval(node, "_OSC", &arr, &ret_obj);
+    for (i = 0; i < UACPI_ARRAY_SIZE(args); ++i)
+        uacpi_object_unref(args[i]);
+
+    if (ret == UACPI_STATUS_OK) {
+        nested_printf(depth, "  _OSC: ok\n");
+        uacpi_object_unref(ret_obj);
+    } else if (ret != UACPI_STATUS_NOT_FOUND) {
+        nested_printf(
+            depth, "  _OSC: unable to evaluate (%s)\n",
+            uacpi_status_to_string(ret)
+        );
+    }
+}
+
 static uacpi_iteration_decision dump_one_node(
     void *ptr, uacpi_namespace_node *node, uacpi_u32 depth
 )
 {
     struct uacpi_namespace_node_info *info;
     uacpi_status ret = uacpi_get_namespace_node_info(node, &info);
+    uacpi_namespace_node *osc;
     const char *path;
+    bool has_osc;
 
     UACPI_UNUSED(ptr);
 
@@ -150,7 +203,10 @@ static uacpi_iteration_decision dump_one_node(
     if (info->type == UACPI_OBJECT_METHOD)
         printf(" (%d args)", info->num_params);
 
-    if (info->flags)
+    has_osc = info->type == UACPI_OBJECT_DEVICE &&
+              uacpi_namespace_node_find(node, "_OSC", &osc) == UACPI_STATUS_OK;
+
+    if (info->flags || has_osc)
         printf(" {\n");
 
     if (info->flags)
@@ -192,9 +248,14 @@ static uacpi_iteration_decision dump_one_node(
             dump_resources(depth, node, uacpi_get_current_resources, "_CRS");
             dump_resources(depth, node, uacpi_get_possible_resources, "_PRS");
         }
+    }
 
+    if (has_osc)
+        run_osc(depth, node);
+
+    if (info->flags || has_osc)
         nested_printf(depth, "}\n");
-    } else
+    else
         printf("\n");
 
     uacpi_free_namespace_node_info(info);
