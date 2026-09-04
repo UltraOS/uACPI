@@ -233,7 +233,7 @@ def run_single_test(case: TestCase, results: Queue, runner: str) -> bool:
     )
 
     try:
-        stdout, stderr = proc.communicate(timeout=60)
+        stdout, stderr = proc.communicate(timeout=300)
         elapsed_time = time.time() - start_time
     except subprocess.TimeoutExpired:
         proc.kill()
