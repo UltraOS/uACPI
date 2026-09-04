@@ -5724,7 +5724,8 @@ static uacpi_status exec_op(struct execution_context *ctx)
                     ret = UACPI_STATUS_AML_UNDEFINED_REFERENCE;
             }
 
-            if (behavior == RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS &&
+            if (uacpi_likely_success(ret) &&
+                behavior == RESOLVE_CREATE_LAST_NAMESEG_FAIL_IF_EXISTS &&
                 !frame->method->named_objects_persist)
                 item->node->flags |= UACPI_NAMESPACE_NODE_FLAG_TEMPORARY;
 
